@@ -19,16 +19,17 @@
 
 - [X] **AB-000** Auditoría de requerimientos, activos de branding y plantillas Excel.
 - [X] **AB-001** Estructura del monorepo, `.gitignore`, `TODO_IMPLEMENTACION.md`, `DECISIONES.md` y `README.md`.
-- [ ] **AB-002** Backend Java 21 + Spring Boot 3.3.x / 3.4.x scaffold modular:
+- [X] **AB-002** Backend Java 21 + Spring Boot 3.3.5 scaffold modular:
   - Dependencias: Web, Validation, Security, Data JPA, Flyway, PostgreSQL, Apache POI, OpenAPI (springdoc), Actuator.
-  - Health check endpoint `/health/public` y `/actuator/health`.
-  - Manejo global de excepciones (`GlobalExceptionHandler`, RFC 7807 / standard error envelope).
-  - Test smoke inicial (`AlexaBeautyApplicationTests`).
-- [ ] **AB-003** Frontend Next.js 15+ (App Router) + TypeScript + Tailwind CSS scaffold:
+  - Health check endpoint `/api/v1/health/public` y `/actuator/health`.
+  - Manejo global de excepciones (`GlobalExceptionHandler`, RFC 7807 ProblemDetail).
+  - Test smoke inicial (`AlexaBeautyApplicationTests` y `HealthControllerTest` passing).
+- [X] **AB-003** Frontend Next.js 15+ (App Router) + TypeScript + Tailwind CSS scaffold:
   - Tokens visuales configurados (`wine: #711A38`, `wine-dark: #4C1126`, `mauve: #B7748C`, `cream: #FCF8F2`, `ink: #2B2025`).
   - Layout responsive base (360px – 1440px) y navegación mobile-first.
-  - Configuración de clientes HTTP con tipado estricto e interceptores.
-- [ ] **AB-004** Configuración de variables de entorno (`.env.example`) y Docker Compose para desarrollo local (Postgres 16).
+  - Vistas iniciales: Home (`/`), Catálogo (`/catalogo`), Carrito (`/carrito`), Admin preview (`/admin`).
+  - Build verificado sin errores (`npm run build` PASS).
+- [X] **AB-004** Configuración de variables de entorno (`.env.example`), Docker Compose para desarrollo local (Postgres 16) y GitHub Actions CI workflows (`ci-backend.yml`, `ci-frontend.yml`).
 
 ---
 

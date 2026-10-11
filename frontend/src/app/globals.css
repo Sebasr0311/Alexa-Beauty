@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --wine: #711a38;
+  --wine-dark: #4c1126;
+  --mauve: #b7748c;
+  --blush: #f5e5e8;
+  --cream: #fcf8f2;
+  --ink: #2b2025;
+  --muted: #786a6f;
+  --border: #eadde0;
+  --success: #22795b;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #fcf8f2;
+  color: #2b2025;
+  min-height: 100vh;
+}
+
+/* Safe area padding for modern mobile devices */
+.pb-safe {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
