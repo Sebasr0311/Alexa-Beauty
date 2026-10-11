@@ -1,0 +1,34 @@
+# IDE & OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+.codegraph/
+
+# Java / Maven
+**/target/
+*.class
+*.jar
+*.war
+
+# Node / Next.js
+**/node_modules/
+**/.next/
+**/out/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Coverage & Tests
+**/coverage/
+**/playwright-report/
+**/test-results/
