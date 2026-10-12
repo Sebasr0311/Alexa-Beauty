@@ -5,6 +5,7 @@
 .DS_Store
 Thumbs.db
 .codegraph/
+.atl/
 
 # Java / Maven
 **/target/

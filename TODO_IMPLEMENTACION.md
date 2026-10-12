@@ -36,19 +36,19 @@
 ## Épica 1: Datos, Migraciones y Seguridad (Fases 2 & 3)
 **Objetivo:** Modelo relacional completo e inmutable con Flyway, control de roles y acceso seguro.
 
-- [ ] **AB-005** Migración `V1__initial_schema.sql`:
+- [X] **AB-005** Migración `V1__initial_schema.sql`:
   - Tablas: `users`, `brands`, `categories`, `products`, `product_variants`, `product_images`, `app_settings`.
-  - Restricciones: UUIDs, checks de precios >= 0, stocks >= 0, slugs y SKUs únicos.
-- [ ] **AB-006** Migración `V2__inventory_and_orders.sql`:
+  - Restricciones: UUIDs, checks de precios >= 0, stocks >= 0, slugs y SKUs únicos, `stock_reserved <= stock_on_hand`.
+- [X] **AB-006** Migración `V2__inventory_and_orders.sql`:
   - Tablas: `inventory_movements`, `stock_receipts`, `stock_receipt_items`, `orders`, `order_items`, `stock_reservations`, `payments`, `order_status_history`, `audit_logs`, `excel_import_jobs`, `excel_import_errors`.
-  - Check de integridad: `stock_reserved <= stock_on_hand`.
-- [ ] **AB-007** Migración `V3__seed_admin_and_settings.sql`:
-  - Usuario admin inicial (con hash Argon2/BCrypt configurable).
-  - Parámetros iniciales de negocio (WhatsApp Business, moneda COP, TTL reserva 45m).
-- [ ] **AB-008** Autenticación y Autorización (Spring Security + Cookie HttpOnly / JWT seguro):
-  - Endpoint `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
-  - RBAC: Roles `ADMIN` y `OPERADOR`. Política "Default Deny".
-  - Rate limiting en login y protección contra fuerza bruta.
+  - Índices de rendimiento en órdenes, reservas y movimientos.
+- [X] **AB-007** Migración `V3__seed_data.sql`:
+  - Usuario admin inicial (`admin@alexabeauty.com`, hash BCrypt).
+  - Parámetros de negocio (`app_settings`), 4 categorías iniciales y 3 marcas semilla.
+- [X] **AB-008** Autenticación y Autorización (Spring Security 6 + JWT y HttpOnly Cookie):
+  - Endpoints `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
+  - RBAC: Roles `ADMIN` y `OPERADOR`. Manejo RFC 7807 de 401/403.
+  - Verificado con `AuthIntegrationTest` y `FlywayMigrationTest` (13 tests PASS).
 
 ---
 

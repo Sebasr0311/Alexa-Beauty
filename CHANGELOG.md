@@ -5,6 +5,23 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+### Added - 2026-10-12
+- **Épica 1: Datos, Migraciones y Seguridad**
+  - **Migraciones Flyway (`V1`, `V2`, `V3`):**
+    - `V1__initial_schema.sql`: Esquema de catálogo, productos, variantes con bloqueo optimista (`version`), imágenes y parámetros con restricciones `CHECK` de stock no negativo y `stock_reserved <= stock_on_hand`.
+    - `V2__inventory_and_orders.sql`: Libro de movimientos (`inventory_movements`), recepciones (`stock_receipts`), órdenes, reservas temporales de stock, pagos auditados, historial de estados y tablas de diagnóstico para importación Excel.
+    - `V3__seed_data.sql`: Semilla con parámetros de negocio, 4 categorías iniciales (`Rostro`, `Labios`, `Ojos`, `Accesorios`), 3 marcas y usuario admin con contraseña hasheada en BCrypt.
+  - **Entidades y Repositorios JPA:**
+    - Modelo relacional inmutable completo para los 9 módulos funcionales.
+  - **Seguridad y Autenticación:**
+    - Spring Security 6 con `JwtTokenProvider`, filtro `JwtAuthenticationFilter`, soporte para Bearer Token y cookies `HttpOnly`.
+    - Endpoints de autenticación: `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
+    - Manejadores de excepción RFC 7807 (`JwtAuthenticationEntryPoint`, `JwtAccessDeniedHandler`).
+  - **Pruebas Automatizadas:**
+    - `FlywayMigrationTest` validando las 3 migraciones y datos semilla en base de datos.
+    - `AuthIntegrationTest` validando logins exitosos, rechazo por credenciales inválidas, extracción de perfil, protección de rutas y logout.
+    - 13 pruebas unitarias y de integración ejecutadas y aprobadas (`BUILD SUCCESS`).
+
 ### Added - 2026-10-10
 - **Épica 0: Scaffold y Fundaciones**
   - **Backend (Spring Boot 3.3.5 / Java 21 LTS):**

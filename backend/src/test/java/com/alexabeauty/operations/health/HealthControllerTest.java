@@ -17,7 +17,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(HealthController.class)
-@Import({SecurityConfig.class, WebCorsConfig.class})
+@Import({
+    SecurityConfig.class,
+    WebCorsConfig.class,
+    com.alexabeauty.security.JwtAuthenticationFilter.class,
+    com.alexabeauty.security.JwtTokenProvider.class,
+    com.alexabeauty.security.JwtAuthenticationEntryPoint.class,
+    com.alexabeauty.security.JwtAccessDeniedHandler.class
+})
 @ActiveProfiles("test")
 class HealthControllerTest {
 
