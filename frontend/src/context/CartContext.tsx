@@ -10,7 +10,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product) => { success: boolean; message?: string };
+  addItem: (product: Product, quantity?: number) => { success: boolean; message?: string };
   updateQuantity: (productId: number, delta: number) => void;
   removeItem: (productId: number) => void;
   clearCart: () => void;
@@ -56,27 +56,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, hasHydrated]);
 
-  const addItem = (product: Product) => {
+  const addItem = (product: Product, quantityToAdd: number = 1) => {
     if (product.stock <= 0) {
       return { success: false, message: 'Producto sin existencias disponibles.' };
     }
 
+    const qty = Math.max(1, quantityToAdd);
     let success = true;
     let message = '';
 
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) {
+        if (existing.quantity + qty > product.stock) {
           success = false;
           message = `No hay más unidades disponibles (${product.stock} máx).`;
           return prev;
         }
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.product.id === product.id ? { ...i, quantity: i.quantity + qty } : i
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: Math.min(qty, product.stock) }];
     });
 
     return { success, message };

@@ -7,5 +7,6 @@ public enum MovementType {
     RESERVATION_CANCELLED,
     MANUAL_ADJUSTMENT,
     DAMAGE,
-    RETURN
+    RETURN,
+    ENTRADA_INICIAL
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Product } from '@/lib/data';
 import { formatCOP } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
@@ -33,38 +34,44 @@ export function ProductCard({ product }: ProductCardProps) {
       ? 'from-[#f8eadc] to-[#ead0be]'
       : 'from-[#f6e7e7] to-[#e6c8c8]';
 
+  const slug = product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
   return (
     <article className="group bg-white border border-[#efdee3] rounded-2xl overflow-hidden shadow-[0_9px_26px_rgba(58,26,39,0.035)] hover:-translate-y-1 transition duration-200 flex flex-col justify-between">
       <div>
         {/* Visual Header */}
-        <div
-          className={`h-48 sm:h-56 relative grid place-items-center bg-gradient-to-br ${gradientClass} overflow-hidden`}
-        >
-          {/* Decorative circular aura */}
-          <div className="absolute -top-4 -right-6 w-36 h-36 bg-white/40 rounded-full pointer-events-none blur-[1px]" />
-
-          {/* Badge chip */}
-          <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-wine text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
-            {product.badge}
-          </span>
-
-          {/* Product Emoji / Icon */}
-          <span
-            className="text-6xl sm:text-7xl select-none filter drop-shadow-[0_15px_12px_rgba(94,49,61,0.18)] -rotate-6 group-hover:scale-105 transition-transform duration-300"
-            aria-hidden="true"
+        <Link href={`/producto/${slug}`} className="block">
+          <div
+            className={`h-48 sm:h-56 relative grid place-items-center bg-gradient-to-br ${gradientClass} overflow-hidden`}
           >
-            {product.icon}
-          </span>
-        </div>
+            {/* Decorative circular aura */}
+            <div className="absolute -top-4 -right-6 w-36 h-36 bg-white/40 rounded-full pointer-events-none blur-[1px]" />
+
+            {/* Badge chip */}
+            <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-wine text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
+              {product.badge}
+            </span>
+
+            {/* Product Emoji / Icon */}
+            <span
+              className="text-6xl sm:text-7xl select-none filter drop-shadow-[0_15px_12px_rgba(94,49,61,0.18)] -rotate-6 group-hover:scale-105 transition-transform duration-300"
+              aria-hidden="true"
+            >
+              {product.icon}
+            </span>
+          </div>
+        </Link>
 
         {/* Content Body */}
         <div className="p-4">
           <span className="text-[#af7b89] text-[10px] font-extrabold tracking-widest uppercase">
             {product.brand}
           </span>
-          <h3 className="text-ink font-semibold text-sm sm:text-base leading-snug mt-1 min-h-[42px] line-clamp-2">
-            {product.name}
-          </h3>
+          <Link href={`/producto/${slug}`} className="block">
+            <h3 className="text-ink font-semibold text-sm sm:text-base leading-snug mt-1 min-h-[42px] line-clamp-2 hover:text-wine transition-colors">
+              {product.name}
+            </h3>
+          </Link>
           <p className="text-muted text-xs mt-1">
             {isOutOfStock ? (
               <span className="text-red-600 font-medium">Agotado temporalmente</span>

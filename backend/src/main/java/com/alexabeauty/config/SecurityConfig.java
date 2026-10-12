@@ -73,6 +73,10 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/v3/api-docs.yaml"
                 ).permitAll()
+                // Public Uploads / Media static resources
+                .requestMatchers(
+                    "/uploads/**"
+                ).permitAll()
                 // Public Catalog and Orders endpoints
                 .requestMatchers(
                     "/api/v1/catalog/**",

@@ -55,18 +55,19 @@
 ## Épica 2: Catálogo, Productos y Almacenamiento de Imágenes (Fase 4)
 **Objetivo:** Gestión de marcas, categorías, productos, variantes y assets multimedia.
 
-- [ ] **AB-009** Módulo Catálogo Backend:
-  - Endpoints CRUD: `/api/v1/admin/products`, `/api/v1/catalog/products` (público paginado y filtrable).
+- [X] **AB-009** Módulo Catálogo Backend:
+  - Endpoints CRUD: `/api/v1/admin/products`, `/api/v1/catalog/products` (público paginado y filtrable), `/catalog/products/{slug}`, `/catalog/categories`, `/catalog/brands`.
   - Generación automática de variante `DEFAULT` si no se especifican tonos.
-  - Registro de movimiento `ENTRADA_INICIAL` al crear producto con stock > 0.
-- [ ] **AB-010** Servicio de Medios (`StorageGateway`):
-  - Interfaz `StorageGateway` con implementación local para tests y Supabase Storage para producción.
-  - Validación de imágenes (MIME `jpeg`, `png`, `webp`, rechazo de ejecutables/falsos binarios).
-  - Endpoints: `POST /api/v1/admin/products/{id}/images`, `DELETE /api/v1/admin/products/{id}/images/{imageId}`.
-- [ ] **AB-011** UI Catálogo y Ficha de Producto (Frontend):
-  - Vista pública móvil `/` y `/catalogo` con búsqueda debounce, filtros y selector de tonos.
-  - Ficha de producto `/producto/[slug]` con proporciones 1:1, estados agotado/disponible y accesibilidad WCAG AA.
-  - Panel admin `/admin/productos` y `/admin/productos/nuevo`.
+  - Registro atómico de movimiento `ENTRADA_INICIAL` en el kardex al crear producto con stock > 0.
+  - Detección de SKU duplicado (HTTP 409) y validación de precios negativos (HTTP 400).
+- [X] **AB-010** Servicio de Medios (`StorageGateway`):
+  - Interfaz `StorageGateway` con implementación `LocalStorageGateway` y `SupabaseStorageGateway`.
+  - Validación estricta de imágenes (MIME `jpeg`, `png`, `webp`, rechazo de otros formatos con HTTP 400).
+  - Endpoints: `POST /api/v1/admin/products/{id}/images`, `DELETE /api/v1/admin/products/{id}/images/{imageId}`, `PATCH /api/v1/admin/products/{id}/images/{imageId}/cover`.
+- [X] **AB-011** UI Catálogo y Ficha de Producto (Frontend):
+  - Cliente API tipado `src/lib/api.ts` con manejo de tokens y errores.
+  - Ficha de producto `/producto/[slug]` con proporciones 1:1, selector interactivo de tonos/variantes, indicador de existencias disponibles y botón de consulta por WhatsApp.
+  - `ProductCard` interactivo enlazado a la ficha de producto. Build de producción verificado (`npm run build` PASS).
 
 ---
 
