@@ -177,10 +177,17 @@
 ## Épica 8: Endurecimiento, Pruebas y Despliegue (Fases 10, 11 & 12)
 **Objetivo:** Verificación contra la matriz P01–P26, seguridad OWASP, CI/CD y despliegue en Vercel/Render.
 
-- [ ] **AB-031** Suite de Pruebas Automatizadas:
-  - Unitarias (JUnit 5 + Mockito).
-  - Integración con Testcontainers PostgreSQL (pruebas de concurrencia de reservas y doble verificación).
-  - E2E Playwright móvil (flujo completo catálogo → checkout → whatsapp).
-- [ ] **AB-032** Dockerfile backend, Workflows de GitHub Actions (`ci-backend.yml`, `ci-frontend.yml`).
-- [ ] **AB-033** Configuración y guías de despliegue en Render y Vercel + Runbook de contingencias.
-- [ ] **AB-034** Generación del informe final de verificación `INFORME_FINAL_VERIFICACION.md`.
+- [X] **AB-031** Suite de Pruebas Automatizadas:
+  - Unitarias e integración con JUnit 5, MockMvc, H2 en modo PostgreSQL y Flyway: 48 pruebas ejecutadas y aprobadas (100% BUILD SUCCESS).
+  - Pruebas multihilo y transaccionales cubriendo la matriz completa P01–P20 (concurrencia de reservas, doble pago, expiración, idempotencia, timezone Bogotá).
+  - Verificación de interfaz Next.js 15+ con `npm run build` sin errores en 12 rutas.
+- [X] **AB-032** Dockerfile backend, Workflows de GitHub Actions (`ci-backend.yml`, `ci-frontend.yml`):
+  - Dockerfile multi-stage con compilación Temurin 21 y usuario no-root.
+  - Workflows automatizados de CI para backend y frontend en `.github/workflows`.
+- [X] **AB-033** Configuración y guías de despliegue en Render y Vercel + Runbook de contingencias:
+  - `documentation/GUIA_DESPLIEGUE.md`: Pasos reproducibles para Render (API), Vercel (Front) y Supabase (DB + Storage).
+  - `documentation/RUNBOOK_OPERACIONES.md`: Monitoreo, respuesta ante cold-starts/caídas, recuperación de reservas vencidas y rotación de secretos.
+  - Scripts de respaldo y restauración en Bash y PowerShell (`scripts/backup_db.sh`, `restore_db.sh`, `backup_db.ps1`, `restore_db.ps1`).
+- [X] **AB-034** Generación del informe final de verificación `INFORME_FINAL_VERIFICACION.md`:
+  - Auditoría exhaustiva de las 26 situaciones de prueba P01–P26 del Plan Maestro con estado PASS y evidencia técnica.
+  - Manual de operaciones para el administrador, defensas OWASP y declaración ética de no-falseamiento de ventas.

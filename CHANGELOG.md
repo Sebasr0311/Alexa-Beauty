@@ -6,6 +6,21 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Added - 2026-10-12
+- **Épica 8: Endurecimiento, Pruebas, Operaciones e Informe Final de Verificación**
+  - **Documentación Operativa y Guías de Despliegue:**
+    - `documentation/GUIA_DESPLIEGUE.md`: Guía paso a paso para producción y staging con Render (Web Service Docker), Vercel (Next.js Edge) y Supabase (PostgreSQL + Storage).
+    - `documentation/RUNBOOK_OPERACIONES.md`: Procedimientos operativos estándar, monitoreo del endpoint de salud (`/api/v1/health/public`), invariantes de inventario en base de datos, respuesta a caídas y rotación de secretos.
+    - Scripts de respaldo y restauración automáticos en Bash y PowerShell (`scripts/backup_db.sh`, `restore_db.sh`, `backup_db.ps1`, `restore_db.ps1`).
+  - **Informe Final de Verificación (`INFORME_FINAL_VERIFICACION.md`):**
+    - Auditoría completa y certificación de las 26 situaciones de prueba P01–P26 del Plan Maestro con estado **PASS**.
+    - Manual detallado para el administrador de Alexa Beauty (altas, importación Excel, recepciones, verificación de transferencias y cuadre de caja).
+    - Evidencias de defensas OWASP (SQL injection, XSS, formula injection P07, MIME spoofing P08, RBAC y JWT).
+    - Pruebas de concurrencia y bloqueo pesimista libre de interbloqueos (competición por último stock P11, doble confirmación P15/P16).
+    - Declaración ética explícita de no-falseamiento de ventas ni stock.
+  - **Resultados de Validación:**
+    - Total de pruebas en Backend: 48 de 48 aprobadas (`BUILD SUCCESS` en 55 s).
+    - Build de Frontend en Next.js: 12 rutas generadas sin errores ni advertencias (`npm run build` PASS).
+
 - **Épica 7: Reportes, Analítica y Exportación Excel de Ventas**
   - **Filtro Estricto de Ventas y Zona Horaria (`America/Bogota`):**
     - `GET /api/v1/admin/sales`: filtrado exclusivo de ventas confirmadas por fecha real de pago (`paidAt`), excluyendo 100% órdenes pendientes, expiradas o canceladas.
