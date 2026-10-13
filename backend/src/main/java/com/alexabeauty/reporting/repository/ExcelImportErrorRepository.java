@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface ExcelImportErrorRepository extends JpaRepository<ExcelImportError, UUID> {
     List<ExcelImportError> findByJobId(UUID jobId);
+    List<ExcelImportError> findByJobIdOrderByRowNumberAsc(UUID jobId);
 }

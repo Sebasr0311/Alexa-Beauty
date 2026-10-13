@@ -13,4 +13,7 @@ import java.util.UUID;
 public interface ExcelImportJobRepository extends JpaRepository<ExcelImportJob, UUID> {
     Optional<ExcelImportJob> findByFileHash(String fileHash);
     List<ExcelImportJob> findByStatus(ImportJobStatus status);
+    boolean existsByFileHashAndStatus(String fileHash, ImportJobStatus status);
+    List<ExcelImportJob> findByFileHashOrderByCreatedAtDesc(String fileHash);
+    Optional<ExcelImportJob> findTopByFileHashOrderByCreatedAtDesc(String fileHash);
 }

@@ -6,6 +6,23 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Added - 2026-10-12
+- **Épica 4: Importación Masiva por Excel**
+  - **Generador de Plantilla `ALEXA_PRODUCTS_V1`:**
+    - `GET /api/v1/admin/products/import/template`: generación dinámica con Apache POI de las 3 hojas (`PRODUCTOS`, `INSTRUCCIONES`, `EJEMPLOS_NO_IMPORTAR`) con estilos de marca bordó/malva, filtros automáticos y validaciones.
+  - **Protección contra Inyección de Fórmulas y Diagnóstico:**
+    - `ExcelSanitizer` neutralizando cadenas que comiencen por `=`, `+`, `-`, `@`, `\t`, `\r` (matriz P07).
+    - `POST /api/v1/admin/products/imports/preview`: previsualización sin persistir, cálculo de hash SHA-256 (advertencia de duplicados), detección de SKUs en conflicto (en archivo y contra BD) y registro de incidencias fila por fila en `excel_import_errors`.
+  - **Commit Atómico e Idempotencia:**
+    - `POST /api/v1/admin/products/imports/{jobId}/commit` con soporte de políticas `CANCEL_ON_ERROR` y `SKIP_DUPLICATES`.
+    - Garantía P06: segundo commit sobre el mismo job lanza 409 Conflict y no duplica stock.
+    - Creación de movimientos `ENTRADA_INICIAL` en el kardex si `stock_inicial > 0`.
+    - `GET /api/v1/admin/products/imports/{jobId}/rejected.xlsx`: descarga de archivo exclusivo con filas rechazadas y motivo de error para corrección.
+  - **Frontend:**
+    - Vista interactiva [`/admin/importar`](file:///C:/Users/JUAN/Antigravity%20IDE/Alexa-Beauty/frontend/src/app/admin/importar/page.tsx) con carga drag-and-drop, métricas previas y confirmación de lote.
+  - **Pruebas Automatizadas:**
+    - `ExcelImportIntegrationTest` verificando la matriz P04, P05, P06 y P07.
+    - Total de pruebas en Backend: 31 de 31 en verde (`BUILD SUCCESS`). Build de Frontend verificado (`npm run build` PASS).
+
 - **Épica 3: Inventario Transaccional y Recepción de Mercancía**
   - **Recepción de Mercancía e Idempotencia:**
     - `POST /api/v1/admin/inventory/receipts` con soporte obligatorio para `Idempotency-Key` y número de recibo determinista (garantía matriz P10: reintentos nunca duplican inventario).

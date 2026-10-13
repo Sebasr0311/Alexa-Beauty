@@ -94,20 +94,20 @@
 ## Épica 4: Importación Masiva por Excel (Fase 6)
 **Objetivo:** Flujo seguro de importación de productos vía Apache POI y plantilla descargable.
 
-- [ ] **AB-016** Generador de Plantilla `ALEXA_PRODUCTS_V1`:
+- [X] **AB-016** Generador de Plantilla `ALEXA_PRODUCTS_V1`:
   - Endpoint `GET /api/v1/admin/products/import/template`.
-  - Hojas: `PRODUCTOS` (cabeceras idénticas al contrato), `INSTRUCCIONES` y `EJEMPLOS_NO_IMPORTAR`.
-- [ ] **AB-017** Validador y Preview de Importación:
+  - Hojas: `PRODUCTOS` (12 columnas exactas del contrato estilizadas con paleta de marca), `INSTRUCCIONES` y `EJEMPLOS_NO_IMPORTAR`.
+- [X] **AB-017** Validador y Preview de Importación:
   - Endpoint `POST /api/v1/admin/products/imports/preview`.
-  - Inspección de 5MB / 5.000 filas, sanitización de inyección de fórmulas (`=`, `+`, `-`, `@`).
-  - Detección de SKUs duplicados dentro del archivo y contra la BD.
-  - Respuesta con reporte de incidencias (fila, columna, valor, causa, solución).
-- [ ] **AB-018** Commit Atómico de Importación:
+  - Protección contra formula injection (`ExcelSanitizer`, matriz P07).
+  - Detección de duplicados internos y contra BD, cálculo de SHA-256 para prevenir reimportaciones.
+  - Tabla de errores persistida en `excel_import_errors` y descarga de rechazadas vía `GET /imports/{jobId}/rejected.xlsx`.
+- [X] **AB-018** Commit Atómico de Importación:
   - Endpoint `POST /api/v1/admin/products/imports/{jobId}/commit`.
-  - Políticas ante conflictos: Omitir o Cancelar todo.
-  - Creación de movimientos `ENTRADA_INICIAL` en transacción única.
-- [ ] **AB-019** UI de Importación en Panel Admin (`/admin/importar`):
-  - Drag-and-drop de `.xlsx`, previsualización de errores y confirmación explícita.
+  - Idempotencia comprobada (P06: segundo commit lanza 409 Conflict sin duplicar stock).
+  - Creación de movimientos `ENTRADA_INICIAL` en el ledger para cada producto con stock inicial > 0.
+- [X] **AB-019** UI de Importación en Panel Admin (`/admin/importar`):
+  - Flujo completo: descarga de plantilla, drag-and-drop, vista previa de métricas/errores, selector de políticas y confirmación. Build verificado (`npm run build` PASS).
 
 ---
 
