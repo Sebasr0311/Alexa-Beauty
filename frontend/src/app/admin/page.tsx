@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   AlertTriangle,
   CheckCircle2,
+  BarChart3,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
@@ -24,12 +25,12 @@ export default function AdminDashboardPage() {
 
   const navItems = [
     { label: 'Resumen', icon: LayoutDashboard, href: '/admin' },
+    { label: 'Pedidos', icon: Clock, href: '/admin/pedidos' },
+    { label: 'Ventas', icon: TrendingUp, href: '/admin/ventas' },
+    { label: 'Analítica', icon: BarChart3, href: '/admin/analitica' },
+    { label: 'Importar Excel', icon: Upload, href: '/admin/importar' },
     { label: 'Productos', icon: Package },
     { label: 'Inventario', icon: Boxes },
-    { label: 'Importar Excel', icon: Upload, href: '/admin/importar' },
-    { label: 'Pedidos', icon: Clock, href: '/admin/pedidos' },
-    { label: 'Ventas', icon: TrendingUp },
-    { label: 'Reportes', icon: FileText },
   ];
 
   const handleActionNotice = (actionName: string) => {
@@ -308,23 +309,29 @@ export default function AdminDashboardPage() {
                 Gestionar pedidos
               </Link>
 
-              <button
-                type="button"
-                onClick={() => handleActionNotice('Crear nuevo producto')}
-                className="inline-flex items-center gap-2 rounded-full bg-white border border-[#b9899c] hover:bg-cream text-wine font-bold text-xs sm:text-sm px-6 py-3 transition shadow-sm active:scale-95"
+              <Link
+                href="/admin/ventas"
+                className="inline-flex items-center gap-2 rounded-full bg-white border border-wine hover:bg-cream text-wine font-bold text-xs sm:text-sm px-6 py-3 transition shadow-sm active:scale-95"
               >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                Nuevo producto
-              </button>
+                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                Ventas confirmadas
+              </Link>
 
-              <button
-                type="button"
-                onClick={() => handleActionNotice('Registrar recepción de mercancía')}
+              <Link
+                href="/admin/analitica"
+                className="inline-flex items-center gap-2 rounded-full bg-white border border-wine hover:bg-cream text-wine font-bold text-xs sm:text-sm px-6 py-3 transition shadow-sm active:scale-95"
+              >
+                <BarChart3 className="w-4 h-4 stroke-[2.5]" />
+                Analítica y métricas
+              </Link>
+
+              <Link
+                href="/admin/importar"
                 className="inline-flex items-center gap-2 rounded-full bg-white border border-[#b9899c] hover:bg-cream text-wine font-bold text-xs sm:text-sm px-6 py-3 transition shadow-sm active:scale-95"
               >
-                <Boxes className="w-4 h-4" />
-                Recibir mercancía
-              </button>
+                <Upload className="w-4 h-4" />
+                Importar productos
+              </Link>
 
               <button
                 type="button"
@@ -335,6 +342,7 @@ export default function AdminDashboardPage() {
                 Descargar plantilla Excel
               </button>
             </div>
+
           </main>
         </div>
       </div>

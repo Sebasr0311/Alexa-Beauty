@@ -6,6 +6,27 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Added - 2026-10-12
+- **Épica 7: Reportes, Analítica y Exportación Excel de Ventas**
+  - **Filtro Estricto de Ventas y Zona Horaria (`America/Bogota`):**
+    - `GET /api/v1/admin/sales`: filtrado exclusivo de ventas confirmadas por fecha real de pago (`paidAt`), excluyendo 100% órdenes pendientes, expiradas o canceladas.
+    - Garantía matriz P19: una venta pagada a las 23:59 Bogotá y otra a las 00:01 del día siguiente se asignan exactamente a su respectivo día local en zona `America/Bogota` (UTC-5).
+    - Cálculo consolidado de KPIs: Ventas Totales en COP, Pedidos Pagados, Unidades Totales Vendidas y Ticket Promedio.
+  - **Generador de Reporte Excel Profesional `ALEXA_SALES_V1`:**
+    - `GET /api/v1/admin/sales/export.xlsx` con Apache POI generando un libro de 5 hojas idéntico al contrato `AlexaBeauty_Ejemplo_Reporte_Ventas.xlsx`:
+      - Hoja 1 `VENTAS`: listado detallado con fechas locales en Bogotá, cliente, método, subtotal, envío, total pagado, verificador, estado y canal, con fórmula `=SUM(H6:H{N})`.
+      - Hoja 2 `DETALLE_PRODUCTOS`: desglose de cada ítem con SKU, producto, marca, tono, cantidad, precio unitario, total línea y costo unitario.
+      - Hoja 3 `TOP_PRODUCTOS`: ranking ordenado por ingresos brutos decrecientes, unidades vendidas y formato porcentual `0.0%` de participación en ingresos.
+      - Hoja 4 `RESUMEN`: tarjetas de indicadores ejecutivos, ticket promedio y metadatos del período con estilo bordó (`#711A38`) y tipografía blanca negrita.
+      - Hoja 5 `METADATOS`: versión de contrato (`ALEXA_SALES_V1`), moneda COP, zona horaria `America/Bogota`, rangos y auditoría de generación con timestamp UTC.
+    - Garantía matriz P20: los totales de ventas, pedidos y unidades del archivo Excel coinciden al 100% con la API y los gráficos.
+  - **Endpoints y Pantalla de Analítica:**
+    - `GET /api/v1/admin/analytics/overview` y `GET /api/v1/admin/analytics/top-products`.
+    - Vista interactiva `/admin/ventas` con selector de fechas, acceso rápido (Hoy, 7 días, Este mes, 30 días), modal de desglose de ítems y botón de descarga directa del reporte `.xlsx`.
+    - Vista interactiva `/admin/analitica` con gráfico visual de barras de tendencia diaria, ranking con insignias de medallas (#1, #2, #3) y distribución por métodos de pago (Nequi, Daviplata, Bancolombia, etc.).
+  - **Pruebas Automatizadas:**
+    - `SalesAndReportingIntegrationTest` validando P19 (límites horarios 23:59 vs 00:01), P20 (coincidencia exacta API vs Excel de 5 hojas), exclusión de pedidos no pagados, y cálculos del top de productos.
+    - Total de pruebas en Backend: 48 de 48 en verde (`BUILD SUCCESS`). Build de Frontend verificado (`npm run build` PASS con 12 rutas generadas limpiamente).
+
 - **Épica 6: Verificación de Pagos y Gestión de Pedidos**
   - **Verificación Atómica de Pagos:**
     - `POST /api/v1/admin/orders/{id}/confirm-payment` con bloqueo pesimista de orden y variantes (`orderRepository.findByIdForUpdate` y `findByIdInOrderByIdForUpdate`).

@@ -158,17 +158,19 @@
 ## Épica 7: Reportes, Analítica y Exportación Excel (Fases 9 & 10)
 **Objetivo:** Cuadre 100% exacto entre BD, interfaz web y libro Excel exportado.
 
-- [ ] **AB-028** Agregación de Ventas en Backend:
-  - Endpoint `GET /api/v1/admin/sales` filtrado por fecha real de pago verificado en `America/Bogota`.
-  - Exclusión estricta de pedidos pendientes o cancelados.
-  - Cálculo de KPIs: Ingresos cobrados, unidades vendidas, ticket promedio.
-- [ ] **AB-029** Exportador Profesional de Ventas XLSX:
-  - Endpoint `GET /api/v1/admin/sales/export.xlsx` con los mismos filtros aplicados.
-  - 5 Hojas: `RESUMEN` (con estilo bordó/malva), `VENTAS`, `DETALLE_PRODUCTOS`, `TOP_PRODUCTOS`, `METADATOS`.
-  - Fórmulas de suma para totales y anchos legibles.
-- [ ] **AB-030** Dashboard de Analítica y Top Productos:
-  - Endpoint `GET /api/v1/admin/analytics/overview` y `/top-products`.
-  - UI `/admin/ventas`, `/admin/analitica` y `/admin/reportes`.
+- [X] **AB-028** Agregación de Ventas en Backend:
+  - Endpoint `GET /api/v1/admin/sales` filtrado por fecha real de pago verificado en `America/Bogota` (garantía matriz P19: 23:59 vs 00:01).
+  - Exclusión estricta de pedidos pendientes, expirados o cancelados.
+  - Cálculo consistente de KPIs: Ingresos cobrados, pedidos pagados, unidades vendidas, ticket promedio.
+- [X] **AB-029** Exportador Profesional de Ventas XLSX:
+  - Endpoint `GET /api/v1/admin/sales/export.xlsx` con los mismos filtros aplicados y garantía matriz P20 (coincidencia 100% con la API).
+  - 5 Hojas exactas del contrato `AlexaBeauty_Ejemplo_Reporte_Ventas.xlsx`: `VENTAS`, `DETALLE_PRODUCTOS`, `TOP_PRODUCTOS`, `RESUMEN` (con estilo bordó `#711A38`/malva) y `METADATOS`.
+  - Fórmulas dinámicas de suma `=SUM(H6:H{N})`, formato de moneda `$ #,##0`, porcentajes `0.0%`, paneles congelados y autoajuste de columnas.
+- [X] **AB-030** Dashboard de Analítica y Top Productos:
+  - Endpoints `GET /api/v1/admin/analytics/overview` y `GET /api/v1/admin/analytics/top-products`.
+  - UI interactiva `/admin/ventas` con filtros por fecha/método, modal de items y descarga de Excel.
+  - UI interactiva `/admin/analitica` con gráfico de tendencia diaria, ranking con medallas y desglose de canales de pago. Build verificado (`npm run build` PASS con 12 rutas).
+  - Verificado con suite `SalesAndReportingIntegrationTest` (48 tests pasando en backend).
 
 ---
 

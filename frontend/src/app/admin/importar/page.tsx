@@ -13,6 +13,10 @@ import {
   AlertCircle,
   ArrowRight,
   ShieldAlert,
+  LayoutDashboard,
+  Clock,
+  TrendingUp,
+  BarChart3,
 } from 'lucide-react';
 import { formatCOP } from '@/lib/utils';
 
@@ -182,6 +186,48 @@ export default function AdminImportPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+        {/* Navigation Bar / Tabs */}
+        <nav
+          aria-label="Pestañas de administración"
+          className="bg-white border border-border rounded-2xl p-1.5 shadow-sm flex items-center gap-1 overflow-x-auto no-scrollbar"
+        >
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            Resumen
+          </Link>
+          <Link
+            href="/admin/pedidos"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
+          >
+            <Clock className="w-4 h-4" />
+            Pedidos
+          </Link>
+          <Link
+            href="/admin/ventas"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
+          >
+            <TrendingUp className="w-4 h-4" />
+            Ventas Confirmadas
+          </Link>
+          <Link
+            href="/admin/analitica"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Analítica
+          </Link>
+          <Link
+            href="/admin/importar"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-wine text-white shadow-xs transition whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4" />
+            Importar Excel
+          </Link>
+        </nav>
+
         {/* Step 1: Upload Card */}
         <div className="bg-white border border-border rounded-3xl p-6 sm:p-8 shadow-[0_9px_26px_rgba(58,26,39,0.03)]">
           <div className="flex items-center gap-3 mb-4">

@@ -68,6 +68,10 @@ public class UserPrincipal implements UserDetails {
         return fullName;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;

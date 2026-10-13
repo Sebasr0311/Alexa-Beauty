@@ -346,7 +346,81 @@ class ApiClient {
       body: JSON.stringify({ additionalMinutes, notes }),
     });
   }
+
+  // --- Admin Ventas y Analítica ---
+  async getAdminSales(params?: {
+    from?: string;
+    to?: string;
+    method?: string;
+    page?: number;
+    size?: number;
+  }): Promise<SalesListResponseDto> {
+    const searchParams = new URLSearchParams();
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    if (params?.method && params.method !== 'TODOS') searchParams.set('method', params.method);
+    if (params?.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params?.size !== undefined) searchParams.set('size', params.size.toString());
+
+    const query = searchParams.toString();
+    return this.request<SalesListResponseDto>(`/admin/sales${query ? `?${query}` : ''}`);
+  }
+
+  async downloadAdminSalesExcel(params: { from?: string; to?: string; method?: string }): Promise<void> {
+    const searchParams = new URLSearchParams();
+    if (params.from) searchParams.set('from', params.from);
+    if (params.to) searchParams.set('to', params.to);
+    if (params.method && params.method !== 'TODOS') searchParams.set('method', params.method);
+    const query = searchParams.toString();
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/admin/sales/export.xlsx${query ? `?${query}` : ''}`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Error ${response.status} al descargar reporte Excel`;
+      try {
+        const errorJson = await response.json();
+        errorMsg = errorJson.detail || errorJson.message || errorMsg;
+      } catch {}
+      throw new Error(errorMsg);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    const fromStr = params.from || 'inicio';
+    const toStr = params.to || 'fin';
+    link.download = `AlexaBeauty_Reporte_Ventas_${fromStr}_${toStr}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  }
+
+  async getAdminAnalytics(params?: { from?: string; to?: string }): Promise<SalesAnalyticsResponseDto> {
+    const searchParams = new URLSearchParams();
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    const query = searchParams.toString();
+    return this.request<SalesAnalyticsResponseDto>(`/admin/analytics/overview${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminTopProducts(params?: { from?: string; to?: string }): Promise<TopProductDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    const query = searchParams.toString();
+    return this.request<TopProductDto[]>(`/admin/analytics/top-products${query ? `?${query}` : ''}`);
+  }
 }
+
 
 export interface OrderItemRequestDto {
   variantId: string;
@@ -484,4 +558,85 @@ export interface AdminOrderDetailDto {
 }
 
 export const api = new ApiClient();
+
+// --- Ventas y Analítica DTOs ---
+
+export interface SalesSummaryDto {
+  totalSales: number;
+  paidOrdersCount: number;
+  totalUnitsSold: number;
+  averageTicket: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface SaleOrderItemDto {
+  id: string;
+  sku: string;
+  productName: string;
+  brandName?: string;
+  shadeName?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  costSnapshot?: number;
+}
+
+export interface SaleOrderDto {
+  id: string;
+  reference: string;
+  customerName: string;
+  customerPhone: string;
+  paymentMethod?: string;
+  subtotal: number;
+  discount: number;
+  shippingFee: number;
+  total: number;
+  verifiedBy?: string;
+  status: string;
+  channel: string;
+  paidAt?: string;
+  localPaidAt?: string;
+  items: SaleOrderItemDto[];
+}
+
+export interface SalesListResponseDto {
+  summary: SalesSummaryDto;
+  orders: SaleOrderDto[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface TopProductDto {
+  rank: number;
+  sku: string;
+  productName: string;
+  brandName?: string;
+  unitsSold: number;
+  grossRevenue: number;
+  revenueSharePercentage: number;
+}
+
+export interface DailySalesDto {
+  date: string;
+  totalSales: number;
+  ordersCount: number;
+  unitsCount: number;
+}
+
+export interface PaymentMethodBreakdownDto {
+  paymentMethod: string;
+  totalAmount: number;
+  orderCount: number;
+  percentage: number;
+}
+
+export interface SalesAnalyticsResponseDto {
+  summary: SalesSummaryDto;
+  dailySales: DailySalesDto[];
+  topProducts: TopProductDto[];
+  paymentMethods: PaymentMethodBreakdownDto[];
+}
 

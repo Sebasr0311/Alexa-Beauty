@@ -60,4 +60,45 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
             @Param("from") Instant from,
             @Param("to") Instant to,
             Pageable pageable);
+
+    List<OrderStatus> VERIFIED_PAID_STATUSES = List.of(
+            OrderStatus.PAGADO,
+            OrderStatus.PREPARANDO,
+            OrderStatus.DESPACHADO,
+            OrderStatus.ENTREGADO
+    );
+
+    @Query(value = "SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN o.payments p " +
+           "WHERE o.status IN :statuses " +
+           "AND o.paidAt IS NOT NULL " +
+           "AND o.paidAt >= :from AND o.paidAt <= :to " +
+           "AND (:method IS NULL OR (p.paymentMethod = :method AND (p.status = com.alexabeauty.payment.domain.PaymentStatus.VERIFICADO OR p.status IS NULL))) " +
+           "ORDER BY o.paidAt DESC",
+           countQuery = "SELECT COUNT(DISTINCT o) FROM Order o " +
+           "LEFT JOIN o.payments p " +
+           "WHERE o.status IN :statuses " +
+           "AND o.paidAt IS NOT NULL " +
+           "AND o.paidAt >= :from AND o.paidAt <= :to " +
+           "AND (:method IS NULL OR (p.paymentMethod = :method AND (p.status = com.alexabeauty.payment.domain.PaymentStatus.VERIFICADO OR p.status IS NULL)))")
+    Page<Order> findPaidOrders(
+            @Param("statuses") List<OrderStatus> statuses,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("method") com.alexabeauty.payment.domain.PaymentMethod method,
+            Pageable pageable);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN o.payments p " +
+           "WHERE o.status IN :statuses " +
+           "AND o.paidAt IS NOT NULL " +
+           "AND o.paidAt >= :from AND o.paidAt <= :to " +
+           "AND (:method IS NULL OR (p.paymentMethod = :method AND (p.status = com.alexabeauty.payment.domain.PaymentStatus.VERIFICADO OR p.status IS NULL))) " +
+           "ORDER BY o.paidAt DESC")
+    List<Order> findPaidOrdersList(
+            @Param("statuses") List<OrderStatus> statuses,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("method") com.alexabeauty.payment.domain.PaymentMethod method);
 }
+
