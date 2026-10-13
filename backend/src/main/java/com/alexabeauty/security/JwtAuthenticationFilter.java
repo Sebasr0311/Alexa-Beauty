@@ -24,9 +24,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtTokenProvider tokenProvider;
+    private final com.alexabeauty.auth.repository.UserRepository users;
 
-    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, com.alexabeauty.auth.repository.UserRepository users) {
         this.tokenProvider = tokenProvider;
+        this.users = users;
     }
 
     @Override
@@ -46,6 +48,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String userIdStr = claims.get("userId", String.class);
                 UUID userId = userIdStr != null ? UUID.fromString(userIdStr) : null;
 
+                var user = userId == null ? null : users.findById(userId).orElse(null);
+                if (user == null || !user.isActive()) {
+                    filterChain.doFilter(request, response); return;
+                }
+                email = user.getEmail(); role = user.getRole().name(); fullName = user.getFullName();
                 UserPrincipal principal = UserPrincipal.fromJwtClaims(userId, email, role, fullName);
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());

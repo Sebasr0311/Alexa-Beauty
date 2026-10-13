@@ -1,4 +1,6 @@
 # INFORME FINAL DE VERIFICACIÓN Y AUDITORÍA TÉCNICA
+
+> **Informe histórico, no aprobación de producción.** La auditoría del 13 de octubre de 2026 encontró datos de demostración, configuración incompleta y defectos de validación. Las afirmaciones PASS de este documento no deben interpretarse como pruebas actuales de despliegue, PostgreSQL, restauración o recorrido de navegador. Consultar `documentation/PRODUCTION_READINESS_2026-10-13.md` para la evidencia vigente y los controles pendientes.
 ## PLATAFORMA DE COMERCIO ELECTRÓNICO ASISTIDO «ALEXA BEAUTY»
 
 **Fecha de emisión:** 12 de Octubre de 2026  

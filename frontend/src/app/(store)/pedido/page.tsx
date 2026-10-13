@@ -36,7 +36,7 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Auto-generate idempotency key for this session
-  const [idempotencyKey] = useState(() => `IDEM-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,51 +64,7 @@ export default function CheckoutPage() {
     setErrorMessage(null);
 
     try {
-      // 1. Resolve variant IDs for all items
-      let catalogVariantsMap = new Map<string, string>();
-      const needsVariantLookup = items.some((i) => !i.variantId);
-
-      if (needsVariantLookup) {
-        try {
-          const catalogData = await api.getCatalogProducts({ size: 100 });
-          for (const prod of catalogData.content) {
-            // Fetch product detail to get variants
-            try {
-              const detail = await api.getProductBySlug(prod.slug);
-              if (detail.variants && detail.variants.length > 0) {
-                catalogVariantsMap.set(prod.name.toLowerCase().trim(), detail.variants[0].id);
-                catalogVariantsMap.set(prod.sku.toLowerCase().trim(), detail.variants[0].id);
-              }
-            } catch {
-              // ignore per-item detail failure
-            }
-          }
-        } catch {
-          // ignore catalog lookup errors
-        }
-      }
-
-      const orderItems: OrderItemRequestDto[] = [];
-      for (const item of items) {
-        let variantId = item.variantId;
-        if (!variantId) {
-          // Attempt resolution by name or sku from catalog map
-          variantId =
-            catalogVariantsMap.get(item.product.name.toLowerCase().trim()) ||
-            catalogVariantsMap.get(item.product.name.split(' - ')[0].toLowerCase().trim());
-        }
-
-        if (!variantId) {
-          throw new Error(
-            `El producto "${item.product.name}" no tiene una variante asignada en el catálogo actual. Por favor retíralo o selecciona uno desde el catálogo.`
-          );
-        }
-
-        orderItems.push({
-          variantId,
-          quantity: item.quantity,
-        });
-      }
+      const orderItems: OrderItemRequestDto[] = items.map(item => ({ variantId: item.variantId, quantity: item.quantity }));
 
       // 2. Prepare payload
       const orderPayload: CreateOrderRequestDto = {

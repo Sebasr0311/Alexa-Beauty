@@ -50,200 +50,10 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'CANCELADOS', label: 'Cancelados' },
 ];
 
-const INITIAL_MOCK_ORDERS: AdminOrderDetailDto[] = [
-  {
-    id: 'ord-001',
-    reference: 'AB-2026-000101',
-    customerName: 'Valeria Restrepo',
-    customerPhone: '3109876543',
-    deliveryType: 'DOMICILIO_LOCAL',
-    city: 'Medellín',
-    address: 'Calle 10 # 43E-22, El Poblado',
-    customerNotes: 'Timbre 301, favor entregar en portería si no contesto.',
-    subtotal: 110000,
-    discount: 0,
-    shippingFee: 8000,
-    total: 118000,
-    status: 'PENDIENTE_CONTACTO',
-    channel: 'WHATSAPP',
-    expiresAt: new Date(Date.now() + 35 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: 'item-1',
-        variantId: 'var-001',
-        sku: 'LAB-MAT-NUD01',
-        productName: 'Labial Mate Duradero Velvet',
-        variantName: 'Nude 01',
-        unitPrice: 45000,
-        quantity: 2,
-        subtotal: 90000,
-      },
-      {
-        id: 'item-2',
-        variantId: 'var-002',
-        sku: 'RUB-ROS-02',
-        productName: 'Rubor Compacto Mineral Glow',
-        variantName: 'Rosa 02',
-        unitPrice: 20000,
-        quantity: 1,
-        subtotal: 20000,
-      },
-    ],
-    payments: [],
-    reservations: [
-      {
-        id: 'res-1',
-        variantId: 'var-001',
-        sku: 'LAB-MAT-NUD01',
-        productName: 'Labial Mate Duradero Velvet',
-        quantity: 2,
-        expiresAt: new Date(Date.now() + 35 * 60 * 1000).toISOString(),
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'res-2',
-        variantId: 'var-002',
-        sku: 'RUB-ROS-02',
-        productName: 'Rubor Compacto Mineral Glow',
-        quantity: 1,
-        expiresAt: new Date(Date.now() + 35 * 60 * 1000).toISOString(),
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    statusHistory: [
-      {
-        id: 'hist-1',
-        newStatus: 'PENDIENTE_CONTACTO',
-        userEmail: 'sistema@alexabeauty.com',
-        notes: 'Pedido generado por checkout de WhatsApp. Reserva activa 45 min.',
-        createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'ord-002',
-    reference: 'AB-2026-000102',
-    customerName: 'Camila Morales',
-    customerPhone: '3001234567',
-    deliveryType: 'LOCAL_PICKUP',
-    city: 'Medellín',
-    address: 'Recoge en Tienda Principal',
-    customerNotes: 'Paso hoy a las 5pm.',
-    subtotal: 65000,
-    discount: 0,
-    shippingFee: 0,
-    total: 65000,
-    status: 'PAGADO',
-    channel: 'WHATSAPP',
-    expiresAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-    paidAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: 'item-3',
-        variantId: 'var-3',
-        sku: 'SER-GLOW-01',
-        productName: 'Serum Vitamina C Radiance',
-        variantName: '30ml',
-        unitPrice: 65000,
-        quantity: 1,
-        subtotal: 65000,
-      },
-    ],
-    payments: [
-      {
-        id: 'pay-1',
-        orderId: 'ord-002',
-        paymentMethod: 'NEQUI',
-        transferReference: 'NEQ-8823194',
-        amount: 65000,
-        status: 'VERIFICADO',
-        verifiedByEmail: 'admin@alexabeauty.com',
-        verifiedAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-        notes: 'Comprobante verificado en cuenta oficial Nequi.',
-      },
-    ],
-    reservations: [],
-    statusHistory: [
-      {
-        id: 'hist-2',
-        newStatus: 'PENDIENTE_CONTACTO',
-        notes: 'Pedido creado',
-        createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 'hist-3',
-        previousStatus: 'PENDIENTE_CONTACTO',
-        newStatus: 'PAGADO',
-        userEmail: 'admin@alexabeauty.com',
-        notes: 'Pago verificado por admin@alexabeauty.com',
-        createdAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'ord-003',
-    reference: 'AB-2026-000103',
-    customerName: 'Daniela Gómez',
-    customerPhone: '3157778899',
-    deliveryType: 'NACIONAL',
-    city: 'Bogotá D.C.',
-    address: 'Carrera 15 # 85-30 Apto 402',
-    customerNotes: 'Enviar guía apenas despachen',
-    subtotal: 180000,
-    discount: 10000,
-    shippingFee: 15000,
-    total: 185000,
-    status: 'PREPARANDO',
-    channel: 'WHATSAPP',
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    paidAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    items: [
-      {
-        id: 'item-4',
-        variantId: 'var-4',
-        sku: 'KIT-RUT-01',
-        productName: 'Kit Rutina Facial Esencial',
-        variantName: 'Piel Mixta',
-        unitPrice: 180000,
-        quantity: 1,
-        subtotal: 180000,
-      },
-    ],
-    payments: [
-      {
-        id: 'pay-2',
-        orderId: 'ord-003',
-        paymentMethod: 'BANCOLOMBIA',
-        transferReference: 'BCOL-0091245',
-        amount: 185000,
-        status: 'VERIFICADO',
-        verifiedByEmail: 'operador@alexabeauty.com',
-        verifiedAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-      },
-    ],
-    reservations: [],
-    statusHistory: [
-      {
-        id: 'hist-4',
-        previousStatus: 'PAGADO',
-        newStatus: 'PREPARANDO',
-        notes: 'En empaque con detalles de regalo',
-        createdAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-      },
-    ],
-  },
-];
+const EMPTY_ORDERS: AdminOrderDetailDto[] = [];
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<AdminOrderDetailDto[]>(INITIAL_MOCK_ORDERS);
+  const [orders, setOrders] = useState<AdminOrderDetailDto[]>(EMPTY_ORDERS);
   const [activeTab, setActiveTab] = useState<FilterTab>('TODOS');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -287,37 +97,12 @@ export default function AdminOrdersPage() {
           pageResult.content.map(async (sum) => {
             try {
               return await api.getAdminOrderDetail(sum.id);
-            } catch {
-              return {
-                id: sum.id,
-                reference: sum.reference,
-                customerName: sum.customerName,
-                customerPhone: sum.customerPhone,
-                deliveryType: sum.deliveryType,
-                subtotal: sum.total,
-                discount: 0,
-                shippingFee: 0,
-                total: sum.total,
-                status: sum.status,
-                channel: sum.channel,
-                expiresAt: sum.expiresAt,
-                paidAt: sum.paidAt,
-                createdAt: sum.createdAt,
-                updatedAt: sum.createdAt,
-                items: [],
-                payments: [],
-                reservations: [],
-                statusHistory: [],
-              } as AdminOrderDetailDto;
-            }
+            } catch { throw new Error("No se pudo consultar el detalle del pedido."); }
           })
         );
         setOrders(details);
       }
-    } catch {
-      // Backend not yet populated or offline; keep fallback mock orders gracefully
-      // console.info('Using local admin orders state:', e);
-    } finally {
+    } catch { setErrorMessage("No se confirmó la operación en el servidor. Actualiza e intenta nuevamente."); setSuccessMessage(null); } finally {
       setLoading(false);
     }
   }, [searchQuery]);
@@ -397,45 +182,7 @@ export default function AdminOrdersPage() {
       setSuccessMessage(`¡Pago confirmado exitosamente para el pedido ${orderForPayment.reference}! Inventario descontado.`);
       setOrderForPayment(null);
       await fetchOrders();
-    } catch {
-      // Fallback state mutation if backend endpoint is unavailable during design preview
-      setOrders((prev) =>
-        prev.map((o) => {
-          if (o.id !== orderForPayment.id) return o;
-          return {
-            ...o,
-            status: 'PAGADO',
-            paidAt: new Date().toISOString(),
-            payments: [
-              {
-                id: 'pay-' + Date.now(),
-                orderId: o.id,
-                paymentMethod,
-                transferReference: transferReference.trim(),
-                amount: paymentAmount,
-                status: 'VERIFICADO',
-                verifiedByEmail: 'admin@alexabeauty.com',
-                verifiedAt: new Date().toISOString(),
-                notes: paymentNotes.trim() || undefined,
-              },
-            ],
-            statusHistory: [
-              ...o.statusHistory,
-              {
-                id: 'hist-' + Date.now(),
-                previousStatus: o.status,
-                newStatus: 'PAGADO',
-                userEmail: 'admin@alexabeauty.com',
-                notes: `Pago verificado ref: ${transferReference.trim()}`,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          };
-        })
-      );
-      setSuccessMessage(`Pago verificado localmente para ${orderForPayment.reference}.`);
-      setOrderForPayment(null);
-    } finally {
+    } catch { throw new Error("No se pudo consultar el detalle del pedido."); } finally {
       setProcessingPayment(false);
     }
   };
@@ -451,34 +198,7 @@ export default function AdminOrdersPage() {
         setSelectedOrder(updated);
       }
       await fetchOrders();
-    } catch {
-      // Local fallback
-      setOrders((prev) =>
-        prev.map((o) => {
-          if (o.id !== orderId) return o;
-          const updatedOrder: AdminOrderDetailDto = {
-            ...o,
-            status: newStatus,
-            statusHistory: [
-              ...o.statusHistory,
-              {
-                id: 'hist-' + Date.now(),
-                previousStatus: o.status,
-                newStatus,
-                userEmail: 'admin@alexabeauty.com',
-                notes: notes || `Transición a ${newStatus}`,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          };
-          if (selectedOrder && selectedOrder.id === orderId) {
-            setSelectedOrder(updatedOrder);
-          }
-          return updatedOrder;
-        })
-      );
-      setSuccessMessage(`Estado actualizado a ${newStatus}.`);
-    } finally {
+    } catch { setErrorMessage("No se confirmó la operación en el servidor. Actualiza e intenta nuevamente."); setSuccessMessage(null); } finally {
       setProcessingTransition(false);
     }
   };
@@ -498,30 +218,7 @@ export default function AdminOrdersPage() {
         setSelectedOrder(updated);
       }
       await fetchOrders();
-    } catch {
-      setOrders((prev) =>
-        prev.map((o) => {
-          if (o.id !== orderForExtend.id) return o;
-          const newExp = new Date(Date.now() + additionalMinutes * 60 * 1000).toISOString();
-          return {
-            ...o,
-            expiresAt: newExp,
-            statusHistory: [
-              ...o.statusHistory,
-              {
-                id: 'hist-' + Date.now(),
-                newStatus: o.status,
-                userEmail: 'admin@alexabeauty.com',
-                notes: `Reserva extendida por ${additionalMinutes} minutos. ${extendNotes}`,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          };
-        })
-      );
-      setSuccessMessage(`Reserva extendida por ${additionalMinutes} minutos.`);
-      setOrderForExtend(null);
-    } finally {
+    } catch { throw new Error("No se pudo consultar el detalle del pedido."); } finally {
       setProcessingExtend(false);
     }
   };

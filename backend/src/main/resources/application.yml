@@ -1,12 +1,12 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
   shutdown: graceful
 
 spring:
   application:
     name: alexa-beauty-api
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   jpa:
     open-in-view: false
     properties:
@@ -23,7 +23,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health
   endpoint:
     health:
       show-details: when-authorized
@@ -33,20 +33,25 @@ management:
 # Application Business Configuration
 app:
   timezone: America/Bogota
-  reservation-minutes: 45
+  reservation-minutes: ${RESERVATION_MINUTES:45}
   jwt:
-    secret: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+    secret: ${JWT_SECRET:}
     expiration-ms: 86400000
   cors:
     allowed-origins:
-      - "http://localhost:3000"
-      - "http://127.0.0.1:3000"
+      - ${FRONTEND_ORIGIN:http://localhost:3000}
   storage:
-    provider: local
+    provider: ${STORAGE_PROVIDER:local}
     local-dir: uploads
     base-url: /uploads
     supabase:
       url: ${SUPABASE_URL:}
       service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
-      bucket-public: ${SUPABASE_BUCKET_PUBLIC:products}
+      bucket-public: ${SUPABASE_STORAGE_BUCKET:products}
 
+
+  whatsapp-number: ${WHATSAPP_BUSINESS_NUMBER:}
+  auth:
+    cookie-secure: false
+    cookie-same-site: Lax
+    require-origin: false

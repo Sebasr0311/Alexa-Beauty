@@ -16,16 +16,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
   const isOutOfStock = product.stock <= 0;
 
-  const handleAdd = () => {
-    if (isOutOfStock) return;
-    const res = addItem(product);
-    if (res.success) {
-      setJustAdded(true);
-      setTimeout(() => setJustAdded(false), 1200);
-    } else if (res.message) {
-      alert(res.message);
-    }
-  };
+  const handleAdd = () => { window.location.assign(`/producto/${encodeURIComponent(product.slug)}`); };
 
   const gradientClass =
     product.visual === 'dark'
@@ -34,7 +25,7 @@ export function ProductCard({ product }: ProductCardProps) {
       ? 'from-[#f8eadc] to-[#ead0be]'
       : 'from-[#f6e7e7] to-[#e6c8c8]';
 
-  const slug = product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const slug = encodeURIComponent(product.slug);
 
   return (
     <article className="group bg-white border border-[#efdee3] rounded-2xl overflow-hidden shadow-[0_9px_26px_rgba(58,26,39,0.035)] hover:-translate-y-1 transition duration-200 flex flex-col justify-between">
@@ -57,7 +48,7 @@ export function ProductCard({ product }: ProductCardProps) {
               className="text-6xl sm:text-7xl select-none filter drop-shadow-[0_15px_12px_rgba(94,49,61,0.18)] -rotate-6 group-hover:scale-105 transition-transform duration-300"
               aria-hidden="true"
             >
-              {product.icon}
+              {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="absolute inset-0 w-full h-full object-contain" /> : product.icon}
             </span>
           </div>
         </Link>
@@ -93,7 +84,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <button
           onClick={handleAdd}
           disabled={isOutOfStock}
-          aria-label={`Agregar ${product.name} al carrito`}
+          aria-label={`Seleccionar variante de ${product.name}`}
           className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
             isOutOfStock
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'

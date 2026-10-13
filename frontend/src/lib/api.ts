@@ -3,7 +3,7 @@
  * Soporta conexión contra el backend Spring Boot (/api/v1) con fallback resiliente.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = '/api/backend';
 
 export interface ProductVariantDto {
   id: string;
@@ -35,6 +35,8 @@ export interface ProductSummaryDto {
   slug: string;
   brandName: string;
   categoryName: string;
+  brand?: { name: string };
+  category?: { name: string };
   minPrice: number;
   maxPrice: number;
   totalAvailableStock: number;
@@ -94,29 +96,9 @@ export interface LoginResponseDto {
 }
 
 class ApiClient {
-  private token: string | null = null;
-
-  setToken(token: string | null) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('alexa_auth_token', token);
-      } else {
-        localStorage.removeItem('alexa_auth_token');
-      }
-    }
-  }
-
-  getToken(): string | null {
-    if (!this.token && typeof window !== 'undefined') {
-      this.token = localStorage.getItem('alexa_auth_token');
-    }
-    return this.token;
-  }
-
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
-      'Content-Transformed': 'true',
+      'X-Requested-With': 'XMLHttpRequest',
       ...(options.headers as Record<string, string>),
     };
 
@@ -124,13 +106,10 @@ class ApiClient {
       headers['Content-Type'] = 'application/json';
     }
 
-    const token = this.getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
+      credentials: 'include',
       headers,
     });
 
@@ -151,7 +130,16 @@ class ApiClient {
     }
 
     const json = await response.json();
-    return json.data !== undefined ? json.data : json;
+    const data = json.data !== undefined ? json.data : json;
+    if (data && Array.isArray(data.content)) {
+      data.content = data.content.map((item: any) => ({ ...item,
+        brandName: item.brandName ?? item.brand?.name,
+        categoryName: item.categoryName ?? item.category?.name,
+      }));
+      data.pageNumber ??= data.number;
+      data.pageSize ??= data.size;
+    }
+    return data;
   }
 
   // --- Catálogo Público ---
@@ -167,12 +155,12 @@ class ApiClient {
     sort?: string;
   }): Promise<PageDto<ProductSummaryDto>> {
     const searchParams = new URLSearchParams();
-    if (params?.q) searchParams.set('q', params.q);
+    if (params?.q) searchParams.set('query', params.q);
     if (params?.category) searchParams.set('category', params.category);
     if (params?.brand) searchParams.set('brand', params.brand);
     if (params?.minPrice !== undefined) searchParams.set('minPrice', params.minPrice.toString());
     if (params?.maxPrice !== undefined) searchParams.set('maxPrice', params.maxPrice.toString());
-    if (params?.inStockOnly) searchParams.set('inStock', 'true');
+    if (params?.inStockOnly) searchParams.set('inStockOnly', 'true');
     if (params?.page !== undefined) searchParams.set('page', params.page.toString());
     if (params?.size !== undefined) searchParams.set('size', params.size.toString());
     if (params?.sort) searchParams.set('sort', params.sort);
@@ -199,18 +187,11 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    if (res.token) {
-      this.setToken(res.token);
-    }
     return res;
   }
 
   async logout(): Promise<void> {
-    try {
-      await this.request('/auth/logout', { method: 'POST' });
-    } finally {
-      this.setToken(null);
-    }
+    await this.request('/auth/logout', { method: 'POST' });
   }
 
   async getMe(): Promise<LoginResponseDto['user']> {
@@ -220,7 +201,7 @@ class ApiClient {
   // --- Admin Catálogo ---
   async getAdminProducts(params?: { q?: string; page?: number; size?: number }): Promise<PageDto<ProductSummaryDto>> {
     const searchParams = new URLSearchParams();
-    if (params?.q) searchParams.set('q', params.q);
+    if (params?.q) searchParams.set('query', params.q);
     if (params?.page !== undefined) searchParams.set('page', params.page.toString());
     if (params?.size !== undefined) searchParams.set('size', params.size.toString());
     const query = searchParams.toString();
@@ -285,6 +266,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
       headers,
+      credentials: 'include',
     });
   }
 
@@ -330,6 +312,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
       headers,
+      credentials: 'include',
     });
   }
 
@@ -372,14 +355,11 @@ class ApiClient {
     if (params.to) searchParams.set('to', params.to);
     if (params.method && params.method !== 'TODOS') searchParams.set('method', params.method);
     const query = searchParams.toString();
-    const token = this.getToken();
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
 
     const response = await fetch(`${API_BASE_URL}/admin/sales/export.xlsx${query ? `?${query}` : ''}`, {
       headers,
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -488,6 +468,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
       headers,
+      credentials: 'include',
     });
   }
 }

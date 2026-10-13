@@ -23,6 +23,7 @@ import com.alexabeauty.whatsapp.WhatsAppGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -49,37 +50,46 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
     private static final Pattern TRACKING_TOKEN_PATTERN = Pattern.compile("\\[Tracking-Token:\\s*([^\\]]+)\\]");
 
     private final OrderRepository orderRepository;
+    private final OrderExpirationWorker expirationWorker;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final ProductVariantRepository productVariantRepository;
     private final AppSettingRepository appSettingRepository;
     private final WhatsAppGateway whatsAppGateway;
     private final OrderReferenceGenerator orderReferenceGenerator;
 
-    private final Map<String, OrderCheckoutResponse> idempotencyCache = new ConcurrentHashMap<>();
+    @Value("${app.whatsapp-number:}")
+    private String configuredBusinessPhone;
+    @Value("${app.reservation-minutes:45}")
+    private int configuredReservationMinutes;
 
     @Override
     @Transactional
     public OrderCheckoutResponse checkout(CreateOrderRequest request, String idempotencyKey) {
         String trimmedKey = (idempotencyKey != null && !idempotencyKey.isBlank()) ? idempotencyKey.trim() : null;
 
+        if (trimmedKey != null && (trimmedKey.length() > 128 || !trimmedKey.matches("[A-Za-z0-9_-]+"))) {
+            throw new ValidationException("Idempotency-Key inválida; máximo 128 caracteres alfanuméricos.");
+        }
+        // Serialize short checkout transactions across replicas, including reference allocation and replay.
+        appSettingRepository.lockBootstrapSetting().orElseThrow(() -> new IllegalStateException("Missing business setting"));
+        String fingerprint;
+        try { fingerprint = hashToken(objectMapper.writeValueAsString(request)); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException exception) { throw new IllegalStateException("Unable to fingerprint checkout", exception); }
+
         // 1. Idempotency Check
         if (trimmedKey != null) {
-            OrderCheckoutResponse cached = idempotencyCache.get(trimmedKey);
-            if (cached != null) {
-                log.info("Returning cached response for idempotencyKey='{}', reference='{}'", trimmedKey, cached.getReference());
-                return cached;
-            }
-
-            String idTag = "[Idempotency-Key: " + trimmedKey + "]";
-            Optional<Order> existingOrderOpt = orderRepository.findByIdempotencyTag(idTag);
+            Optional<Order> existingOrderOpt = orderRepository.findByIdempotencyKey(trimmedKey);
             if (existingOrderOpt.isPresent()) {
                 Order existing = existingOrderOpt.get();
-                String recoveredToken = extractTrackingToken(existing.getCustomerNotes());
+                if (!fingerprint.equals(existing.getRequestFingerprint())) {
+                    throw new ConflictException("La clave de idempotencia ya se utilizó con otro pedido.");
+                }
+                String recoveredToken = existing.getTrackingToken();
                 String businessPhone = resolveBusinessPhone();
                 String messageText = whatsAppGateway.formatOrderMessage(existing);
                 String whatsappUrl = whatsAppGateway.generateClickToChatUrl(existing, businessPhone);
 
                 OrderCheckoutResponse response = mapToResponse(existing, recoveredToken, whatsappUrl, messageText);
-                idempotencyCache.put(trimmedKey, response);
                 log.info("Found existing order for idempotencyKey='{}', reference='{}'", trimmedKey, existing.getReference());
                 return response;
             }
@@ -108,6 +118,9 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
 
         for (Map.Entry<UUID, Integer> entry : totalRequestedByVariant.entrySet()) {
             ProductVariant variant = variantMap.get(entry.getKey());
+            if (!variant.isActive() || !variant.getProduct().isActive()) {
+                throw new ConflictException("El producto o variante ya no está disponible.");
+            }
             int available = variant.getStockOnHand() - variant.getStockReserved();
             int requestedQty = entry.getValue();
             if (available < requestedQty) {
@@ -157,16 +170,7 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(reservationMinutes));
         String businessPhone = resolveBusinessPhone();
 
-        // 6. Embed idempotency key & tracking token into customer notes
         String rawNotes = request.getCustomerNotes() != null ? request.getCustomerNotes().trim() : "";
-        StringBuilder notesBuilder = new StringBuilder();
-        if (trimmedKey != null) {
-            notesBuilder.append("[Idempotency-Key: ").append(trimmedKey).append("] ");
-        }
-        notesBuilder.append("[Tracking-Token: ").append(trackingToken).append("] ");
-        if (!rawNotes.isBlank()) {
-            notesBuilder.append(rawNotes);
-        }
 
         // 7. Create Order entity
         Order order = Order.builder()
@@ -176,7 +180,10 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
                 .deliveryType(request.getDeliveryType().trim())
                 .city(request.getCity() != null ? request.getCity().trim() : null)
                 .address(request.getAddress() != null ? request.getAddress().trim() : null)
-                .customerNotes(notesBuilder.toString().trim())
+                .customerNotes(rawNotes)
+                .trackingToken(trackingToken)
+                .idempotencyKey(trimmedKey)
+                .requestFingerprint(fingerprint)
                 .subtotal(subtotal)
                 .discount(BigDecimal.ZERO)
                 .shippingFee(shippingFee)
@@ -218,9 +225,6 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
 
         OrderCheckoutResponse response = mapToResponse(savedOrder, trackingToken, whatsappUrl, messageText);
 
-        if (trimmedKey != null) {
-            idempotencyCache.put(trimmedKey, response);
-        }
 
         log.info("Order created successfully: reference='{}', total={}, expiresAt={}",
                 reference, total, expiresAt);
@@ -271,77 +275,19 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
     }
 
     @Override
-    @Transactional
     public void expireOrder(UUID orderId) {
-        Order order = orderRepository.findById(orderId).orElse(null);
-        if (order == null) {
-            return;
-        }
-
-        if (order.getStatus() != OrderStatus.PENDIENTE_CONTACTO && order.getStatus() != OrderStatus.PENDIENTE_PAGO) {
-            return;
-        }
-
-        OrderStatus previousStatus = order.getStatus();
-
-        // Lock variants deterministically
-        List<UUID> variantIds = order.getItems().stream()
-                .map(item -> item.getVariant().getId())
-                .distinct()
-                .sorted()
-                .toList();
-
-        List<ProductVariant> lockedVariants = productVariantRepository.findByIdInOrderByIdForUpdate(variantIds);
-        Map<UUID, ProductVariant> variantMap = lockedVariants.stream()
-                .collect(Collectors.toMap(ProductVariant::getId, v -> v));
-
-        // Release reserved stock (stock_on_hand is untouched!)
-        for (OrderItem item : order.getItems()) {
-            ProductVariant variant = variantMap.get(item.getVariant().getId());
-            if (variant != null) {
-                variant.setStockReserved(Math.max(0, variant.getStockReserved() - item.getQuantity()));
-            }
-        }
-
-        // Mark StockReservations as RELEASED
-        for (StockReservation res : order.getReservations()) {
-            if (res.getStatus() == ReservationStatus.ACTIVE) {
-                res.setStatus(ReservationStatus.RELEASED);
-            }
-        }
-
-        // Transition Order.status = EXPIRADO
-        order.setStatus(OrderStatus.EXPIRADO);
-
-        // Add OrderStatusHistory entry
-        OrderStatusHistory history = OrderStatusHistory.builder()
-                .order(order)
-                .previousStatus(previousStatus)
-                .newStatus(OrderStatus.EXPIRADO)
-                .notes("Tiempo de reserva agotado (45 min)")
-                .build();
-        order.getStatusHistory().add(history);
-
-        orderRepository.save(order);
-        log.info("Order reference='{}' expired. Stock reservations released.", order.getReference());
+        expirationWorker.expire(orderId);
     }
 
     @Override
-    @Transactional
     public int expireOverdueReservations() {
-        Instant now = Instant.now();
-        List<Order> overdueOrders = orderRepository.findByStatusInAndExpiresAtBefore(
-                List.of(OrderStatus.PENDIENTE_CONTACTO, OrderStatus.PENDIENTE_PAGO),
-                now
-        );
-
+        List<UUID> ids = orderRepository.findOverdueIds(OrderExpirationWorker.EXPIRABLE, Instant.now());
         int count = 0;
-        for (Order order : overdueOrders) {
+        for (UUID id : ids) {
             try {
-                expireOrder(order.getId());
-                count++;
-            } catch (Exception e) {
-                log.error("Failed to expire order id={}", order.getId(), e);
+                if (expirationWorker.expire(id)) count++;
+            } catch (Exception exception) {
+                log.error("Failed to expire order id={}", id, exception);
             }
         }
         return count;
@@ -381,21 +327,17 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
     }
 
     private int resolveReservationMinutes() {
-        return appSettingRepository.findBySettingKey("reservation_minutes")
-                .map(s -> {
-                    try {
-                        return Integer.parseInt(s.getSettingValue().trim());
-                    } catch (Exception e) {
-                        return 45;
-                    }
-                })
-                .orElse(45);
+        if (configuredReservationMinutes < 1 || configuredReservationMinutes > 1440) {
+            throw new ValidationException("RESERVATION_MINUTES must be between 1 and 1440");
+        }
+        return configuredReservationMinutes;
     }
 
     private String resolveBusinessPhone() {
-        return appSettingRepository.findBySettingKey("whatsapp_number")
-                .map(AppSetting::getSettingValue)
-                .orElse("573001234567");
+        if (configuredBusinessPhone != null && configuredBusinessPhone.matches("[1-9][0-9]{9,14}")) {
+            return configuredBusinessPhone;
+        }
+        throw new ValidationException("El contacto WhatsApp del negocio no está configurado.");
     }
 
     private String extractTrackingToken(String customerNotes) {

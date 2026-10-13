@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+server:
+  forward-headers-strategy: framework
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+  cors:
+    allowed-origins: ${FRONTEND_ORIGIN}
+  whatsapp-number: ${WHATSAPP_BUSINESS_NUMBER}
+  auth:
+    cookie-secure: true
+    cookie-same-site: Lax
+    require-origin: true
+  rate-limit:
+    enabled: true
+    login-per-minute: ${LOGIN_BUDGET_PER_MINUTE:30}
+    checkout-per-minute: ${CHECKOUT_BUDGET_PER_MINUTE:120}
+  storage:
+    provider: supabase
+    supabase:
+      url: ${SUPABASE_URL}
+      service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+      bucket-public: ${SUPABASE_STORAGE_BUCKET}
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

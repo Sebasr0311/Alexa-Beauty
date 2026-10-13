@@ -27,10 +27,10 @@ export default function StoreLayout({
       {/* 1. Announcement Banner */}
       <aside
         role="region"
-        aria-label="Aviso de demostración"
+        aria-label="Información de compra"
         className="bg-wineDark text-white text-[11px] sm:text-xs font-semibold tracking-widest text-center py-2 px-3 selection:bg-mauve"
       >
-        PROTOTIPO VISUAL · DATOS FICTICIOS · NO REALIZA COBROS
+        PEDIDOS CON RESERVA · PAGO MANUAL VERIFICADO POR NUESTRO EQUIPO
       </aside>
 
       {/* 2. Sticky Header */}
@@ -124,8 +124,7 @@ export default function StoreLayout({
             belleza, tu esencia · 2026
           </p>
           <p className="text-[11px]">
-            Prototipo conceptual para validación de experiencia. Ningún cobro real
-            se ejecuta aquí.
+            Coordinamos tu pedido por WhatsApp. No solicitamos pagos con tarjeta en esta tienda.
           </p>
         </div>
       </footer>

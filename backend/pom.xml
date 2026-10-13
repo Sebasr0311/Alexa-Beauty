@@ -133,6 +133,22 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>postgresql-verification</id>
+            <build><plugins><plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration><systemPropertyVariables>
+                    <spring.datasource.url>${env.TEST_DATABASE_URL}</spring.datasource.url>
+                    <spring.datasource.username>${env.TEST_DATABASE_USERNAME}</spring.datasource.username>
+                    <spring.datasource.password>${env.TEST_DATABASE_PASSWORD}</spring.datasource.password>
+                    <spring.datasource.driver-class-name>org.postgresql.Driver</spring.datasource.driver-class-name>
+                </systemPropertyVariables></configuration>
+            </plugin></plugins></build>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>

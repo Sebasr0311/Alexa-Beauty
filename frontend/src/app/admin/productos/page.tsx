@@ -27,67 +27,10 @@ import {
   BrandDto,
 } from '@/lib/api';
 
-const INITIAL_MOCK_PRODUCTS: ProductSummaryDto[] = [
-  {
-    id: 'prod-001',
-    sku: 'LAB-MAT-NUD01',
-    name: 'Labial Mate Duradero Velvet',
-    slug: 'labial-mate-duradero-velvet',
-    brandName: 'Bella Cosmetics',
-    categoryName: 'Labios',
-    minPrice: 18000,
-    maxPrice: 18000,
-    totalAvailableStock: 45,
-    featured: true,
-    active: true,
-    coverImageUrl: '/branding/logo.png',
-  },
-  {
-    id: 'prod-002',
-    sku: 'RUB-ROS-02',
-    name: 'Rubor Compacto Mineral Glow',
-    slug: 'rubor-compacto-mineral-glow',
-    brandName: 'Rosa Glow',
-    categoryName: 'Rostro',
-    minPrice: 24000,
-    maxPrice: 24000,
-    totalAvailableStock: 28,
-    featured: true,
-    active: true,
-    coverImageUrl: '/branding/logo.png',
-  },
-  {
-    id: 'prod-003',
-    sku: 'BASE-03',
-    name: 'Base Líquida Cobertura Media',
-    slug: 'base-liquida-cobertura-media',
-    brandName: 'Bella Cosmetics',
-    categoryName: 'Rostro',
-    minPrice: 35000,
-    maxPrice: 35000,
-    totalAvailableStock: 12,
-    featured: false,
-    active: true,
-    coverImageUrl: '/branding/logo.png',
-  },
-  {
-    id: 'prod-004',
-    sku: 'KIT-BRO-01',
-    name: 'Set de Brochas Profesionales x8',
-    slug: 'set-brochas-profesionales-x8',
-    brandName: 'Luna Beauty',
-    categoryName: 'Accesorios',
-    minPrice: 42000,
-    maxPrice: 42000,
-    totalAvailableStock: 5,
-    featured: false,
-    active: true,
-    coverImageUrl: '/branding/logo.png',
-  },
-];
+const EMPTY_PRODUCTS: ProductSummaryDto[] = [];
 
 export default function AdminProductosPage() {
-  const [products, setProducts] = useState<ProductSummaryDto[]>(INITIAL_MOCK_PRODUCTS);
+  const [products, setProducts] = useState<ProductSummaryDto[]>(EMPTY_PRODUCTS);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [brands, setBrands] = useState<BrandDto[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,9 +75,7 @@ export default function AdminProductosPage() {
       if (prodsRes.status === 'fulfilled' && prodsRes.value?.content?.length > 0) {
         setProducts(prodsRes.value.content);
       }
-    } catch {
-      // Fallback a los datos mock iniciales
-    } finally {
+    } catch { setFeedback({ type: "error", text: "La operación no se confirmó en el servidor. No se modificaron datos locales." }); } finally {
       setLoading(false);
     }
   }, [searchQuery, newProductCategoryId, newProductBrandId]);
@@ -153,16 +94,7 @@ export default function AdminProductosPage() {
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, active: !currentStatus } : p))
       );
-    } catch {
-      // Fallback local
-      setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, active: !currentStatus } : p))
-      );
-      setFeedback({
-        type: 'success',
-        text: `Estado actualizado localmente.`,
-      });
-    }
+    } catch { setFeedback({ type: "error", text: "La operación no se confirmó en el servidor. No se modificaron datos locales." }); }
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -205,29 +137,7 @@ export default function AdminProductosPage() {
       setIsModalOpen(false);
       resetForm();
       await loadData();
-    } catch (err: any) {
-      // Fallback local visual
-      const createdItem: ProductSummaryDto = {
-        id: 'prod-' + Date.now(),
-        sku: newProductSku.trim().toUpperCase(),
-        name: newProductName.trim(),
-        slug: newProductName.toLowerCase().replace(/\s+/g, '-'),
-        brandName: brands.find((b) => b.id === brandIdToUse)?.name || 'Marca General',
-        categoryName: categories.find((c) => c.id === categoryIdToUse)?.name || 'General',
-        minPrice: newProductPrice,
-        maxPrice: newProductPrice,
-        totalAvailableStock: newProductStock,
-        featured: false,
-        active: true,
-      };
-      setProducts((prev) => [createdItem, ...prev]);
-      setFeedback({
-        type: 'success',
-        text: `Producto agregado al catálogo (${err.message || 'registrado'}).`,
-      });
-      setIsModalOpen(false);
-      resetForm();
-    } finally {
+    } catch (err: any) { setFeedback({ type: "error", text: "La operación no se confirmó en el servidor. No se modificaron datos locales." }); } finally {
       setCreating(false);
     }
   };

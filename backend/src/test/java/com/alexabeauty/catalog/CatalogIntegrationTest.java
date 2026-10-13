@@ -398,7 +398,7 @@ class CatalogIntegrationTest {
                 "file",
                 "glow.png",
                 "image/png",
-                new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+                validPng()
         );
 
         MvcResult uploadResult = mockMvc.perform(multipart("/api/v1/admin/products/{id}/images", productId)
@@ -425,5 +425,10 @@ class CatalogIntegrationTest {
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+    private byte[] validPng() throws java.io.IOException {
+        var bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", bytes);
+        return bytes.toByteArray();
     }
 }

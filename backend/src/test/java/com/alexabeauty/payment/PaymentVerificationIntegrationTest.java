@@ -106,6 +106,9 @@ class PaymentVerificationIntegrationTest {
     @Autowired
     private OrderCheckoutService orderCheckoutService;
 
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     private String adminToken;
     private Brand testBrand;
     private Category testCategory;
@@ -158,6 +161,170 @@ class PaymentVerificationIntegrationTest {
                 .build();
 
         return orderCheckoutService.checkout(request, "IDEM-TEST-" + UUID.randomUUID());
+    }
+
+    @Test
+    void rejectsPartialManualPaymentWithoutConsumingStock() throws Exception {
+        ProductVariant variant = createTestVariant("PARTIAL-" + UUID.randomUUID(), 10, 0);
+        OrderCheckoutResponse checkout = createTestOrder(variant, 2);
+        assertRejectedPayment(checkout, new BigDecimal("1.00"));
+        assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockOnHand()).isEqualTo(10);
+        assertThat(paymentRepository.findByOrderId(checkout.getOrderId())).isEmpty();
+    }
+
+    @Test
+    void expirationDoesNotReleaseFutureReservation() {
+        ProductVariant variant = createTestVariant("NOT-DUE-" + UUID.randomUUID(), 10, 0);
+        var checkout = createTestOrder(variant, 2);
+        orderCheckoutService.expireOrder(checkout.getOrderId());
+        assertThat(orderRepository.findById(checkout.getOrderId()).orElseThrow().getStatus()).isNotEqualTo(OrderStatus.EXPIRADO);
+        assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockReserved()).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentExpirationReleasesOnlyItsOwnActiveReservation() throws Exception {
+        ProductVariant variant = createTestVariant("EXPIRE-RACE-" + UUID.randomUUID().toString().substring(0, 8), 10, 0);
+        var expired = createTestOrder(variant, 2);
+        var other = createTestOrder(variant, 2);
+        Order due = orderRepository.findById(expired.getOrderId()).orElseThrow();
+        due.setExpiresAt(Instant.now().minusSeconds(60)); orderRepository.save(due);
+        CountDownLatch variantLocked = new CountDownLatch(1), releaseVariant = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        try {
+            Future<?> holder = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+                productVariantRepository.findByIdInOrderByIdForUpdate(List.of(variant.getId()));
+                variantLocked.countDown();
+                try { if (!releaseVariant.await(5, TimeUnit.SECONDS)) throw new AssertionError("release timeout"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new RuntimeException(e); }
+            }));
+            assertThat(variantLocked.await(5, TimeUnit.SECONDS)).isTrue();
+            CountDownLatch started = new CountDownLatch(2);
+            Future<?> first = pool.submit(() -> { started.countDown(); orderCheckoutService.expireOrder(expired.getOrderId()); });
+            Future<?> second = pool.submit(() -> { started.countDown(); orderCheckoutService.expireOrder(expired.getOrderId()); });
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread.sleep(500); releaseVariant.countDown();
+            holder.get(10, TimeUnit.SECONDS); first.get(10, TimeUnit.SECONDS); second.get(10, TimeUnit.SECONDS);
+            assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockReserved()).isEqualTo(2);
+            assertThat(orderRepository.findById(other.getOrderId()).orElseThrow().getStatus()).isNotEqualTo(OrderStatus.EXPIRADO);
+            assertThat(stockReservationRepository.findByOrderId(other.getOrderId())).allMatch(r -> r.getStatus() == ReservationStatus.ACTIVE);
+        } finally { releaseVariant.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test
+    void expirationWaitingForPaymentCommitCannotOverwritePaidOrder() throws Exception {
+        ProductVariant variant = createTestVariant("PAY-WINS-" + UUID.randomUUID().toString().substring(0, 8), 10, 0);
+        var checkout = createTestOrder(variant, 2);
+        var payment = ConfirmPaymentRequest.builder().paymentMethod(PaymentMethod.NEQUI)
+                .transferReference("RACE-PAYMENT").amount(checkout.getTotal()).build();
+        Instant deadline = Instant.now().plusSeconds(2);
+        Order boundaryOrder = orderRepository.findById(checkout.getOrderId()).orElseThrow();
+        boundaryOrder.setExpiresAt(deadline); orderRepository.saveAndFlush(boundaryOrder);
+        CountDownLatch paymentRecorded = new CountDownLatch(1), commitPayment = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> paying = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+                try {
+                    mockMvc.perform(post("/api/v1/admin/orders/" + checkout.getOrderId() + "/confirm-payment")
+                            .header("Authorization", "Bearer " + adminToken).contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(payment))).andExpect(status().isOk());
+                    paymentRecorded.countDown();
+                    if (!commitPayment.await(5, TimeUnit.SECONDS)) throw new AssertionError("commit timeout");
+                } catch (Exception e) { throw new RuntimeException(e); }
+            }));
+            assertThat(paymentRecorded.await(5, TimeUnit.SECONDS)).isTrue();
+            while (Instant.now().isBefore(deadline)) Thread.sleep(25);
+            assertThat(Instant.now()).isAfterOrEqualTo(deadline);
+            CountDownLatch started = new CountDownLatch(1);
+            Future<?> expiring = pool.submit(() -> { started.countDown(); orderCheckoutService.expireOrder(checkout.getOrderId()); });
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread.sleep(500); commitPayment.countDown();
+            paying.get(10, TimeUnit.SECONDS); expiring.get(10, TimeUnit.SECONDS);
+            assertThat(orderRepository.findById(checkout.getOrderId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAGADO);
+            assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockOnHand()).isEqualTo(8);
+            assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockReserved()).isZero();
+            assertThat(stockReservationRepository.findByOrderId(checkout.getOrderId())).allMatch(r -> r.getStatus() == ReservationStatus.CONSUMED);
+        } finally { commitPayment.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test
+    void publicCheckoutReplayManualPaymentAndExcelReportUseRealInventory() throws Exception {
+        ProductVariant variant = createTestVariant("FLOW-" + UUID.randomUUID(), 5, 0);
+        String slug = productRepository.findById(variant.getProduct().getId()).orElseThrow().getSlug();
+        mockMvc.perform(get("/api/v1/catalog/products/" + slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.variants[0].id").value(variant.getId().toString()));
+        CreateOrderRequest request = CreateOrderRequest.builder().customerName("Integration Customer")
+                .customerPhone("3001234567").deliveryType("RETIRO_TIENDA")
+                .items(List.of(OrderItemRequest.builder().variantId(variant.getId()).quantity(2).build())).build();
+        String key = UUID.randomUUID().toString();
+        MvcResult created = mockMvc.perform(post("/api/v1/orders").header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andReturn();
+        var data = objectMapper.readTree(created.getResponse().getContentAsString()).path("data");
+        String orderId = data.path("orderId").asText();
+        mockMvc.perform(post("/api/v1/orders").header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.data.orderId").value(orderId));
+        assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockReserved()).isEqualTo(2);
+        request.setCustomerName("Different Customer");
+        mockMvc.perform(post("/api/v1/orders").header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+        var payment = ConfirmPaymentRequest.builder().paymentMethod(PaymentMethod.EFECTIVO)
+                .transferReference("MANUAL-FLOW-" + key).amount(new BigDecimal("100000.00")).build();
+        mockMvc.perform(post("/api/v1/admin/orders/" + orderId + "/confirm-payment")
+                .header("Authorization", "Bearer " + adminToken).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payment))).andExpect(status().isOk());
+        assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockOnHand()).isEqualTo(3);
+        mockMvc.perform(get("/api/v1/orders/track").param("reference", data.path("reference").asText())
+                .param("token", data.path("trackingToken").asText()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PAGADO"));
+        String date = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota")).toString();
+        var report = mockMvc.perform(get("/api/v1/admin/sales/export.xlsx")
+                .header("Authorization", "Bearer " + adminToken).param("from", date).param("to", date))
+                .andExpect(status().isOk()).andReturn();
+        try (var workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(
+                new java.io.ByteArrayInputStream(report.getResponse().getContentAsByteArray()))) {
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(5);
+            boolean found = false;
+            for (var sheet : workbook) for (var row : sheet) for (var cell : row) {
+                if (cell.toString().contains(data.path("reference").asText())) found = true;
+            }
+            assertThat(found).isTrue();
+        }
+    }
+
+    @Test
+    void rejectsElapsedReservationBeforeExpirationWorkerRuns() throws Exception {
+        ProductVariant variant = createTestVariant("ELAPSED-" + UUID.randomUUID(), 10, 0);
+        OrderCheckoutResponse checkout = createTestOrder(variant, 2);
+        Order order = orderRepository.findById(checkout.getOrderId()).orElseThrow();
+        order.setExpiresAt(Instant.now().minusSeconds(60));
+        orderRepository.save(order);
+        assertRejectedPayment(checkout, checkout.getTotal());
+        assertThat(paymentRepository.findByOrderId(checkout.getOrderId())).isEmpty();
+    }
+
+    @Test
+    void rejectsMissingReservedStockInsteadOfClampingIt() throws Exception {
+        ProductVariant variant = createTestVariant("INV-" + UUID.randomUUID(), 10, 0);
+        OrderCheckoutResponse checkout = createTestOrder(variant, 2);
+        ProductVariant stored = productVariantRepository.findById(variant.getId()).orElseThrow();
+        stored.setStockReserved(0);
+        productVariantRepository.save(stored);
+        assertRejectedPayment(checkout, checkout.getTotal());
+        assertThat(productVariantRepository.findById(variant.getId()).orElseThrow().getStockOnHand()).isEqualTo(10);
+    }
+
+    private void assertRejectedPayment(OrderCheckoutResponse checkout, BigDecimal amount) throws Exception {
+        ConfirmPaymentRequest request = ConfirmPaymentRequest.builder()
+                .paymentMethod(PaymentMethod.NEQUI).transferReference("REGRESSION")
+                .amount(amount).build();
+        mockMvc.perform(post("/api/v1/admin/orders/" + checkout.getOrderId() + "/confirm-payment")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -307,6 +474,9 @@ class PaymentVerificationIntegrationTest {
         UUID orderId = checkout.getOrderId();
 
         // Expire the order
+        Order due = orderRepository.findById(orderId).orElseThrow();
+        due.setExpiresAt(Instant.now().minusSeconds(60));
+        orderRepository.saveAndFlush(due);
         orderCheckoutService.expireOrder(orderId);
 
         Order expiredOrder = orderRepository.findById(orderId).orElseThrow();

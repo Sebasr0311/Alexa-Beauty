@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,6 +27,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Value("${app.auth.cookie-secure:false}")
+    private boolean cookieSecure;
+
+    @Value("${app.auth.cookie-same-site:Lax}")
+    private String cookieSameSite;
+
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
@@ -41,10 +48,10 @@ public class AuthController {
         // Set HttpOnly cookie for web security
         ResponseCookie cookie = ResponseCookie.from("token", authResponse.getToken())
                 .httpOnly(true)
-                .secure(false) // Set true in production behind HTTPS
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(authResponse.getExpiresIn())
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
@@ -56,10 +63,10 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from("token", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 

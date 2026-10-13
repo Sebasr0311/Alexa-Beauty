@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, OrderTrackingResponseDto } from '@/lib/api';
 import { formatCOP } from '@/lib/utils';
+import { whatsappContact } from '@/lib/contact';
 import {
   Clock,
   MessageCircle,
@@ -41,6 +42,7 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
       if (!reference) return;
       try {
         setLoading(true);
+        if (!token) { setError('El enlace de seguimiento está incompleto. Usa el enlace original de tu pedido.'); return; }
         if (token) {
           const data = await api.trackOrder(reference, token);
           setOrder(data);
@@ -105,9 +107,12 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
   // WhatsApp click-to-chat URL fallback
   const whatsappUrl =
     order?.whatsappUrl ||
-    `https://wa.me/573001234567?text=${encodeURIComponent(
+    whatsappContact(
       `Hola, Alexa Beauty 🌷\nQuiero consultar y confirmar mi pedido ${reference}.\nTotal: ${order ? formatCOP(order.total) : ''}\n¿Me ayudan a confirmar disponibilidad?`
-    )}`;
+    );
+
+  if (loading) return <p role="status" className="p-8">Consultando pedido...</p>;
+  if (error || !order) return <div className="p-8" role="alert">{error || 'No pudimos verificar este pedido.'} <Link href="/catalogo">Volver al catálogo</Link></div>;
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 py-4 sm:py-8">
@@ -173,7 +178,7 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
         {/* Primary and Secondary CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           {/* Big Primary WhatsApp Button */}
-          <a
+          {whatsappUrl ? <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -181,7 +186,7 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
           >
             <MessageCircle className="w-5 h-5 fill-current" />
             Continuar pedido en WhatsApp ↗
-          </a>
+          </a> : <p role="alert">El contacto de WhatsApp no está configurado. Copia el mensaje y contacta a la tienda.</p>}
 
           {/* Secondary Clipboard Fallback Button (P24 Matrix) */}
           <button

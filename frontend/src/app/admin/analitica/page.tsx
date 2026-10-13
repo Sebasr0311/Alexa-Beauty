@@ -39,114 +39,13 @@ import {
 } from '@/lib/utils';
 
 // Fallback mock analytics data
-const MOCK_ANALYTICS_SUMMARY: SalesSummaryDto = {
-  totalSales: 1285000,
-  paidOrdersCount: 11,
-  totalUnitsSold: 28,
-  averageTicket: 116818,
-  startDate: getColombiaDaysAgo(30),
-  endDate: getColombiaToday(),
-};
+const EMPTY_ANALYTICS_SUMMARY: SalesSummaryDto = { totalSales: 0, paidOrdersCount: 0, totalUnitsSold: 0, averageTicket: 0, startDate: '', endDate: '' };
 
-const MOCK_DAILY_SALES: DailySalesDto[] = [
-  { date: '2026-10-06', totalSales: 145000, ordersCount: 1, unitsCount: 3 },
-  { date: '2026-10-07', totalSales: 210000, ordersCount: 2, unitsCount: 5 },
-  { date: '2026-10-08', totalSales: 95000, ordersCount: 1, unitsCount: 2 },
-  { date: '2026-10-09', totalSales: 280000, ordersCount: 2, unitsCount: 6 },
-  { date: '2026-10-10', totalSales: 165000, ordersCount: 2, unitsCount: 4 },
-  { date: '2026-10-11', totalSales: 195000, ordersCount: 1, unitsCount: 4 },
-  { date: '2026-10-12', totalSales: 195000, ordersCount: 2, unitsCount: 4 },
-];
+const EMPTY_DAILY_SALES: DailySalesDto[] = [];
 
-const MOCK_TOP_PRODUCTS: TopProductDto[] = [
-  {
-    rank: 1,
-    sku: 'LAB-BELL-01',
-    productName: 'Labial Mate Velvet Cream',
-    brandName: 'Bella Flor',
-    unitsSold: 10,
-    grossRevenue: 450000,
-    revenueSharePercentage: 35.0,
-  },
-  {
-    rank: 2,
-    sku: 'KIT-RUT-01',
-    productName: 'Kit Rutina Facial Esencial',
-    brandName: 'Dermique',
-    unitsSold: 2,
-    grossRevenue: 360000,
-    revenueSharePercentage: 28.0,
-  },
-  {
-    rank: 3,
-    sku: 'FND-NAT-03',
-    productName: 'Base Líquida Serum Radiance',
-    brandName: 'Lumina Skin',
-    unitsSold: 3,
-    grossRevenue: 195000,
-    revenueSharePercentage: 15.2,
-  },
-  {
-    rank: 4,
-    sku: 'SER-VIT-02',
-    productName: 'Serum Vitamina C Iluminador',
-    brandName: 'Dermique',
-    unitsSold: 2,
-    grossRevenue: 156000,
-    revenueSharePercentage: 12.1,
-  },
-  {
-    rank: 5,
-    sku: 'MSK-VOL-01',
-    productName: 'Máscara Pestañas Volumen Extremo',
-    brandName: 'Bella Flor',
-    unitsSold: 3,
-    grossRevenue: 105000,
-    revenueSharePercentage: 8.2,
-  },
-  {
-    rank: 6,
-    sku: 'PAL-SOM-04',
-    productName: 'Paleta de Sombras Nude Sunset',
-    brandName: 'Bella Flor',
-    unitsSold: 1,
-    grossRevenue: 92000,
-    revenueSharePercentage: 7.2,
-  },
-];
+const EMPTY_TOP_PRODUCTS: TopProductDto[] = [];
 
-const MOCK_PAYMENT_METHODS: PaymentMethodBreakdownDto[] = [
-  {
-    paymentMethod: 'NEQUI',
-    totalAmount: 585000,
-    orderCount: 5,
-    percentage: 45.5,
-  },
-  {
-    paymentMethod: 'BANCOLOMBIA',
-    totalAmount: 385000,
-    orderCount: 3,
-    percentage: 30.0,
-  },
-  {
-    paymentMethod: 'DAVIPLATA',
-    totalAmount: 185000,
-    orderCount: 1,
-    percentage: 14.4,
-  },
-  {
-    paymentMethod: 'EFECTIVO',
-    totalAmount: 92000,
-    orderCount: 1,
-    percentage: 7.2,
-  },
-  {
-    paymentMethod: 'OTRO',
-    totalAmount: 38000,
-    orderCount: 1,
-    percentage: 2.9,
-  },
-];
+const EMPTY_PAYMENT_METHODS: PaymentMethodBreakdownDto[] = [];
 
 export default function AdminAnaliticaPage() {
   // Date range state
@@ -155,17 +54,18 @@ export default function AdminAnaliticaPage() {
   const [toDate, setToDate] = useState<string>(() => getColombiaToday());
 
   // Loading & data state
+  const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
   const [analyticsData, setAnalyticsData] = useState<SalesAnalyticsResponseDto>({
-    summary: MOCK_ANALYTICS_SUMMARY,
-    dailySales: MOCK_DAILY_SALES,
-    topProducts: MOCK_TOP_PRODUCTS,
-    paymentMethods: MOCK_PAYMENT_METHODS,
+    summary: EMPTY_ANALYTICS_SUMMARY,
+    dailySales: EMPTY_DAILY_SALES,
+    topProducts: EMPTY_TOP_PRODUCTS,
+    paymentMethods: EMPTY_PAYMENT_METHODS,
   });
 
   // Fetch analytics from API
   const fetchAnalytics = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     try {
       const [overviewRes, topProductsRes] = await Promise.allSettled([
         api.getAdminAnalytics({ from: fromDate, to: toDate }),
@@ -177,40 +77,28 @@ export default function AdminAnaliticaPage() {
         const topProducts =
           topProductsRes.status === 'fulfilled' && Array.isArray(topProductsRes.value)
             ? topProductsRes.value
-            : overview.topProducts || MOCK_TOP_PRODUCTS;
+            : overview.topProducts || EMPTY_TOP_PRODUCTS;
 
         setAnalyticsData({
-          summary: overview.summary || MOCK_ANALYTICS_SUMMARY,
-          dailySales: overview.dailySales || MOCK_DAILY_SALES,
+          summary: overview.summary || EMPTY_ANALYTICS_SUMMARY,
+          dailySales: overview.dailySales || EMPTY_DAILY_SALES,
           topProducts,
-          paymentMethods: overview.paymentMethods || MOCK_PAYMENT_METHODS,
+          paymentMethods: overview.paymentMethods || EMPTY_PAYMENT_METHODS,
         });
       } else {
-        // Fallback to mock data with updated dates
+        setLoadError('No pudimos consultar la analítica.');
         setAnalyticsData({
           summary: {
-            ...MOCK_ANALYTICS_SUMMARY,
+            ...EMPTY_ANALYTICS_SUMMARY,
             startDate: fromDate,
             endDate: toDate,
           },
-          dailySales: MOCK_DAILY_SALES,
-          topProducts: MOCK_TOP_PRODUCTS,
-          paymentMethods: MOCK_PAYMENT_METHODS,
+          dailySales: EMPTY_DAILY_SALES,
+          topProducts: EMPTY_TOP_PRODUCTS,
+          paymentMethods: EMPTY_PAYMENT_METHODS,
         });
       }
-    } catch {
-      // Fallback
-      setAnalyticsData({
-        summary: {
-          ...MOCK_ANALYTICS_SUMMARY,
-          startDate: fromDate,
-          endDate: toDate,
-        },
-        dailySales: MOCK_DAILY_SALES,
-        topProducts: MOCK_TOP_PRODUCTS,
-        paymentMethods: MOCK_PAYMENT_METHODS,
-      });
-    } finally {
+    } catch { setLoadError("No pudimos consultar la analítica."); setAnalyticsData({ summary: EMPTY_ANALYTICS_SUMMARY, dailySales: [], topProducts: [], paymentMethods: [] }); } finally {
       setLoading(false);
     }
   }, [fromDate, toDate]);
@@ -309,6 +197,7 @@ export default function AdminAnaliticaPage() {
         </button>
       }
     >
+      {loadError && <p role="alert" className="text-red-700">{loadError}</p>}
       <div className="space-y-6">
 
         {/* Date Filter Bar */}

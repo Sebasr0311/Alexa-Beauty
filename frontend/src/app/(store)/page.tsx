@@ -1,20 +1,24 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { PRODUCTS } from '@/lib/data';
+import { Product, toStoreProduct } from '@/lib/data';
+import { api } from '@/lib/api';
+import { whatsappContact } from '@/lib/contact';
 import { ProductCard } from '@/components/ProductCard';
 import { ArrowUpRight, ArrowRight, MessageCircleHeart, Sparkles, Heart, ShieldCheck } from 'lucide-react';
 
 export default function HomePage() {
-  const featuredProducts = PRODUCTS.slice(0, 4);
-
-  const handleWhatsAppDemo = () => {
-    alert(
-      'Demostración de WhatsApp:\n\nEn la versión conectada con backend, este enlace abrirá WhatsApp Business con una conversación preconfigurada y asesoría personalizada de Alexa Beauty.'
-    );
-  };
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [catalogError, setCatalogError] = useState('');
+  useEffect(() => { let cancelled = false;
+    api.getCatalogProducts({ size: 4, inStockOnly: true }).then(data => { if (!cancelled) setFeaturedProducts(data.content.map(toStoreProduct)); })
+      .catch(() => { if (!cancelled) setCatalogError('El catálogo no está disponible en este momento.'); });
+    return () => { cancelled = true; };
+  }, []);
+  const contact = whatsappContact('Hola Alexa Beauty, quisiera asesoría sobre sus productos.');
+  const handleWhatsAppContact = () => { if (contact) window.open(contact, '_blank', 'noopener,noreferrer'); };
 
   return (
     <div className="space-y-12 sm:space-y-16">
@@ -48,7 +52,8 @@ export default function HomePage() {
 
               <button
                 type="button"
-                onClick={handleWhatsAppDemo}
+                onClick={handleWhatsAppContact}
+                disabled={!contact}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-[#b9899c] bg-white/80 hover:bg-white text-wine font-bold px-6 py-3.5 transition-all shadow-sm"
               >
                 <MessageCircleHeart className="w-4 h-4 text-wine" />
@@ -138,6 +143,8 @@ export default function HomePage() {
           </Link>
         </div>
 
+        {catalogError && <p role="alert">{catalogError}</p>}
+        {!catalogError && featuredProducts.length === 0 && <p>Consulta el catálogo para ver la disponibilidad actual.</p>}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
           {featuredProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
@@ -159,7 +166,8 @@ export default function HomePage() {
 
           <button
             type="button"
-            onClick={handleWhatsAppDemo}
+            onClick={handleWhatsAppContact}
+                disabled={!contact}
             className="w-full sm:w-auto flex-shrink-0 inline-flex items-center justify-center gap-2 rounded-full bg-white text-wine font-extrabold px-8 py-4 hover:bg-blush transition shadow-lg"
           >
             <MessageCircleHeart className="w-5 h-5 text-wine" />

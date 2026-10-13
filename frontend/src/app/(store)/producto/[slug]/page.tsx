@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { api, ProductDetailDto, ProductVariantDto } from '@/lib/api';
-import { PRODUCTS } from '@/lib/data';
+import { whatsappContact } from '@/lib/contact';
 import { formatCOP } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { ArrowLeft, Check, Heart, Minus, Plus, Share2, ShieldCheck, Sparkles, Truck } from 'lucide-react';
@@ -33,40 +33,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
           setSelectedVariant(data.variants[0]);
         }
       } catch {
-        // Fallback resiliente a mock data si la BD aún no tiene el producto
-        const fallback = PRODUCTS.find(
-          (p) => p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') === slug || p.id.toString() === slug
-        ) || PRODUCTS[0];
-
-        if (fallback) {
-          const mockVariant: ProductVariantDto = {
-            id: 'mock-var-1',
-            sku: `MOCK-${fallback.id}`,
-            shadeName: 'Tono Universal',
-            salePrice: fallback.price,
-            minStock: 3,
-            stockOnHand: fallback.stock,
-            stockReserved: 0,
-            availableStock: fallback.stock,
-            active: true,
-          };
-
-          setProduct({
-            id: fallback.id.toString(),
-            sku: `SKU-${fallback.id}`,
-            name: fallback.name,
-            slug: slug,
-            description: fallback.description || 'Producto cosmético de alta calidad diseñado para realzar tu belleza natural.',
-            brand: { id: 'b1', name: fallback.brand, slug: 'brand' },
-            category: { id: 'c1', name: fallback.category, slug: 'category' },
-            featured: true,
-            active: true,
-            images: [],
-            variants: [mockVariant],
-            totalAvailableStock: fallback.stock,
-          });
-          setSelectedVariant(mockVariant);
-        }
+        setProduct(null); setSelectedVariant(null);
       } finally {
         setLoading(false);
       }
@@ -88,7 +55,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center">
         <h2 className="font-serif text-2xl text-wine mb-2">Producto no encontrado</h2>
-        <p className="text-muted text-sm mb-6">No encontramos el producto que estás buscando o fue retirado del catálogo.</p>
+        <p className="text-muted text-sm mb-6">El producto no existe o no pudimos consultar sus datos. No mostraremos existencias sin verificar.</p>
         <Link href="/catalogo" className="inline-flex items-center gap-2 bg-wine text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-wineDark transition">
           <ArrowLeft className="w-4 h-4" /> Volver al catálogo
         </Link>
@@ -105,7 +72,8 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
     // Map to CartContext format
     const res = addItem(
       {
-        id: parseInt(product.id) || 1,
+        id: product.id,
+        slug: product.slug,
         brand: product.brand.name,
         name: `${product.name}${selectedVariant?.shadeName ? ` - ${selectedVariant.shadeName}` : ''}`,
         category: (product.category.name as any) || 'Rostro',
@@ -145,7 +113,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
         <div className="space-y-4">
           <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#f8e4ea] to-[#ebd0d9] border border-border shadow-[0_12px_36px_rgba(92,26,49,0.06)] grid place-items-center">
             <span className="text-8xl select-none filter drop-shadow-lg -rotate-6" aria-hidden="true">
-              💄
+              {images[selectedImageIndex]?.url ? <img src={images[selectedImageIndex].url} alt={images[selectedImageIndex].altText || product.name} className="absolute inset-0 h-full w-full object-contain" /> : '💄'}
             </span>
             {isOutOfStock && (
               <span className="absolute top-4 left-4 bg-red-600/95 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
@@ -167,7 +135,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                     selectedImageIndex === idx ? 'border-wine scale-105' : 'border-border/60 hover:border-wine/40'
                   }`}
                 >
-                  <div className="w-full h-full bg-[#f8e4ea] grid place-items-center text-xl">💄</div>
+                  <img src={img.url} alt={img.altText || product.name} className="w-full h-full object-contain" />
                 </button>
               ))}
             </div>
@@ -292,9 +260,8 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
 
             {/* Direct WhatsApp Consultation CTA */}
             <a
-              href={`https://wa.me/573001234567?text=${encodeURIComponent(
-                `Hola Alexa Beauty 🌷 Tengo dudas sobre el producto "${product.name}" (${selectedVariant?.shadeName || ''}). ¿Me pueden asesorar?`
-              )}`}
+              href={whatsappContact(`Hola Alexa Beauty, tengo dudas sobre ${product.name}.`)}
+              aria-disabled={!whatsappContact('Consulta')}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full py-3 px-4 rounded-full border border-wine/40 bg-white hover:bg-cream text-wine font-bold text-xs sm:text-sm text-center flex items-center justify-center gap-2 transition"

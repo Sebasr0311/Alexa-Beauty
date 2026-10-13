@@ -26,7 +26,7 @@ public class ConfirmPaymentRequest {
     private String transferReference;
 
     @NotNull(message = "El monto es requerido")
-    @DecimalMin(value = "0.00", message = "El monto no puede ser negativo")
+    @DecimalMin(value = "0.01", message = "El monto debe ser mayor que cero")
     private BigDecimal amount;
 
     private String notes;

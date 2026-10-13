@@ -370,7 +370,7 @@ class OrderCheckoutIntegrationTest {
         assertThat(historyList).isNotEmpty();
         OrderStatusHistory latestHistory = historyList.get(0);
         assertThat(latestHistory.getNewStatus()).isEqualTo(OrderStatus.EXPIRADO);
-        assertThat(latestHistory.getNotes()).contains("Tiempo de reserva agotado (45 min)");
+        assertThat(latestHistory.getNotes()).contains("Reservation expired");
 
         // Crucial P14 invariant: stock_reserved is released back to 0, and stock_on_hand is UNTOUCHED (10)!
         ProductVariant variantAfterExpiration = productVariantRepository.findById(variant.getId()).orElseThrow();

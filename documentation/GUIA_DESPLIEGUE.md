@@ -2,126 +2,34 @@
 
 Esta guía describe el procedimiento oficial y reproducible para desplegar la plataforma **Alexa Beauty** en entornos de staging y producción utilizando **Supabase (PostgreSQL + Storage)**, **Render (Backend Spring Boot)** y **Vercel (Frontend Next.js)**.
 
----
+## Controles obligatorios antes de publicar (13 de octubre de 2026)
 
-## 1. Arquitectura de Despliegue
+- No hay pasarela de pago: el cliente reserva el pedido y coordina por WhatsApp. Solo ADMIN u OPERADOR registra un pago manual comprobado en el panel. El importe debe coincidir exactamente con el total y la reserva debe seguir vigente. No confirmar por una captura de pantalla sin comprobar el abono real.
+- La web usa `/api/backend/*`, reenviado por Next.js al `API_BACKEND_URL` HTTPS del servidor. La cookie de sesión es HttpOnly, Secure en `prod`, sin Domain, SameSite=Lax. No usar el antiguo `NEXT_PUBLIC_API_BASE_URL`, `SESSION_SECRET` ni `STORAGE_BUCKET_PUBLIC`: las variables reales están en `.env.example`.
+- Configurar el origen exacto HTTPS de la web, sin barra final. Las solicitudes de escritura deben conservar `Origin` y `X-Requested-With: XMLHttpRequest` a través del proxy.
+- Las variables de backend se inyectan en Render; Spring Boot no lee automáticamente el archivo `.env` de la raíz. Las variables `NEXT_PUBLIC_*` se fijan al compilar la web. No compartir claves JWT o service_role con Vercel ni con el navegador.
+- El primer arranque `prod` desactiva el administrador de demostración y crea/configura el administrador indicado. Los reinicios posteriores no restablecen la contraseña. Mantener protegidas las credenciales de bootstrap; cualquier recuperación posterior debe ser explícita.
+- El backend tiene presupuestos globales por instancia para login (30/min) y checkout (120/min), configurables. Son protección básica, no límites distribuidos por cliente. Configurar límites adicionales en el borde confiable y probarlos en staging; no confiar en X-Forwarded-For suministrado por el cliente.
+- Crear y comprobar el bucket público solo para imágenes del catálogo. No colocar comprobantes de pago ni datos privados en ese bucket. La carga permite JPEG/PNG decodificados, hasta 5 MB y 16 megapíxeles.
+- Respaldar PostgreSQL antes de aplicar V4. Es una migración aditiva; volver a la imagen anterior no elimina sus columnas. Probar restauración en una base aislada antes del lanzamiento.
+- Verificar flujo real en staging sobre PostgreSQL: catálogo → pedido → pago manual → inventario → Excel; además, confirmaciones simultáneas y expiración de reservas. No publicar si estos controles faltan.
+- Acordar costos y cobertura de envío: actualmente `shippingFee` es cero. No presentar como cobrado un transporte coordinado fuera del total del sistema.
+- Verificar dominio, TLS, número WhatsApp real, catálogo/precios/stock iniciales, alertas y responsable operativo. Esta guía no acredita que esos recursos ya existan.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                       ARQUITECTURA CLOUD                        │
-└─────────────────────────────────────────────────────────────────┘
-
-   [Cliente Web / Móvil]
-           │
-           ▼ (HTTPS)
-   ┌───────────────────────┐
-   │    Vercel (Edge)      │  Next.js 15+ App Router
-   │    Frontend PWA       │  Palette: #711A38 / #FCF8F2
-   └──────────┬────────────┘
-              │ (REST / JSON)
-              ▼
-   ┌───────────────────────┐
-   │    Render (Docker)    │  Spring Boot 3.3.5 / Java 21 LTS
-   │    Backend Web Svc    │  Multi-stage container (no-root)
-   │  /api/v1/health/public│  Cron de expiración de reservas (60s)
-   └─────┬───────────┬─────┘
-         │           │
-         │ (JDBC SSL)│ (REST HTTPS + Service Role)
-         ▼           ▼
-   ┌───────────┐ ┌──────────────┐
-   │ PostgreSQL│ │   Storage    │
-   │  Supabase │ │   Supabase   │
-   └───────────┘ └──────────────┘
-```
+La evidencia local vigente está en `documentation/PRODUCTION_READINESS_2026-10-13.md`; el informe anterior no constituye autorización de lanzamiento.
 
 ---
 
-## 2. Paso 1: Configuración de Supabase (Base de Datos y Almacenamiento)
+## Configuración y procedimiento vigentes
 
-### 2.1. Base de Datos PostgreSQL
-1. Crea un proyecto en [Supabase](https://supabase.com).
-2. En **Project Settings > Database**, copia la URL de conexión directa:
-   ```
-   postgresql://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
-   ```
-3. Las migraciones Flyway (`V1`, `V2`, `V3`) se aplicarán **automáticamente** al arrancar el backend Spring Boot.
+Use [CONFIGURACION_DESPLIEGUE.md](CONFIGURACION_DESPLIEGUE.md) como referencia única para los campos del panel, variables y orden de despliegue de Supabase, Render y Vercel. Corrige las rutas Docker, elimina credenciales de demostración y separa secretos por servicio.
 
-### 2.2. Supabase Storage (Imágenes de Catálogo)
-1. Ve a **Storage** en el panel de Supabase.
-2. Crea un nuevo bucket llamado: `alexa-beauty-public`.
-3. Activa la opción **Public bucket** para permitir lectura directa de imágenes vía CDN.
-4. En **Policies**, asegúrate de que:
-   - Lectura pública: `SELECT` permitido para rol `anon` y `authenticated`.
-   - Inserción y eliminación: Permitido únicamente mediante la clave `service_role` (utilizada exclusivamente por el backend).
+### Resumen operativo
 
----
+1. Supabase: conexión Session pooler IPv4 en puerto 5432, JDBC con TLS; Data API desactivada y bucket público `alexa-beauty-public` solo para JPEG/PNG comerciales.
+2. Render: Web Service Docker, raíz `backend`, Dockerfile `./Dockerfile`, contexto `.`, sin override de ENTRYPOINT, health `/api/v1/health/public`. Preferir instancia siempre activa: la gratuita se suspende y detiene la expiración programada.
+3. Vercel: Next.js, raíz `frontend`, Node 22.x, `npm ci`, `npm run build`, salida automática. Solo las tres variables frontend de la referencia.
+4. Configurar URLs canónicas HTTPS cruzadas, publicar las correcciones locales autorizadas y desplegar API antes de web. No sustituir claves por valores de demostración.
+5. Completar todos los controles cloud de la referencia antes de abrir ventas. Las pruebas locales aprobadas no acreditan HTTPS, cookies o Storage desplegados.
 
-## 3. Paso 2: Despliegue del Backend en Render
-
-### 3.1. Creación del Servicio Web
-1. En [Render Dashboard](https://dashboard.render.com), selecciona **New > Web Service**.
-2. Conecta el repositorio de GitHub: `https://github.com/Sebasr0311/Alexa-Beauty.git`.
-3. Configuración del servicio:
-   - **Name:** `alexa-beauty-api`
-   - **Region:** Ohio (US East) o Frankfurt (según proximidad a Supabase).
-   - **Branch:** `main`
-   - **Root Directory:** `backend` (o déjalo en blanco si indicas la ruta del Dockerfile).
-   - **Runtime:** `Docker`
-   - **Dockerfile Path:** `./backend/Dockerfile`
-   - **Plan:** `Starter` (mínimo recomendado para evitar suspensión en frío y garantizar la ejecución del worker de expiración de reservas cada 60s).
-
-### 3.2. Variables de Entorno en Render
-En la pestaña **Environment**, define las siguientes variables:
-
-| Variable | Valor de Ejemplo / Descripción |
-|---|---|
-| `SPRING_PROFILES_ACTIVE` | `prod` |
-| `DATABASE_URL` | `jdbc:postgresql://db.[REF].supabase.co:5432/postgres?sslmode=require` |
-| `DATABASE_USERNAME` | `postgres` |
-| `DATABASE_PASSWORD` | `[Tu contraseña de Supabase]` |
-| `SUPABASE_URL` | `https://[REF].supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | `[Clave secreta service_role de Supabase]` |
-| `SUPABASE_STORAGE_BUCKET` | `alexa-beauty-public` |
-| `WHATSAPP_BUSINESS_NUMBER` | `573001234567` (Número verificado con código país) |
-| `FRONTEND_ORIGIN` | `https://alexabeauty.com` (o URL de Vercel) |
-| `JWT_SECRET` | `[Clave segura de al menos 256 bits generada con openssl rand -base64 64]` |
-| `RESERVATION_MINUTES` | `45` |
-
-### 3.3. Configuración de Salud (Health Check)
-- **Health Check Path:** `/api/v1/health/public`
-- **Port:** `8080` (expuesto por el Dockerfile)
-
----
-
-## 4. Paso 3: Despliegue del Frontend en Vercel
-
-### 4.1. Importación del Proyecto
-1. En [Vercel Dashboard](https://vercel.com/dashboard), selecciona **Add New > Project**.
-2. Importa el repositorio: `Sebasr0311/Alexa-Beauty`.
-3. Ajustes del proyecto:
-   - **Framework Preset:** `Next.js`
-   - **Root Directory:** `frontend`
-   - **Build Command:** `next build`
-   - **Output Directory:** `.next`
-
-### 4.2. Variables de Entorno en Vercel
-En la pestaña **Environment Variables**:
-
-| Variable | Valor |
-|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | `https://alexa-beauty-api.onrender.com/api/v1` |
-| `NEXT_PUBLIC_SITE_URL` | `https://alexabeauty.com` |
-
-4. Presiona **Deploy**. El build generará las 12 rutas estáticas y dinámicas.
-
----
-
-## 5. Paso 4: Checklist de Verificación Post-Despliegue
-
-- [ ] **Health Check:** `curl https://alexa-beauty-api.onrender.com/api/v1/health/public` devuelve HTTP 200 con `status: "UP"`.
-- [ ] **CORS:** Petición OPTIONS desde el dominio de Vercel devuelve cabeceras `Access-Control-Allow-Origin` correctas.
-- [ ] **Semilla de Administrador:** Ingreso a `/admin` con credenciales iniciales (`admin@alexabeauty.com` / `Admin123*Alexa`).
-- [ ] **Cambio de Contraseña:** Inmediata actualización de la clave del usuario `admin` en base de datos.
-- [ ] **Catálogo Público:** Carga fluida de `/` y `/catalogo` con imágenes servidas desde Supabase Storage.
-- [ ] **Flujo de Checkout:** Creación de un pedido de prueba y verificación de la redirección correcta a WhatsApp con referencia `AB-YYYY-NNNNNN`.
-- [ ] **Expiración:** Comprobar en logs de Render que `ReservationExpirationJob` se ejecuta periódicamente sin errores.
+No se instala pasarela: el cliente coordina por WhatsApp y el administrador comprueba el abono real antes de confirmarlo. No restaurar respaldos ni ejecutar pruebas destructivas sobre producción.

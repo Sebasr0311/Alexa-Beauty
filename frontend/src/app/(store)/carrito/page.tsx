@@ -16,7 +16,6 @@ export default function CartPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerCity, setCustomerCity] = useState('');
   const [notes, setNotes] = useState('');
-  const [orderPlaced, setOrderPlaced] = useState(false);
 
   const handleCheckoutWhatsApp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,51 +35,10 @@ export default function CartPage() {
           Mi carrito
         </h1>
         <p className="text-muted text-sm sm:text-base mt-2">
-          Precios y existencias de demostración. Los pedidos finales se coordinan y confirman vía WhatsApp.
+          El total es estimado. El servidor verifica precios y existencias al crear tu pedido; el pago se confirma manualmente.
         </p>
       </div>
 
-      {orderPlaced ? (
-        /* Order Confirmed Mock State */
-        <div className="bg-white border border-[#22795B]/30 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto shadow-soft space-y-5">
-          <div className="w-16 h-16 rounded-full bg-[#E2F5EA] text-success mx-auto flex items-center justify-center text-3xl">
-            ✓
-          </div>
-          <span className="text-xs uppercase font-extrabold tracking-widest text-success">
-            Pedido preparado para WhatsApp
-          </span>
-          <h2 className="font-serif text-2xl sm:text-3xl text-wine font-bold">
-            ¡Referencia AB-2026-DEMO generada!
-          </h2>
-          <p className="text-muted text-sm sm:text-base leading-relaxed">
-            En la versión productiva conectada con la API de Spring Boot, el sistema reservará tu stock por 45 minutos y abrirá WhatsApp con el siguiente resumen listo para enviar a Alexa Beauty.
-          </p>
-
-          <div className="bg-cream border border-border rounded-2xl p-4 text-left text-xs sm:text-sm font-mono space-y-1 text-ink/80">
-            <p><strong>Cliente:</strong> {customerName || 'Cliente demo'}</p>
-            <p><strong>Teléfono:</strong> {customerPhone || '300 000 0000'}</p>
-            <p><strong>Ciudad:</strong> {customerCity || 'Colombia'}</p>
-            <p><strong>Total pedido:</strong> {formatCOP(totalAmount)}</p>
-            <p><strong>Artículos:</strong> {totalCount} unidades</p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <button
-              onClick={() => setOrderPlaced(false)}
-              className="px-6 py-3 rounded-full border border-border text-sm font-bold text-ink hover:bg-cream"
-            >
-              Volver al carrito
-            </button>
-            <Link
-              href="/catalogo"
-              className="px-6 py-3 rounded-full bg-wine text-white text-sm font-bold hover:bg-wineDark"
-            >
-              Seguir explorando
-            </Link>
-          </div>
-        </div>
-      ) : (
-        /* Main Cart Layout */
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-8 items-start">
           {/* Left: Cart Items List */}
           <div className="bg-white border border-border rounded-3xl p-6 sm:p-8 shadow-soft">
@@ -101,9 +59,9 @@ export default function CartPage() {
 
             {items.length > 0 ? (
               <div className="divide-y divide-border">
-                {items.map(({ product, quantity }) => (
+                {items.map(({ product, quantity, variantId }) => (
                   <div
-                    key={product.id}
+                    key={variantId}
                     className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     {/* Item info */}
@@ -129,7 +87,7 @@ export default function CartPage() {
                       <div className="flex items-center border border-border rounded-full bg-cream p-1">
                         <button
                           type="button"
-                          onClick={() => updateQuantity(product.id, -1)}
+                          onClick={() => updateQuantity(variantId, -1)}
                           aria-label={`Reducir cantidad de ${product.name}`}
                           className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-ink hover:text-wine shadow-xs transition"
                         >
@@ -140,7 +98,7 @@ export default function CartPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQuantity(product.id, 1)}
+                          onClick={() => updateQuantity(variantId, 1)}
                           disabled={quantity >= product.stock}
                           aria-label={`Aumentar cantidad de ${product.name}`}
                           className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-ink hover:text-wine disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition"
@@ -157,7 +115,7 @@ export default function CartPage() {
 
                       <button
                         type="button"
-                        onClick={() => removeItem(product.id)}
+                        onClick={() => removeItem(variantId)}
                         aria-label={`Eliminar ${product.name} del carrito`}
                         className="text-muted hover:text-wine p-1.5 transition"
                       >
@@ -288,11 +246,11 @@ export default function CartPage() {
 
             {/* Architectural Note */}
             <div className="bg-[#FFF8E7] border border-[#F0D597] rounded-2xl p-4 text-xs text-[#8A5C11] leading-relaxed">
-              <strong>Nota del flujo de compra:</strong> En la versión final, este botón registra el pedido en el servidor, bloquea el stock por 45 min y genera el mensaje de WhatsApp preformateado. La venta se marca como pagada solo cuando el administrador confirma la transferencia.
+              <strong>Cómo funciona:</strong> En el siguiente paso confirmas el pedido y reservas las existencias por tiempo limitado. Coordinamos el pago por WhatsApp; el pedido solo se marca como pagado cuando nuestro equipo verifica el importe recibido.
             </div>
           </div>
         </div>
-      )}
+
     </div>
   );
 }

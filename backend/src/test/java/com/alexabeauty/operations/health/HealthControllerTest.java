@@ -27,6 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @ActiveProfiles("test")
 class HealthControllerTest {
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private com.alexabeauty.auth.repository.UserRepository users;
+
 
     @Autowired
     private MockMvc mockMvc;

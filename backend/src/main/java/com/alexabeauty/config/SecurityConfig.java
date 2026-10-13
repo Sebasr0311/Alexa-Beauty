@@ -64,7 +64,7 @@ public class SecurityConfig {
                 // Public Health and Actuator endpoints
                 .requestMatchers(
                     "/api/v1/health/**",
-                    "/actuator/**"
+                    "/actuator/health", "/actuator/health/**"
                 ).permitAll()
                 // Public OpenAPI / Swagger Documentation
                 .requestMatchers(

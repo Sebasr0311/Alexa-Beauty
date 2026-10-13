@@ -24,8 +24,9 @@ import {
 export default function AdminDashboardPage() {
   const [salesSummary, setSalesSummary] = useState<SalesSummaryDto | null>(null);
   const [recentOrders, setRecentOrders] = useState<AdminOrderSummaryDto[]>([]);
-  const [lowStockAlerts, setLowStockAlerts] = useState<number>(3);
-  const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(4);
+  const [lowStockAlerts, setLowStockAlerts] = useState<number>(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function AdminDashboardPage() {
           api.getInventorySummary({ lowStockOnly: true, size: 5 }),
         ]);
 
+        if ([salesRes, ordersRes, invRes].some(result => result.status === 'rejected')) setError('No pudimos consultar todos los indicadores. Los datos faltantes no están disponibles.');
         if (salesRes.status === 'fulfilled' && salesRes.value?.summary) {
           setSalesSummary(salesRes.value.summary);
         }
@@ -46,7 +48,7 @@ export default function AdminDashboardPage() {
           const pending = ordersRes.value.content.filter(
             (o) => o.status === 'PENDIENTE_CONTACTO' || o.status === 'PENDIENTE_PAGO'
           ).length;
-          setPendingOrdersCount(pending || 4);
+          setPendingOrdersCount(pending);
         }
         if (invRes.status === 'fulfilled' && invRes.value?.totalElements !== undefined) {
           setLowStockAlerts(invRes.value.totalElements);
@@ -67,6 +69,7 @@ export default function AdminDashboardPage() {
       title="Hola, administrador ♡"
       subtitle="Resumen general de Alexa Beauty · Ventas, pedidos y alertas de inventario."
     >
+      {error && <p role="alert" className="text-red-700">{error}</p>}
       {/* 3 Tarjetas KPI Principales */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-border rounded-2xl p-5 shadow-sm">
@@ -74,11 +77,11 @@ export default function AdminDashboardPage() {
             Ventas pagadas · acumuladas
           </span>
           <p className="font-serif text-3xl font-bold text-wine my-2 tracking-tight">
-            {formatCOP(salesSummary?.totalSales ?? 189000)}
+            {formatCOP(salesSummary?.totalSales ?? 0)}
           </p>
           <span className="text-xs text-success font-semibold flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>{salesSummary?.paidOrdersCount ?? 3} pedidos verificados</span>
+            <span>{salesSummary?.paidOrdersCount ?? 0} pedidos verificados</span>
           </span>
         </div>
 

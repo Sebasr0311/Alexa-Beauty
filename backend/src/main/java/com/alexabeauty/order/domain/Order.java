@@ -88,6 +88,12 @@ public class Order {
 
     @Column(name = "tracking_token_hash", nullable = false, length = 255)
     private String trackingTokenHash;
+    @Column(name = "tracking_token", length = 64)
+    private String trackingToken;
+    @Column(name = "idempotency_key", unique = true, length = 128)
+    private String idempotencyKey;
+    @Column(name = "request_fingerprint", length = 64)
+    private String requestFingerprint;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

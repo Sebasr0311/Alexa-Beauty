@@ -82,6 +82,26 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void httpOnlySessionAuthenticatesWithoutBrowserTokenStorage() throws Exception {
+        var login = mockMvc.perform(post("/api/v1/auth/login")
+                .header("Origin", "http://localhost:3000").header("X-Requested-With", "XMLHttpRequest")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new LoginRequest("admin@alexabeauty.com", "Admin123*Alexa"))))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(login.getResponse().getHeader("Set-Cookie")).contains("HttpOnly", "SameSite=Lax");
+        String token = objectMapper.readTree(login.getResponse().getContentAsString()).path("data").path("token").asText();
+        mockMvc.perform(get("/api/v1/auth/me").cookie(new jakarta.servlet.http.Cookie("token", token)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.role").value("ADMIN"));
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(new jakarta.servlet.http.Cookie("token", token))
+                .header("Origin", "https://untrusted.example").header("X-Requested-With", "XMLHttpRequest"))
+                .andExpect(status().isForbidden());
+        var logout = mockMvc.perform(post("/api/v1/auth/logout").cookie(new jakarta.servlet.http.Cookie("token", token))
+                .header("Origin", "http://localhost:3000").header("X-Requested-With", "XMLHttpRequest"))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(logout.getResponse().getHeader("Set-Cookie")).contains("Max-Age=0", "HttpOnly");
+    }
+
+    @Test
     @DisplayName("Access to /api/v1/auth/me with valid Bearer token returns user profile")
     void getProfile_withValidToken_shouldReturnProfile() throws Exception {
         // Step 1: Login to get token

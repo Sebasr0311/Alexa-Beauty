@@ -36,8 +36,7 @@ public class PublicOrderController {
             @Valid @RequestBody CreateOrderRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        log.info("Received public checkout request for customer='{}', phone='{}'",
-                request.getCustomerName(), request.getCustomerPhone());
+        log.info("Received public checkout request");
         OrderCheckoutResponse response = orderCheckoutService.checkout(request, idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Pedido registrado exitosamente. Stock reservado por 45 minutos.", response));

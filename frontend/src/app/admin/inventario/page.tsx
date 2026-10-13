@@ -24,121 +24,14 @@ import {
   InventoryMovementDto,
 } from '@/lib/api';
 
-const INITIAL_MOCK_SUMMARY: InventorySummaryDto[] = [
-  {
-    variantId: 'var-001',
-    productId: 'prod-001',
-    sku: 'LAB-MAT-NUD01',
-    productName: 'Labial Mate Duradero Velvet',
-    brandName: 'Bella Cosmetics',
-    categoryName: 'Labios',
-    shadeName: 'Nude 01',
-    stockOnHand: 50,
-    stockReserved: 5,
-    availableStock: 45,
-    minStock: 10,
-    isLowStock: false,
-    active: true,
-  },
-  {
-    variantId: 'var-002',
-    productId: 'prod-002',
-    sku: 'RUB-ROS-02',
-    productName: 'Rubor Compacto Mineral Glow',
-    brandName: 'Rosa Glow',
-    categoryName: 'Rostro',
-    shadeName: 'Rosa 02',
-    stockOnHand: 30,
-    stockReserved: 2,
-    availableStock: 28,
-    minStock: 10,
-    isLowStock: false,
-    active: true,
-  },
-  {
-    variantId: 'var-003',
-    productId: 'prod-003',
-    sku: 'BASE-03',
-    productName: 'Base Líquida Cobertura Media',
-    brandName: 'Bella Cosmetics',
-    categoryName: 'Rostro',
-    shadeName: '03 Beige Natural',
-    stockOnHand: 15,
-    stockReserved: 3,
-    availableStock: 12,
-    minStock: 15,
-    isLowStock: true,
-    active: true,
-  },
-  {
-    variantId: 'var-004',
-    productId: 'prod-004',
-    sku: 'KIT-BRO-01',
-    productName: 'Set de Brochas Profesionales x8',
-    brandName: 'Luna Beauty',
-    categoryName: 'Accesorios',
-    shadeName: 'Default',
-    stockOnHand: 6,
-    stockReserved: 1,
-    availableStock: 5,
-    minStock: 5,
-    isLowStock: true,
-    active: true,
-  },
-];
+const EMPTY_SUMMARY: InventorySummaryDto[] = [];
 
-const INITIAL_MOCK_MOVEMENTS: InventoryMovementDto[] = [
-  {
-    id: 'mov-001',
-    variantId: 'var-001',
-    sku: 'LAB-MAT-NUD01',
-    productName: 'Labial Mate Duradero Velvet',
-    shadeName: 'Nude 01',
-    movementType: 'VENTA',
-    quantityDelta: -2,
-    qtyBefore: 52,
-    qtyAfter: 50,
-    reference: 'AB-2026-000101',
-    reason: 'Venta verificada pago ref: NEQ-10492',
-    actorEmail: 'admin@alexabeauty.com',
-    createdAt: new Date(Date.now() - 3600 * 1000).toISOString(),
-  },
-  {
-    id: 'mov-002',
-    variantId: 'var-003',
-    sku: 'BASE-03',
-    productName: 'Base Líquida Cobertura Media',
-    shadeName: '03 Beige Natural',
-    movementType: 'ENTRADA',
-    quantityDelta: 10,
-    qtyBefore: 5,
-    qtyAfter: 15,
-    reference: 'REC-20261012-001',
-    reason: 'Recepción de mercancía factura F-9901',
-    actorEmail: 'admin@alexabeauty.com',
-    createdAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: 'mov-003',
-    variantId: 'var-002',
-    sku: 'RUB-ROS-02',
-    productName: 'Rubor Compacto Mineral Glow',
-    shadeName: 'Rosa 02',
-    movementType: 'AJUSTE',
-    quantityDelta: -1,
-    qtyBefore: 31,
-    qtyAfter: 30,
-    reference: 'AJUSTE_MANUAL',
-    reason: 'Merma por muestra de tono en tienda',
-    actorEmail: 'admin@alexabeauty.com',
-    createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-  },
-];
+const EMPTY_MOVEMENTS: InventoryMovementDto[] = [];
 
 export default function AdminInventarioPage() {
   const [activeTab, setActiveTab] = useState<'EXISTENCIAS' | 'KARDEX'>('EXISTENCIAS');
-  const [summaryList, setSummaryList] = useState<InventorySummaryDto[]>(INITIAL_MOCK_SUMMARY);
-  const [movementsList, setMovementsList] = useState<InventoryMovementDto[]>(INITIAL_MOCK_MOVEMENTS);
+  const [summaryList, setSummaryList] = useState<InventorySummaryDto[]>(EMPTY_SUMMARY);
+  const [movementsList, setMovementsList] = useState<InventoryMovementDto[]>(EMPTY_MOVEMENTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -178,9 +71,7 @@ export default function AdminInventarioPage() {
       if (movRes.status === 'fulfilled' && movRes.value?.content?.length > 0) {
         setMovementsList(movRes.value.content);
       }
-    } catch {
-      // Fallback
-    } finally {
+    } catch { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setLoading(false);
     }
   }, [searchQuery, lowStockFilter]);
@@ -237,44 +128,7 @@ export default function AdminInventarioPage() {
       });
       setAdjustModalOpen(false);
       await loadData();
-    } catch (err: any) {
-      // Fallback local
-      const delta = newStockOnHand - selectedVariantForAdjust.stockOnHand;
-      setSummaryList((prev) =>
-        prev.map((s) =>
-          s.variantId === selectedVariantForAdjust.variantId
-            ? {
-                ...s,
-                stockOnHand: newStockOnHand,
-                availableStock: newStockOnHand - s.stockReserved,
-                isLowStock: newStockOnHand - s.stockReserved <= s.minStock,
-              }
-            : s
-        )
-      );
-      setMovementsList((prev) => [
-        {
-          id: 'mov-' + Date.now(),
-          variantId: selectedVariantForAdjust.variantId,
-          sku: selectedVariantForAdjust.sku,
-          productName: selectedVariantForAdjust.productName,
-          movementType: 'AJUSTE',
-          quantityDelta: delta,
-          qtyBefore: selectedVariantForAdjust.stockOnHand,
-          qtyAfter: newStockOnHand,
-          reference: 'AJUSTE_MANUAL',
-          reason: adjustReason.trim(),
-          actorEmail: 'admin@alexabeauty.com',
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-      setFeedback({
-        type: 'success',
-        text: `Ajuste aplicado localmente (${err.message || 'guardado'}).`,
-      });
-      setAdjustModalOpen(false);
-    } finally {
+    } catch (err: any) { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setAdjusting(false);
     }
   };
@@ -305,42 +159,7 @@ export default function AdminInventarioPage() {
       setFeedback({ type: 'success', text: `Recepción de mercancía registrada exitosamente (+${receiptQuantity} unidades).` });
       setReceiptModalOpen(false);
       await loadData();
-    } catch {
-      // Fallback local
-      const target = summaryList.find((s) => s.variantId === targetVariantId);
-      if (target) {
-        setSummaryList((prev) =>
-          prev.map((s) =>
-            s.variantId === targetVariantId
-              ? {
-                  ...s,
-                  stockOnHand: s.stockOnHand + receiptQuantity,
-                  availableStock: s.availableStock + receiptQuantity,
-                }
-              : s
-          )
-        );
-        setMovementsList((prev) => [
-          {
-            id: 'mov-' + Date.now(),
-            variantId: targetVariantId,
-            sku: target.sku,
-            productName: target.productName,
-            movementType: 'ENTRADA',
-            quantityDelta: receiptQuantity,
-            qtyBefore: target.stockOnHand,
-            qtyAfter: target.stockOnHand + receiptQuantity,
-            reference: receiptInvoice || 'REC-LOCAL',
-            reason: `Recepción de ${receiptProvider || 'proveedor'}`,
-            actorEmail: 'admin@alexabeauty.com',
-            createdAt: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
-      }
-      setFeedback({ type: 'success', text: `Recepción de mercancía aplicada localmente.` });
-      setReceiptModalOpen(false);
-    } finally {
+    } catch { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setReceiving(false);
     }
   };

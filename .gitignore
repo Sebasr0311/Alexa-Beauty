@@ -6,6 +6,8 @@
 Thumbs.db
 .codegraph/
 .atl/
+.agents/
+skills-lock.json
 
 # Java / Maven
 **/target/
@@ -16,6 +18,12 @@ Thumbs.db
 # Node / Next.js
 **/node_modules/
 **/.next/
+**/.next-production-check/
+**/.next-runtime-check/
+*-verification.log
+rate-limit-*.log
+config-red.log
+expiry-*.log
 **/out/
 *.tsbuildinfo
 npm-debug.log*

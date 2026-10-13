@@ -65,7 +65,7 @@ export default function AdminImportPage() {
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+  const API_BASE = '/api/backend';
 
   const handleDownloadTemplate = () => {
     window.open(`${API_BASE}/admin/products/import/template`, '_blank');
@@ -94,11 +94,11 @@ export default function AdminImportPage() {
     formData.append('file', file);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('alexa_auth_token') : null;
       const res = await fetch(`${API_BASE}/admin/products/imports/preview`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'X-Requested-With': 'XMLHttpRequest',
         },
         body: formData,
       });
@@ -123,12 +123,12 @@ export default function AdminImportPage() {
     setErrorMsg(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('alexa_auth_token') : null;
       const res = await fetch(`${API_BASE}/admin/products/imports/${preview.jobId}/commit`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify({ policy: conflictPolicy }),
       });
@@ -142,7 +142,7 @@ export default function AdminImportPage() {
       const resultData = data.data || data;
       setCommitResult({
         success: true,
-        importedCount: resultData.importedProductsCount || preview.validRows,
+        importedCount: resultData.importedProductsCount ?? 0,
         initialStockAdded: resultData.totalInitialStockAdded || 0,
       });
     } catch (err: any) {

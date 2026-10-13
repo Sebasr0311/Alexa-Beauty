@@ -30,8 +30,7 @@ public class MediaServiceImpl implements MediaService {
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
             "image/jpeg",
-            "image/png",
-            "image/webp"
+            "image/png"
     );
     private static final Set<String> FORBIDDEN_EXTENSIONS = Set.of(
             ".exe", ".bat", ".cmd", ".sh", ".php", ".jsp", ".py", ".pl", ".dll", ".jar", ".msi", ".scr", ".bin"
@@ -56,23 +55,11 @@ public class MediaServiceImpl implements MediaService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
 
-        validateFile(file);
+        byte[] bytes = validateFile(file);
 
         String contentType = file.getContentType().toLowerCase(Locale.ROOT);
         String ext = resolveExtension(contentType);
         String storagePath = String.format("products/%s/%s.%s", productId, UUID.randomUUID(), ext);
-
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (IOException e) {
-            log.error("Failed to read image bytes for product {}: {}", productId, e.getMessage(), e);
-            throw new ApiException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    ErrorCodes.INTERNAL_SERVER_ERROR,
-                    "Error al leer contenido del archivo: " + e.getMessage()
-            );
-        }
 
         storageGateway.upload(bytes, storagePath, contentType);
 
@@ -147,7 +134,7 @@ public class MediaServiceImpl implements MediaService {
         return storageGateway.getPublicUrl(storagePath);
     }
 
-    private void validateFile(MultipartFile file) {
+    private byte[] validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ValidationException("El archivo de imagen no puede estar vacío");
         }
@@ -159,7 +146,7 @@ public class MediaServiceImpl implements MediaService {
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
             throw new ValidationException(
-                    "Tipo de archivo no permitido: " + contentType + ". Tipos válidos: image/jpeg, image/png, image/webp"
+                    "Tipo de archivo no permitido: " + contentType + ". Tipos válidos: image/jpeg, image/png"
             );
         }
 
@@ -171,6 +158,33 @@ public class MediaServiceImpl implements MediaService {
                     throw new ValidationException("Extensiones ejecutables o peligrosas no están permitidas: " + originalName);
                 }
             }
+        }
+
+        try (var input = javax.imageio.ImageIO.createImageInputStream(new java.io.ByteArrayInputStream(file.getBytes()))) {
+            var readers = javax.imageio.ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) throw new ValidationException("El contenido no es una imagen JPEG o PNG válida.");
+            var reader = readers.next();
+            try {
+                reader.setInput(input, true, true);
+                String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+                if (!(format.equals("jpeg") || format.equals("png"))
+                        || !contentType.equals(format.equals("jpeg") ? "image/jpeg" : "image/png")) {
+                    throw new ValidationException("El formato real de la imagen no coincide con el tipo declarado.");
+                }
+                int width = reader.getWidth(0), height = reader.getHeight(0);
+                if (width < 1 || height < 1 || (long) width * height > 16000000L) {
+                    throw new ValidationException("La imagen excede 16 megapíxeles.");
+                }
+                var image = reader.read(0);
+                var output = new java.io.ByteArrayOutputStream();
+                if (image == null || !javax.imageio.ImageIO.write(image, format, output)) {
+                    throw new ValidationException("No se pudo decodificar la imagen.");
+                }
+                if (output.size() > MAX_FILE_SIZE) throw new ValidationException("La imagen procesada excede 5MB.");
+                return output.toByteArray();
+            } finally { reader.dispose(); }
+        } catch (IOException | IllegalArgumentException exception) {
+            throw new ValidationException("El contenido de la imagen es inválido.");
         }
     }
 

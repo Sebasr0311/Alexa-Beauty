@@ -10,3 +10,8 @@ spring:
     show-sql: true
   flyway:
     enabled: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-development-only-key-at-least-32-characters}
+  whatsapp-number: ${WHATSAPP_BUSINESS_NUMBER:573001234567}

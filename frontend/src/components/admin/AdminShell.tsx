@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -42,6 +43,31 @@ export function AdminShell({
   actions,
 }: AdminShellProps) {
   const pathname = usePathname();
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [pending, setPending] = useState(false);
+  useEffect(() => { let cancelled = false;
+    api.getMe().then(user => { if (!cancelled) setAuthenticated(user.role === 'ADMIN' || user.role === 'OPERADOR'); })
+      .catch(() => { if (!cancelled) setAuthenticated(false); });
+    return () => { cancelled = true; };
+  }, []);
+  if (authenticated === null) return <p role="status" className="p-8">Verificando sesión...</p>;
+  if (!authenticated) return <main className="min-h-screen bg-cream flex items-center justify-center p-6">
+    <form className="bg-white p-8 rounded-2xl border border-border space-y-4 max-w-sm w-full" onSubmit={async event => {
+      event.preventDefault(); setPending(true); setLoginError('');
+      try { await api.login(email, password); window.location.reload(); }
+      catch { setLoginError('No pudimos iniciar sesión. Verifica tus credenciales o la conexión.'); }
+      finally { setPending(false); }
+    }}>
+      <h1 className="text-2xl text-wine">Acceso administrativo</h1>
+      <label className="block">Correo <input className="border p-2 w-full" type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} /></label>
+      <label className="block">Contraseña <input className="border p-2 w-full" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label>
+      {loginError && <p role="alert">{loginError}</p>}
+      <button className="bg-wine text-white p-3 rounded-lg" disabled={pending}>{pending ? 'Ingresando...' : 'Ingresar'}</button>
+    </form>
+  </main>;
 
   const isItemActive = (href: string) => {
     if (href === '/admin') {
@@ -59,7 +85,7 @@ export function AdminShell({
       >
         <ShieldCheck className="w-4 h-4 text-[#865B0D] flex-shrink-0" />
         <span>
-          PANEL ADMINISTRATIVO AUTORIZADO · ALEXA BEAUTY — Conexión autoritativa Spring Boot &amp; PostgreSQL activa.
+          PANEL ADMINISTRATIVO AUTORIZADO · ALEXA BEAUTY — Sesión verificada; las operaciones requieren confirmación del servidor.
         </span>
       </aside>
 
@@ -86,6 +112,7 @@ export function AdminShell({
           </div>
 
           <div className="flex items-center gap-3">
+            <button onClick={async () => { await api.logout(); window.location.reload(); }} className="text-xs text-wine">Cerrar sesión</button>
             <Link
               href="/"
               className="inline-flex items-center gap-1.5 text-xs font-bold text-wine hover:text-wineDark bg-blush/60 hover:bg-blush px-3.5 py-2 rounded-full transition"

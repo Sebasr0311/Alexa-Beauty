@@ -20,6 +20,7 @@ import java.util.UUID;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecificationExecutor<Order> {
     Optional<Order> findByReference(String reference);
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
     Optional<Order> findByTrackingTokenHash(String trackingTokenHash);
     List<Order> findByStatus(OrderStatus status);
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
@@ -31,6 +32,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
 
     @Query("SELECT o FROM Order o WHERE o.status IN :statuses AND o.expiresAt < :cutoff")
     List<Order> findByStatusInAndExpiresAtBefore(@Param("statuses") List<OrderStatus> statuses, @Param("cutoff") Instant cutoff);
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Query("SELECT o.id FROM Order o WHERE o.status IN :statuses AND o.expiresAt <= :cutoff")
+    List<UUID> findOverdueIds(@Param("statuses") List<OrderStatus> statuses, @Param("cutoff") Instant cutoff);
 
     @Query("SELECT MAX(o.reference) FROM Order o WHERE o.reference LIKE :prefix")
     Optional<String> findMaxReferenceByPrefix(@Param("prefix") String prefix);

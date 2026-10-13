@@ -90,6 +90,14 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             throw new ConflictException("No se puede verificar el pago para un pedido en estado " + order.getStatus());
         }
 
+        if (order.getExpiresAt() == null || !order.getExpiresAt().isAfter(Instant.now())) {
+            throw new ConflictException("La reserva ha vencido. Cree un nuevo pedido antes de verificar el pago.");
+        }
+        if (request.getAmount() == null || request.getAmount().signum() <= 0
+                || request.getAmount().compareTo(order.getTotal()) != 0) {
+            throw new ConflictException("El pago manual debe cubrir exactamente el total del pedido.");
+        }
+
         // 4. Deterministically lock variants in ascending UUID order
         List<UUID> variantIds = order.getItems().stream()
                 .map(item -> item.getVariant().getId())
@@ -100,6 +108,23 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         List<ProductVariant> lockedVariants = productVariantRepository.findByIdInOrderByIdForUpdate(variantIds);
         Map<UUID, ProductVariant> lockedMap = lockedVariants.stream()
                 .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+
+        Map<UUID, Integer> requested = order.getItems().stream().collect(Collectors.groupingBy(
+                item -> item.getVariant().getId(), Collectors.summingInt(OrderItem::getQuantity)));
+        Map<UUID, Integer> reserved = order.getReservations().stream()
+                .filter(res -> res.getStatus() == ReservationStatus.ACTIVE)
+                .collect(Collectors.groupingBy(res -> res.getVariant().getId(),
+                        Collectors.summingInt(StockReservation::getQuantity)));
+        for (Map.Entry<UUID, Integer> entry : requested.entrySet()) {
+            ProductVariant variant = lockedMap.get(entry.getKey());
+            int qty = entry.getValue();
+            if (variant == null || qty <= 0 || variant.getStockOnHand() < qty
+                    || variant.getStockReserved() < qty
+                    || variant.getStockOnHand() < variant.getStockReserved()
+                    || reserved.getOrDefault(entry.getKey(), 0) != qty) {
+                throw new ConflictException("Inventario o reserva inconsistente. No se registró el pago.");
+            }
+        }
 
         // Resolve actor user entity
         User actorEntity = null;
@@ -115,9 +140,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             }
             int qty = item.getQuantity();
             int qtyBefore = variant.getStockOnHand();
-            int qtyAfter = Math.max(0, qtyBefore - qty);
+            int qtyAfter = qtyBefore - qty;
 
-            variant.setStockReserved(Math.max(0, variant.getStockReserved() - qty));
+            variant.setStockReserved(variant.getStockReserved() - qty);
             variant.setStockOnHand(qtyAfter);
             productVariantRepository.save(variant);
 
