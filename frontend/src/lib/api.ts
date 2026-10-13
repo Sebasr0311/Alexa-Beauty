@@ -419,7 +419,79 @@ class ApiClient {
     const query = searchParams.toString();
     return this.request<TopProductDto[]>(`/admin/analytics/top-products${query ? `?${query}` : ''}`);
   }
+
+  // --- Admin Inventario ---
+  async getInventorySummary(params?: {
+    query?: string;
+    lowStockOnly?: boolean;
+    page?: number;
+    size?: number;
+  }): Promise<PageDto<InventorySummaryDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.query) searchParams.set('query', params.query);
+    if (params?.lowStockOnly !== undefined) searchParams.set('lowStockOnly', params.lowStockOnly.toString());
+    if (params?.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params?.size !== undefined) searchParams.set('size', params.size.toString());
+    const q = searchParams.toString();
+    return this.request<PageDto<InventorySummaryDto>>(`/admin/inventory/summary${q ? `?${q}` : ''}`);
+  }
+
+  async getInventoryMovements(params?: {
+    variantId?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    size?: number;
+  }): Promise<PageDto<InventoryMovementDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.variantId) searchParams.set('variantId', params.variantId);
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    if (params?.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params?.size !== undefined) searchParams.set('size', params.size.toString());
+    const q = searchParams.toString();
+    return this.request<PageDto<InventoryMovementDto>>(`/admin/inventory/movements${q ? `?${q}` : ''}`);
+  }
+
+  async adjustStock(data: {
+    variantId: string;
+    newStockOnHand: number;
+    reason: string;
+    notes?: string;
+  }): Promise<any> {
+    return this.request('/admin/inventory/adjustments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createStockReceipt(
+    data: {
+      receiptNumber?: string;
+      providerName?: string;
+      invoiceNumber?: string;
+      notes?: string;
+      items: Array<{
+        variantId: string;
+        quantity: number;
+        unitCost?: number;
+        notes?: string;
+      }>;
+    },
+    idempotencyKey?: string
+  ): Promise<any> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+    return this.request('/admin/inventory/receipts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers,
+    });
+  }
 }
+
 
 
 export interface OrderItemRequestDto {
@@ -639,4 +711,37 @@ export interface SalesAnalyticsResponseDto {
   topProducts: TopProductDto[];
   paymentMethods: PaymentMethodBreakdownDto[];
 }
+
+export interface InventorySummaryDto {
+  variantId: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  brandName?: string;
+  categoryName?: string;
+  shadeName?: string;
+  stockOnHand: number;
+  stockReserved: number;
+  availableStock: number;
+  minStock: number;
+  isLowStock: boolean;
+  active: boolean;
+}
+
+export interface InventoryMovementDto {
+  id: string;
+  variantId: string;
+  sku: string;
+  productName: string;
+  shadeName?: string;
+  movementType: string;
+  quantityDelta: number;
+  qtyBefore: number;
+  qtyAfter: number;
+  reference?: string;
+  reason?: string;
+  actorEmail?: string;
+  createdAt: string;
+}
+
 

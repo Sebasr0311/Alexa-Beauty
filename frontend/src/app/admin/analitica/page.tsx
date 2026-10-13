@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { AdminShell } from '@/components/admin/AdminShell';
 import {
   ArrowLeft,
   Calendar,
@@ -292,110 +293,23 @@ export default function AdminAnaliticaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cream text-ink">
-      {/* Admin Header Bar */}
-      <header className="bg-white border-b border-border sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative w-9 h-9 rounded-full overflow-hidden border border-border bg-blush">
-              <Image
-                src="/branding/logo.png"
-                alt="Logo Alexa Beauty"
-                fill
-                sizes="36px"
-                className="object-cover"
-              />
-            </div>
-            <div>
-              <span className="font-serif text-lg font-bold text-wine leading-none block">
-                Alexa Beauty <span className="text-mauve font-normal text-xs uppercase tracking-wider ml-1">Admin</span>
-              </span>
-              <span className="text-[10px] text-muted">Inteligencia Comercial &amp; Rendimiento</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-wine hover:text-wineDark bg-blush/60 hover:bg-blush px-3.5 py-2 rounded-full transition"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Volver al</span> Panel
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {/* Navigation Bar / Tabs */}
-        <nav
-          aria-label="Pestañas de navegación administrativa"
-          className="bg-white border border-border rounded-2xl p-1.5 shadow-sm flex items-center gap-1 overflow-x-auto no-scrollbar"
+    <AdminShell
+      title="Analítica y Rendimiento"
+      badge="Business Intelligence"
+      subtitle="Métricas consolidadas de ventas e inventario calculadas en tiempo real."
+      actions={
+        <button
+          type="button"
+          onClick={() => fetchAnalytics()}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border hover:bg-blush/40 text-wine text-xs font-bold transition shadow-xs"
         >
-          <Link
-            href="/admin"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            Resumen
-          </Link>
-          <Link
-            href="/admin/pedidos"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
-          >
-            <Clock className="w-4 h-4" />
-            Pedidos
-          </Link>
-          <Link
-            href="/admin/ventas"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
-          >
-            <TrendingUp className="w-4 h-4" />
-            Ventas Confirmadas
-          </Link>
-          <Link
-            href="/admin/analitica"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-wine text-white shadow-xs transition whitespace-nowrap"
-          >
-            <BarChart3 className="w-4 h-4" />
-            Analítica
-          </Link>
-          <Link
-            href="/admin/importar"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-muted hover:text-wine hover:bg-blush/40 transition whitespace-nowrap"
-          >
-            <Upload className="w-4 h-4" />
-            Importar Excel
-          </Link>
-        </nav>
-
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-border rounded-3xl p-6 sm:p-8 shadow-soft">
-          <div>
-            <span className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-wine">
-              Business Intelligence
-            </span>
-            <h1 className="font-serif text-2xl sm:text-3xl text-wine font-normal tracking-tight mt-1">
-              Analítica y Rendimiento
-            </h1>
-            <p className="text-muted text-xs sm:text-sm mt-1">
-              Métricas consolidadas de ventas e inventario calculadas en tiempo real.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 self-start md:self-center">
-            <button
-              type="button"
-              onClick={() => fetchAnalytics()}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border hover:bg-blush/40 text-wine text-xs font-bold transition shadow-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Actualizar datos</span>
-            </button>
-          </div>
-        </div>
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Actualizar datos</span>
+        </button>
+      }
+    >
+      <div className="space-y-6">
 
         {/* Date Filter Bar */}
         <section aria-label="Selector de rango de fechas" className="bg-white border border-border rounded-3xl p-5 shadow-soft">
@@ -780,7 +694,7 @@ export default function AdminAnaliticaPage() {
             )}
           </section>
         </div>
-      </main>
-    </div>
+      </div>
+    </AdminShell>
   );
 }
