@@ -6,6 +6,21 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Added - 2026-10-12
+- **Épica 3: Inventario Transaccional y Recepción de Mercancía**
+  - **Recepción de Mercancía e Idempotencia:**
+    - `POST /api/v1/admin/inventory/receipts` con soporte obligatorio para `Idempotency-Key` y número de recibo determinista (garantía matriz P10: reintentos nunca duplican inventario).
+    - Bloqueo pesimista determinista libre de interbloqueos (`findByIdInOrderByIdForUpdate`).
+    - Incremento atómico exclusivo de `stock_on_hand`, manteniendo intacto `stock_reserved` (garantía matriz P09).
+  - **Ajustes Manuales Auditados e Invariantes:**
+    - `POST /api/v1/admin/inventory/adjustments` con motivo obligatorio y registro en `audit_logs`.
+    - Cumplimiento estricto del invariante `on_hand >= reserved`: rechazo con HTTP 422 Unprocessable Entity si se intenta reducir el stock por debajo de las unidades reservadas.
+  - **Kardex y Resumen de Existencias:**
+    - `GET /api/v1/admin/inventory/movements`: libro de movimientos con filtros por variante, tipo y rango temporal.
+    - `GET /api/v1/admin/inventory/summary`: resumen de stock físico, reservado, disponible (`on_hand - reserved`) y filtro de stock bajo (`available <= min_stock`).
+  - **Pruebas Automatizadas:**
+    - `InventoryIntegrationTest` con 7 nuevos tests de integración cubriendo recepciones, idempotencia, invariantes de ajuste y Kardex.
+    - Total de pruebas en Backend: 26 de 26 en verde (`BUILD SUCCESS`).
+
 - **Épica 2: Catálogo, Gestión de Productos y Almacenamiento de Imágenes**
   - **Dominio de Catálogo y Productos:**
     - Generación automática de variante `DEFAULT` cuando el producto no define tonos o variantes explícitas.

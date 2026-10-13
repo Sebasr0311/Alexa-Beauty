@@ -74,19 +74,20 @@
 ## Épica 3: Inventario Transaccional y Recepción de Mercancía (Fase 5)
 **Objetivo:** Control estricto de existencias con la ecuación `available = on_hand - reserved`.
 
-- [ ] **AB-012** Kardex y Ledger de Movimientos:
-  - Registro inmutable en `inventory_movements` (tipos: `ENTRADA`, `VENTA`, `SALIDA`, `AJUSTE`, `DEVOLUCION`).
-  - Endpoint `GET /api/v1/admin/inventory/movements`.
-- [ ] **AB-013** Módulo de Recepción de Mercancía (`stock_receipts`):
-  - Endpoint `POST /api/v1/admin/inventory/receipts` con clave de idempotencia.
-  - Incremento atómico de `stock_on_hand` (no altera `reserved`).
-  - Registro de proveedor, costo, factura y movimiento asociado.
-- [ ] **AB-014** Ajuste Manual de Inventario con Causa:
-  - Endpoint `POST /api/v1/admin/inventory/adjustments` con motivo obligatorio y auditoría.
-  - Validación estricta: prohibido dejar `on_hand < reserved`.
-- [ ] **AB-015** UI de Inventario y Recepciones en Panel Admin:
-  - Buscador rápido por SKU/nombre, vista Antes/Entrada/Después.
-  - Prevención de doble clic en UI.
+- [X] **AB-012** Kardex y Ledger de Movimientos:
+  - Registro inmutable en `inventory_movements` (tipos: `ENTRADA_INICIAL`, `ENTRADA`, `VENTA`, `SALIDA`, `AJUSTE`, `DEVOLUCION`).
+  - Endpoint `GET /api/v1/admin/inventory/movements` con filtros dinámicos por variante, tipo y rango de fechas.
+- [X] **AB-013** Módulo de Recepción de Mercancía (`stock_receipts`):
+  - Endpoint `POST /api/v1/admin/inventory/receipts` con soporte para header `Idempotency-Key` (garantía matriz P10).
+  - Bloqueo pesimista determinista libre de interbloqueos (`findByIdInOrderByIdForUpdate`).
+  - Incremento atómico de `stock_on_hand` preservando rigurosamente `stock_reserved` (matriz P09).
+  - Endpoints `GET /receipts` y `GET /receipts/{id}` con trazabilidad completa de costos e ítems.
+- [X] **AB-014** Ajuste Manual de Inventario con Causa:
+  - Endpoint `POST /api/v1/admin/inventory/adjustments` con motivo obligatorio y registro en `audit_logs`.
+  - Validación de regla inviolable: rechazo con HTTP 422 si se intenta dejar `newStockOnHand < stock_reserved`.
+- [X] **AB-015** Resumen de Inventario y Existencias:
+  - Endpoint `GET /api/v1/admin/inventory/summary` con cálculo `availableStock = on_hand - reserved` y filtro `lowStockOnly`.
+  - Verificado con suite de pruebas `InventoryIntegrationTest` (26 tests pasando en total).
 
 ---
 

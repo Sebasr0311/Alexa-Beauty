@@ -14,6 +14,10 @@ public class ApiException extends RuntimeException {
     private final String errorCode;
     private final Map<String, Object> details;
 
+    public ApiException(HttpStatus status, String message) {
+        this(status, status.name(), message);
+    }
+
     public ApiException(HttpStatus status, String errorCode, String message) {
         this(status, errorCode, message, Collections.emptyMap());
     }

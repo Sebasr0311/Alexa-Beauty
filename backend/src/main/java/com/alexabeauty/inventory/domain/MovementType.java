@@ -8,5 +8,7 @@ public enum MovementType {
     MANUAL_ADJUSTMENT,
     DAMAGE,
     RETURN,
-    ENTRADA_INICIAL
+    ENTRADA_INICIAL,
+    ENTRADA,
+    AJUSTE
 }
