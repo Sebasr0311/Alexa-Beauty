@@ -23,11 +23,11 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('Resumen');
 
   const navItems = [
-    { label: 'Resumen', icon: LayoutDashboard },
+    { label: 'Resumen', icon: LayoutDashboard, href: '/admin' },
     { label: 'Productos', icon: Package },
     { label: 'Inventario', icon: Boxes },
-    { label: 'Importar Excel', icon: Upload },
-    { label: 'Pedidos', icon: Clock },
+    { label: 'Importar Excel', icon: Upload, href: '/admin/importar' },
+    { label: 'Pedidos', icon: Clock, href: '/admin/pedidos' },
     { label: 'Ventas', icon: TrendingUp },
     { label: 'Reportes', icon: FileText },
   ];
@@ -96,6 +96,25 @@ export default function AdminDashboardPage() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.label;
+              const buttonClasses = `flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap w-full text-left ${
+                isActive
+                  ? 'bg-white/20 text-white shadow-xs'
+                  : 'text-white/80 hover:bg-white/10 hover:text-white'
+              }`;
+
+              if (item.href && item.href !== '/admin') {
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className={buttonClasses}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              }
+
               return (
                 <button
                   key={item.label}
@@ -106,11 +125,7 @@ export default function AdminDashboardPage() {
                       handleActionNotice(`Módulo ${item.label}`);
                     }
                   }}
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap w-full text-left ${
-                    isActive
-                      ? 'bg-white/20 text-white shadow-xs'
-                      : 'text-white/80 hover:bg-white/10 hover:text-white'
-                  }`}
+                  className={buttonClasses}
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   <span>{item.label}</span>
@@ -188,14 +203,23 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleActionNotice('Exportar pedidos a Excel')}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-wine hover:underline self-start sm:self-auto"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Exportar a Excel
-                </button>
+                <div className="flex items-center gap-4 self-start sm:self-auto">
+                  <Link
+                    href="/admin/pedidos"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-wine hover:underline"
+                  >
+                    Ver todos los pedidos →
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => handleActionNotice('Exportar pedidos a Excel')}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-wine hover:underline"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Exportar a Excel
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -276,10 +300,18 @@ export default function AdminDashboardPage() {
 
             {/* Quick Action Buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                href="/admin/pedidos"
+                className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-xs sm:text-sm px-6 py-3 shadow-glow transition active:scale-95"
+              >
+                <Clock className="w-4 h-4 stroke-[2.5]" />
+                Gestionar pedidos
+              </Link>
+
               <button
                 type="button"
                 onClick={() => handleActionNotice('Crear nuevo producto')}
-                className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-xs sm:text-sm px-6 py-3 shadow-glow transition active:scale-95"
+                className="inline-flex items-center gap-2 rounded-full bg-white border border-[#b9899c] hover:bg-cream text-wine font-bold text-xs sm:text-sm px-6 py-3 transition shadow-sm active:scale-95"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
                 Nuevo producto

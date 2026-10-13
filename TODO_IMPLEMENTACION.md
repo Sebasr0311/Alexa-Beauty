@@ -138,18 +138,20 @@
 ## Épica 6: Verificación de Pagos y Ventas (Fases 8 & 9)
 **Objetivo:** Confirmación administrativa humana de transferencias, consumo de stock y reporte de ventas.
 
-- [ ] **AB-025** Verificación de Pago (`POST /api/v1/admin/orders/{id}/confirm-payment`):
-  - Operación atómica e idempotente.
-  - Transición a `PAGADO`.
-  - Consumo de reserva: `stock_reserved -= qty`, `stock_on_hand -= qty`.
-  - Creación de movimiento `VENTA` en el ledger.
-  - Registro de datos del pago (método Nequi/Daviplata/Bancolombia, referencia, comprobante, usuario auditor).
-- [ ] **AB-026** Gestión de Estados y Cancelaciones:
-  - Transiciones válidas: `PREPARANDO`, `DESPACHADO`, `ENTREGADO`, `CANCELADO`.
-  - Cancelación de pedido antes del pago libera únicamente `stock_reserved`.
-- [ ] **AB-027** Bandeja de Pedidos Admin (`/admin/pedidos`):
-  - Filtros por estado, fecha, buscador por cliente o referencia.
-  - Formulario modal de verificación de pago con confirmación de seguridad.
+- [X] **AB-025** Verificación de Pago (`POST /api/v1/admin/orders/{id}/confirm-payment`):
+  - Operación atómica e idempotente con bloqueo pesimista de orden y variantes (`orderRepository.findByIdForUpdate`).
+  - Consumo irreversible de stock: `stock_reserved -= qty` y `stock_on_hand -= qty` en transacción única.
+  - Creación del movimiento `VENTA` en el ledger kardex con referencia de pago.
+  - Garantía matrices P15 y P16: confirmaciones repetidas o concurrentes no duplican el descuento ni la venta.
+  - Garantía matriz P17: rechazo de pagos sobre pedidos expirados o cancelados (409 Conflict).
+- [X] **AB-026** Gestión de Estados y Cancelaciones:
+  - Máquina de estados: `PAGADO -> PREPARANDO -> DESPACHADO -> ENTREGADO`.
+  - Prórroga de reserva (`/extend-reservation`) auditada.
+  - Cancelación antes del pago (matriz P18): libera `stock_reserved` manteniendo intacto `stock_on_hand`.
+- [X] **AB-027** Bandeja de Pedidos Admin (`/admin/pedidos`):
+  - Tabla responsive con filtros por estado, búsqueda y fecha.
+  - Drawer con detalle del pedido, historial cronológico y pagos.
+  - Modal de verificación de transferencias (Nequi, Daviplata, Bancolombia, etc.) y botones de avance de estado. Build verificado (`npm run build` PASS).
 
 ---
 

@@ -295,6 +295,57 @@ class ApiClient {
     });
     return this.request<OrderTrackingResponseDto>(`/orders/track?${searchParams.toString()}`);
   }
+
+  // --- Admin Pedidos y Pagos ---
+  async getAdminOrders(params?: {
+    status?: string;
+    search?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    size?: number;
+  }): Promise<PageDto<AdminOrderSummaryDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    if (params?.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params?.size !== undefined) searchParams.set('size', params.size.toString());
+
+    const query = searchParams.toString();
+    return this.request<PageDto<AdminOrderSummaryDto>>(`/admin/orders${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminOrderDetail(id: string): Promise<AdminOrderDetailDto> {
+    return this.request<AdminOrderDetailDto>(`/admin/orders/${id}`);
+  }
+
+  async confirmAdminOrderPayment(id: string, data: ConfirmPaymentDto, idempotencyKey?: string): Promise<PaymentDto> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    return this.request<PaymentDto>(`/admin/orders/${id}/confirm-payment`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers,
+    });
+  }
+
+  async transitionAdminOrderStatus(id: string, newStatus: string, notes?: string): Promise<AdminOrderDetailDto> {
+    return this.request<AdminOrderDetailDto>(`/admin/orders/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ newStatus, notes }),
+    });
+  }
+
+  async extendAdminOrderReservation(id: string, additionalMinutes: number, notes?: string): Promise<AdminOrderDetailDto> {
+    return this.request<AdminOrderDetailDto>(`/admin/orders/${id}/extend-reservation`, {
+      method: 'POST',
+      body: JSON.stringify({ additionalMinutes, notes }),
+    });
+  }
 }
 
 export interface OrderItemRequestDto {
@@ -351,4 +402,86 @@ export interface OrderTrackingResponseDto {
   items?: OrderItemResponseDto[];
 }
 
+export interface PaymentDto {
+  id: string;
+  orderId: string;
+  paymentMethod: 'NEQUI' | 'BANCOLOMBIA' | 'DAVIPLATA' | 'EFECTIVO' | 'OTRO';
+  transferReference: string;
+  amount: number;
+  status: 'PENDIENTE' | 'VERIFICADO' | 'RECHAZADO';
+  verifiedByEmail?: string;
+  verifiedAt?: string;
+  notes?: string;
+  receiptImageUrl?: string;
+  createdAt?: string;
+}
+
+export interface ConfirmPaymentDto {
+  paymentMethod: 'NEQUI' | 'BANCOLOMBIA' | 'DAVIPLATA' | 'EFECTIVO' | 'OTRO';
+  transferReference: string;
+  amount: number;
+  notes?: string;
+  receiptImageUrl?: string;
+}
+
+export interface StockReservationDto {
+  id: string;
+  variantId?: string;
+  sku?: string;
+  productName?: string;
+  quantity: number;
+  expiresAt: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface OrderStatusHistoryDto {
+  id: string;
+  previousStatus?: string;
+  newStatus: string;
+  userEmail?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface AdminOrderSummaryDto {
+  id: string;
+  reference: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryType: string;
+  total: number;
+  status: string;
+  channel: string;
+  createdAt: string;
+  paidAt?: string;
+  expiresAt: string;
+}
+
+export interface AdminOrderDetailDto {
+  id: string;
+  reference: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryType: string;
+  city?: string;
+  address?: string;
+  customerNotes?: string;
+  subtotal: number;
+  discount: number;
+  shippingFee: number;
+  total: number;
+  status: string;
+  channel: string;
+  expiresAt: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderItemResponseDto[];
+  payments: PaymentDto[];
+  reservations: StockReservationDto[];
+  statusHistory: OrderStatusHistoryDto[];
+}
+
 export const api = new ApiClient();
+

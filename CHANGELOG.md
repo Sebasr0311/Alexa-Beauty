@@ -6,6 +6,27 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Added - 2026-10-12
+- **Épica 6: Verificación de Pagos y Gestión de Pedidos**
+  - **Verificación Atómica de Pagos:**
+    - `POST /api/v1/admin/orders/{id}/confirm-payment` con bloqueo pesimista de orden y variantes (`orderRepository.findByIdForUpdate` y `findByIdInOrderByIdForUpdate`).
+    - Consumo irreversible de stock en una única transacción: decremento simultáneo de `stock_reserved` y `stock_on_hand`, marcando la reserva como `CONSUMED`.
+    - Generación atómica del movimiento `VENTA` en `inventory_movements` (Kardex) con referencia del comprobante y usuario verificador.
+    - Garantía matriz P15 y P16: confirmaciones repetidas o concurrentes son idempotentes, devuelven el pago verificado y no duplican el descuento de inventario ni generan ventas duplicadas.
+    - Garantía matriz P17: bloqueo estricto con HTTP 409 Conflict si se intenta verificar un pedido en estado `EXPIRADO` o `CANCELADO`.
+  - **Gestión de Ciclo de Vida y Prórrogas de Reserva:**
+    - `POST /api/v1/admin/orders/{id}/transition`: transiciones ordenadas (`PAGADO` -> `PREPARANDO` -> `DESPACHADO` -> `ENTREGADO`).
+    - Cancelación antes del pago (matriz P18): libera `stock_reserved` a 0 y preserva intacto `stock_on_hand`, marcando la reserva como `RELEASED`.
+    - `POST /api/v1/admin/orders/{id}/extend-reservation`: extensión segura de 1 a 120 minutos para dar tiempo a clientes en proceso de pago con comprobante.
+    - Auditoría completa en `order_status_history` y `audit_logs` con usuario actor.
+  - **Frontend Administrativo (`/admin/pedidos`):**
+    - Tabla responsiva de pedidos con filtros por estado (`Todos`, `Pendientes`, `Pagados`, `Preparando`, `Despachados`, `Cancelados`) y buscador de cliente/código.
+    - Drawer lateral con detalle completo: items, precios congelados, resumen de cliente, historial de estados y pagos registrados.
+    - Modal de verificación de pago con selección de método (Nequi, Daviplata, Bancolombia, Efectivo, Otro), referencia y notas.
+    - Enlace a la bandeja de pedidos integrado en el dashboard general `/admin`.
+  - **Pruebas Automatizadas:**
+    - `PaymentVerificationIntegrationTest` verificando los escenarios P15, P16, P17 y P18.
+    - Total de pruebas en Backend: 43 de 43 en verde (`BUILD SUCCESS`). Build de Frontend verificado (`npm run build` PASS con 10 rutas generadas).
+
 - **Épica 5: Carrito, Checkout Transaccional y Gateway de WhatsApp**
   - **Checkout Transaccional y Reservas de Stock:**
     - `POST /api/v1/orders` con recálculo autoritativo de precios y bloqueo pesimista determinista en orden ascendente de ID (`findByIdInOrderByIdForUpdate`).

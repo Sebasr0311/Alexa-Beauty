@@ -107,6 +107,10 @@ public class Order {
     @Builder.Default
     private List<OrderStatusHistory> statusHistory = new ArrayList<>();
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<com.alexabeauty.payment.domain.Payment> payments = new ArrayList<>();
+
     @PrePersist
     public void prePersist() {
         Instant now = Instant.now();
