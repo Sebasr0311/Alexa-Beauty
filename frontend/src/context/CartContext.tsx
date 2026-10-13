@@ -6,11 +6,18 @@ import { Product, PRODUCTS } from '@/lib/data';
 export interface CartItem {
   product: Product;
   quantity: number;
+  variantId?: string;
+  variantName?: string;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, quantity?: number) => { success: boolean; message?: string };
+  addItem: (
+    product: Product,
+    quantity?: number,
+    variantId?: string,
+    variantName?: string
+  ) => { success: boolean; message?: string };
   updateQuantity: (productId: number, delta: number) => void;
   removeItem: (productId: number) => void;
   clearCart: () => void;
@@ -56,17 +63,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, hasHydrated]);
 
-  const addItem = (product: Product, quantityToAdd: number = 1) => {
+  const addItem = (
+    product: Product,
+    quantityToAdd: number = 1,
+    variantId?: string,
+    variantName?: string
+  ) => {
     if (product.stock <= 0) {
       return { success: false, message: 'Producto sin existencias disponibles.' };
     }
 
     const qty = Math.max(1, quantityToAdd);
+    const resolvedVariantId = variantId || product.variantId;
     let success = true;
     let message = '';
 
     setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
+      const existing = prev.find(
+        (i) => i.product.id === product.id && (!resolvedVariantId || i.variantId === resolvedVariantId)
+      );
       if (existing) {
         if (existing.quantity + qty > product.stock) {
           success = false;
@@ -74,10 +89,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           return prev;
         }
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + qty } : i
+          (i.product.id === product.id && (!resolvedVariantId || i.variantId === resolvedVariantId))
+            ? { ...i, quantity: i.quantity + qty }
+            : i
         );
       }
-      return [...prev, { product, quantity: Math.min(qty, product.stock) }];
+      return [
+        ...prev,
+        {
+          product,
+          quantity: Math.min(qty, product.stock),
+          variantId: resolvedVariantId,
+          variantName,
+        },
+      ];
     });
 
     return { success, message };

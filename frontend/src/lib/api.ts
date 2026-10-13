@@ -274,6 +274,81 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // --- Pedidos y Checkout Público ---
+  async createOrder(data: CreateOrderRequestDto, idempotencyKey?: string): Promise<OrderCheckoutResponseDto> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    return this.request<OrderCheckoutResponseDto>('/orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers,
+    });
+  }
+
+  async trackOrder(reference: string, token: string): Promise<OrderTrackingResponseDto> {
+    const searchParams = new URLSearchParams({
+      reference,
+      token,
+    });
+    return this.request<OrderTrackingResponseDto>(`/orders/track?${searchParams.toString()}`);
+  }
+}
+
+export interface OrderItemRequestDto {
+  variantId: string;
+  quantity: number;
+}
+
+export interface CreateOrderRequestDto {
+  customerName: string;
+  customerPhone: string;
+  deliveryType: string;
+  city?: string;
+  address?: string;
+  customerNotes?: string;
+  items: OrderItemRequestDto[];
+}
+
+export interface OrderItemResponseDto {
+  id: string;
+  variantId: string;
+  sku: string;
+  productName: string;
+  variantName?: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface OrderCheckoutResponseDto {
+  orderId: string;
+  reference: string;
+  trackingToken: string;
+  status: string;
+  expiresAt: string;
+  subtotal: number;
+  shippingFee: number;
+  total: number;
+  whatsappUrl: string;
+  whatsappMessageText: string;
+  items: OrderItemResponseDto[];
+}
+
+export interface OrderTrackingResponseDto {
+  reference: string;
+  status: string;
+  expiresAt: string;
+  total: number;
+  itemCount: number;
+  createdAt: string;
+  customerName?: string;
+  deliveryType?: string;
+  whatsappUrl?: string;
+  whatsappMessageText?: string;
+  items?: OrderItemResponseDto[];
 }
 
 export const api = new ApiClient();

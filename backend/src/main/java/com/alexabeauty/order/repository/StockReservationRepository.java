@@ -12,5 +12,5 @@ import java.util.UUID;
 @Repository
 public interface StockReservationRepository extends JpaRepository<StockReservation, UUID> {
     List<StockReservation> findByOrderId(UUID orderId);
-    List<StockReservation> findByStatusAndExpiresAtBefore(ReservationStatus status, Instant dateTime);
+    List<StockReservation> findByStatusAndExpiresAtBefore(ReservationStatus status, Instant cutoff);
 }

@@ -6,6 +6,24 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Added - 2026-10-12
+- **Épica 5: Carrito, Checkout Transaccional y Gateway de WhatsApp**
+  - **Checkout Transaccional y Reservas de Stock:**
+    - `POST /api/v1/orders` con recálculo autoritativo de precios y bloqueo pesimista determinista en orden ascendente de ID (`findByIdInOrderByIdForUpdate`).
+    - Garantía matriz P11: ante compradores concurrentes compitiendo por la última unidad, exactamente uno reserva y el otro recibe 409 Conflict; el inventario nunca queda negativo.
+    - Reserva temporal de stock con TTL de 45 minutos y código público secuencial único `AB-yyyy-NNNNNN` con hash seguro SHA-256 para seguimiento.
+    - Soporte de header `Idempotency-Key` (matriz P13: reintentos devuelven el pedido existente y no duplican reservas).
+  - **Pasarela de WhatsApp (`WhatsAppGateway`):**
+    - `ClickToChatGateway` generando URLs formateadas `https://wa.me/{number}?text={encoded}` con desglose del pedido, cliente y modalidad de entrega.
+    - Endpoint público de seguimiento de pedidos `GET /api/v1/orders/track`.
+  - **Job Programado de Expiración de Reservas:**
+    - `ReservationExpirationJob` ejecutándose cada 60s: libera el stock reservado (`stock_reserved` vuelve a 0 manteniendo intacto `stock_on_hand`, matriz P14), marca reservas como `RELEASED` y transiciona el pedido a `EXPIRADO`.
+  - **Frontend:**
+    - Pantalla de checkout `/pedido` con formulario express y validación de inventario.
+    - Pantalla de confirmación `/pedido/confirmado/[reference]` con cuenta regresiva de 45m, mensaje honesto de reserva, botón directo a WhatsApp y botón de respaldo para copiar el mensaje (matriz P24).
+  - **Pruebas Automatizadas:**
+    - `OrderCheckoutIntegrationTest` validando escenarios P11, P12, P13 y P14.
+    - Total de pruebas en Backend: 35 de 35 en verde (`BUILD SUCCESS`). Build de Frontend verificado (`npm run build` PASS con 10 rutas generadas).
+
 - **Épica 4: Importación Masiva por Excel**
   - **Generador de Plantilla `ALEXA_PRODUCTS_V1`:**
     - `GET /api/v1/admin/products/import/template`: generación dinámica con Apache POI de las 3 hojas (`PRODUCTOS`, `INSTRUCCIONES`, `EJEMPLOS_NO_IMPORTAR`) con estilos de marca bordó/malva, filtros automáticos y validaciones.

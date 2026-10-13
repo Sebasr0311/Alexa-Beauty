@@ -4,5 +4,6 @@ public enum ReservationStatus {
     ACTIVE,
     CONFIRMED,
     CANCELLED,
-    EXPIRED
+    EXPIRED,
+    RELEASED
 }

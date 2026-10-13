@@ -114,25 +114,24 @@
 ## Épica 5: Carrito, Checkout y Gateway WhatsApp (Fases 7 & 8)
 **Objetivo:** Checkout transaccional con reserva de inventario y generación del enlace de conversación.
 
-- [ ] **AB-020** Carrito de Compras en Frontend:
-  - Persistencia en `localStorage`, cálculo de subtotales, validación reactiva de existencias.
-- [ ] **AB-021** Checkout Transaccional (`POST /api/v1/orders`):
-  - Recalculo autoritativo de precios en backend (el cliente nunca envía el total final).
-  - Bloqueo pesimista determinista (`SELECT ... FOR UPDATE` ordenado por variant_id).
-  - Comprobación: `available >= requested_qty`.
-  - Incremento de `stock_reserved` y creación de `stock_reservations` con TTL de 45m.
-  - Generación de código público único `AB-YYYY-NNNNNN` y token seguro de seguimiento.
-  - Clave de idempotencia `Idempotency-Key` en headers.
-- [ ] **AB-022** Interfaz `WhatsAppGateway`:
+- [X] **AB-020** Carrito de Compras en Frontend:
+  - Persistencia en `localStorage`, cálculo de subtotales, soporte para variantes y tonos.
+- [X] **AB-021** Checkout Transaccional (`POST /api/v1/orders`):
+  - Recálculo autoritativo de precios en backend (precios congelados en `order_items`).
+  - Bloqueo pesimista determinista en orden ascendente de UUID (`findByIdInOrderByIdForUpdate`, previene deadlocks).
+  - Comprobación estricta de disponibilidad `available >= requested_qty` (P11 matrix: sin sobreventa ni stock negativo).
+  - Incremento atómico de `stock_reserved` y creación de `stock_reservations` con TTL de 45m.
+  - Generación de código público único `AB-YYYY-NNNNNN` y token seguro de seguimiento hasheado (SHA-256).
+  - Soporte para `Idempotency-Key` (P13 matrix: reintentos no duplican reservas ni pedidos).
+- [X] **AB-022** Interfaz `WhatsAppGateway`:
   - `ClickToChatGateway` (MVP): Generación de URL `https://wa.me/{number}?text={encodedText}` con desglose del pedido.
-  - Fallback en UI: botón "Copiar mensaje" si falla la apertura de la app.
-  - Especificación documentada para futuro `CloudApiGateway`.
-- [ ] **AB-023** Job de Expiración y Reconciliación de Reservas:
-  - Tarea programada confiable cada 5 minutos (`ScheduledJob` transaccional).
-  - Detección de órdenes en `PENDIENTE_CONTACTO` o `PENDIENTE_PAGO` con `expires_at < now()`.
-  - Transición a `EXPIRADO` y decremento de `stock_reserved`.
-- [ ] **AB-024** UI de Checkout y Confirmación de Pedido:
-  - Pantalla `/pedido` y `/pedido/confirmado/[reference]`. Mensajes honestos (sin proclamar pago falso).
+  - Fallback en UI: botón "Copiar mensaje de pedido" con retroalimentación instantánea (P24 matrix).
+- [X] **AB-023** Job de Expiración y Reconciliación de Reservas:
+  - Tarea programada confiable `ReservationExpirationJob` cada 60s con `@EnableScheduling`.
+  - Liberación transaccional de reservas vencidas (`stock_reserved` vuelve a 0, `stock_on_hand` intacto, matriz P14).
+  - Transición a `EXPIRADO` con registro en `order_status_history`.
+- [X] **AB-024** UI de Checkout y Confirmación de Pedido:
+  - Pantallas `/pedido` y `/pedido/confirmado/[reference]` con cuenta regresiva en tiempo real y mensaje honesto sin proclamar pagos falsos. Build verificado (`npm run build` PASS).
 
 ---
 

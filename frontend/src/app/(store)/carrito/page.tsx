@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { formatCOP } from '@/lib/utils';
 import { Trash2, Plus, Minus, ArrowRight, MessageCircleHeart, ShoppingBag, Sparkles } from 'lucide-react';
 
 export default function CartPage() {
+  const router = useRouter();
   const { items, updateQuantity, removeItem, clearCart, totalAmount, totalCount } =
     useCart();
 
@@ -19,9 +21,7 @@ export default function CartPage() {
   const handleCheckoutWhatsApp = (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
-
-    // Simulate WhatsApp order creation
-    setOrderPlaced(true);
+    router.push('/pedido');
   };
 
   return (
@@ -282,7 +282,7 @@ export default function CartPage() {
                 className="w-full mt-4 py-4 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-glow transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <MessageCircleHeart className="w-5 h-5" />
-                Continuar por WhatsApp ↗
+                Continuar al pedido y reservar stock ↗
               </button>
             </form>
 

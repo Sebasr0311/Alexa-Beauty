@@ -114,8 +114,11 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
         icon: '💄',
         visual: 'dark',
         badge: 'Destacado',
+        variantId: selectedVariant?.id,
       },
-      quantity
+      quantity,
+      selectedVariant?.id,
+      selectedVariant?.shadeName || selectedVariant?.presentation
     );
 
     if (res.success) {

@@ -9,6 +9,7 @@ export interface Product {
   visual: 'dark' | 'blush' | 'gold';
   badge: string;
   description?: string;
+  variantId?: string;
 }
 
 export const CATEGORIES = ['Todos', 'Rostro', 'Labios', 'Ojos', 'Accesorios'] as const;

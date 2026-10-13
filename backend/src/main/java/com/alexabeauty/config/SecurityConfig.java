@@ -81,8 +81,7 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/v1/catalog/**",
                     "/api/v1/orders",
-                    "/api/v1/orders/track",
-                    "/api/v1/orders/track/**"
+                    "/api/v1/orders/**"
                 ).permitAll()
                 // Public Auth login endpoint
                 .requestMatchers(
