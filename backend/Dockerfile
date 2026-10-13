@@ -1,17 +1,14 @@
 # syntax=docker/dockerfile:1
 
-# Stage 1: Build stage using official Eclipse Temurin JDK 21
-FROM eclipse-temurin:21-jdk AS builder
+# Stage 1: Build stage using official Maven with Eclipse Temurin JDK 21
+FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
 
-# Install Maven in builder container
-RUN apt-get update && apt-get install -y --no-install-recommends maven && rm -rf /var/lib/apt/lists/*
+# Configure Google Cloud Maven Central Mirror to prevent HTTP 429 rate limits on cloud runners
+COPY settings.xml /root/.m2/settings.xml
 
-# Cache dependency layer
+# Copy POM and source code, package application
 COPY pom.xml .
-RUN mvn dependency:go-offline -B || true
-
-# Copy source code and package application
 COPY src src
 RUN mvn clean package -DskipTests -B
 
