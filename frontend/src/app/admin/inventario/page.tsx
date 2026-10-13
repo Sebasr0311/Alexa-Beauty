@@ -687,12 +687,17 @@ export default function AdminInventarioPage() {
 
       {/* Modal Ajuste Manual de Stock */}
       {adjustModalOpen && selectedVariantForAdjust && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="adjust-modal-title"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2 text-wine">
                 <SlidersHorizontal className="w-5 h-5" />
-                <h3 className="font-serif text-xl font-bold">Ajuste de Stock Auditado</h3>
+                <h3 id="adjust-modal-title" className="font-serif text-xl font-bold">Ajuste de Stock Auditado</h3>
               </div>
               <button
                 type="button"
@@ -772,12 +777,17 @@ export default function AdminInventarioPage() {
 
       {/* Modal Recepción de Mercancía */}
       {receiptModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="receipt-modal-title"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2 text-wine">
                 <Boxes className="w-5 h-5" />
-                <h3 className="font-serif text-xl font-bold">Recepción de Mercancía</h3>
+                <h3 id="receipt-modal-title" className="font-serif text-xl font-bold">Recepción de Mercancía</h3>
               </div>
               <button
                 type="button"

@@ -470,12 +470,17 @@ export default function AdminProductosPage() {
 
       {/* Modal Crear Producto */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="product-modal-title"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2 text-wine">
                 <Tag className="w-5 h-5" />
-                <h3 className="font-serif text-xl font-bold">Nuevo Producto</h3>
+                <h3 id="product-modal-title" className="font-serif text-xl font-bold">Nuevo Producto</h3>
               </div>
               <button
                 type="button"

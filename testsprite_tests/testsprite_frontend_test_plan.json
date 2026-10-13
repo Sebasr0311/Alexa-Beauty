@@ -1,0 +1,948 @@
+[
+  {
+    "id": "TC001",
+    "title": "Confirm payment for a pending order and verify it advances",
+    "description": "Verifies that an admin can confirm a pending bank payment and see the order move into the paid state with inventory reserved units reduced.",
+    "category": "Admin Gestión de Pedidos y Cobranza",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/pedidos"
+      },
+      {
+        "type": "action",
+        "description": "Filter the orders to pending items"
+      },
+      {
+        "type": "action",
+        "description": "Open the payment verification modal for a pending order"
+      },
+      {
+        "type": "action",
+        "description": "Select a payment method"
+      },
+      {
+        "type": "action",
+        "description": "Enter a bank reference"
+      },
+      {
+        "type": "action",
+        "description": "Submit the payment verification"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order is marked as paid"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify reserved inventory decreases"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Inspect and search orders on the orders board",
+    "description": "Verifies that an admin can filter and search orders to find a specific order for investigation.",
+    "category": "Admin Gestión de Pedidos y Cobranza",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/pedidos"
+      },
+      {
+        "type": "action",
+        "description": "Filter the orders by a status"
+      },
+      {
+        "type": "action",
+        "description": "Search for an order by reference or customer name"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the orders list reflects the active filter and search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify matching orders are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Review dashboard KPIs and recent orders",
+    "description": "Verifies that an admin can open the dashboard and see the monthly KPI summary together with recent orders.",
+    "category": "Admin Resumen Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify monthly KPI cards are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify recent orders are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Adjust physical stock for a product variant",
+    "description": "Verifies that a manual stock adjustment can be saved for a selected variant and the available stock updates immediately.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "action",
+        "description": "Open the manual stock adjustment modal"
+      },
+      {
+        "type": "action",
+        "description": "Select a product variant"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid new physical stock value into the stock field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a reason into the adjustment reason field"
+      },
+      {
+        "type": "action",
+        "description": "Save the adjustment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the stock values are updated immediately"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a movement record for the adjustment is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Cancel an unpaid order and release reserved stock",
+    "description": "Verifies that an admin can cancel an unpaid order from the detail drawer and see reserved stock released back into inventory.",
+    "category": "Admin Gestión de Pedidos y Cobranza",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/pedidos"
+      },
+      {
+        "type": "action",
+        "description": "Open the order detail drawer for an unpaid order"
+      },
+      {
+        "type": "action",
+        "description": "Cancel the order"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order is marked as cancelled"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify reserved stock is released"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Review inventory levels and movement history",
+    "description": "Verifies that a warehouse operator can open inventory, review low stock, apply a manual adjustment or receive merchandise, and see the movement history update.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "action",
+        "description": "Review the stock summary"
+      },
+      {
+        "type": "action",
+        "description": "Open a low stock view"
+      },
+      {
+        "type": "action",
+        "description": "Apply a manual stock adjustment or register a receipt"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the stock summary updates"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the movement history is updated"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Open order details and review the order breakdown",
+    "description": "Verifies that an admin can open an order drawer and inspect the item breakdown, frozen price, and status history.",
+    "category": "Admin Gestión de Pedidos y Cobranza",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/pedidos"
+      },
+      {
+        "type": "action",
+        "description": "Open an order detail drawer"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order detail drawer is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the item breakdown and status history are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Review inventory summary and movement history",
+    "description": "Verifies that the inventory page shows stock summary information and allows switching to movement history to review stock records.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify stock summary information is displayed"
+      },
+      {
+        "type": "action",
+        "description": "Click the tab for movement history"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify movement history records are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Advance an order through fulfillment stages",
+    "description": "Verifies that an admin can move an order from preparing to dispatched and then delivered while the status history updates.",
+    "category": "Admin Gestión de Pedidos y Cobranza",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/pedidos"
+      },
+      {
+        "type": "action",
+        "description": "Open an order detail drawer"
+      },
+      {
+        "type": "action",
+        "description": "Advance the order to preparing"
+      },
+      {
+        "type": "action",
+        "description": "Advance the order to dispatched"
+      },
+      {
+        "type": "action",
+        "description": "Mark the order as delivered"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order shows the delivered state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the status history is updated"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Open a related admin section from the dashboard",
+    "description": "Verifies that an admin can use the dashboard shortcuts to jump into another operational module.",
+    "category": "Admin Resumen Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin"
+      },
+      {
+        "type": "action",
+        "description": "Click a shortcut to the orders section"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the orders management page is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Receive merchandise and record the stock movement",
+    "description": "Verifies that receiving merchandise increases stock and creates a corresponding movement record.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "action",
+        "description": "Open the merchandise receipt modal"
+      },
+      {
+        "type": "action",
+        "description": "Fill supplier information into the supplier field"
+      },
+      {
+        "type": "action",
+        "description": "Fill an invoice number into the invoice field"
+      },
+      {
+        "type": "action",
+        "description": "Fill valid received quantities into the quantity field"
+      },
+      {
+        "type": "action",
+        "description": "Save the receipt"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify stock levels increase"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a receipt movement record is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Prevent payment confirmation for an invalid order state",
+    "description": "Verifies that an admin cannot confirm payment for a cancelled or expired order and the action is blocked in the interface.",
+    "category": "Admin Gestión de Pedidos y Cobranza",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/pedidos"
+      },
+      {
+        "type": "action",
+        "description": "Filter the orders to cancelled items"
+      },
+      {
+        "type": "action",
+        "description": "Open the payment verification modal for a cancelled order"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit payment verification"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payment verification is not allowed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order remains in an invalid payment state"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "Create a new product in the catalog",
+    "description": "This test verifies that a user can add a new product with the required details and see it appear in the catalog.",
+    "category": "Admin Catálogo de Productos",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/productos"
+      },
+      {
+        "type": "action",
+        "description": "Open the new product form"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the product name"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the brand field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the SKU field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the sale price field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the physical stock field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the minimum stock field"
+      },
+      {
+        "type": "action",
+        "description": "Save the product"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new product is displayed in the catalog"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the product creation was successful"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC014",
+    "title": "Review sales filters and KPI summary",
+    "description": "Verifies that an analyst can filter paid sales by date range and payment method and see the sales summary update.",
+    "category": "Admin Ventas Confirmadas y Reportes",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/ventas"
+      },
+      {
+        "type": "action",
+        "description": "Select a date range preset"
+      },
+      {
+        "type": "action",
+        "description": "Filter sales by a payment method"
+      },
+      {
+        "type": "action",
+        "description": "Search for a buyer or reference"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the sales table reflects the active filters"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify sales KPI cards are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC015",
+    "title": "Filter the warehouse list to low stock items",
+    "description": "Verifies that enabling the low-stock filter narrows the warehouse list and disabling it returns the full inventory list.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "action",
+        "description": "Enable the low-stock filter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify only low-stock items are displayed"
+      },
+      {
+        "type": "action",
+        "description": "Disable the low-stock filter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the full warehouse inventory list is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC016",
+    "title": "Open and close a sales detail view",
+    "description": "Verifies that an analyst can open a sale detail view and inspect the sold items and cost snapshot.",
+    "category": "Admin Ventas Confirmadas y Reportes",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/ventas"
+      },
+      {
+        "type": "action",
+        "description": "Open the detail view for a sale"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the sale detail view is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the sold items and cost snapshot are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC017",
+    "title": "Search the product catalog and filter by category",
+    "description": "This test verifies that users can find products by name or SKU and narrow the catalog using a category filter.",
+    "category": "Admin Catálogo de Productos",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/productos"
+      },
+      {
+        "type": "action",
+        "description": "Search for a product by name or SKU"
+      },
+      {
+        "type": "action",
+        "description": "Select a category filter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify matching catalog items are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the catalog reflects the selected category"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC018",
+    "title": "Manage products from the catalog",
+    "description": "Verifies that an operator can search products, filter by category, create a quick product, and change its active state.",
+    "category": "Admin Catálogo de Productos",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/productos"
+      },
+      {
+        "type": "action",
+        "description": "Search products by name or SKU"
+      },
+      {
+        "type": "action",
+        "description": "Filter products by category"
+      },
+      {
+        "type": "action",
+        "description": "Create a quick product"
+      },
+      {
+        "type": "action",
+        "description": "Toggle a product between active and inactive"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the filtered product list is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the product state can be changed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC019",
+    "title": "Download the paid sales Excel report",
+    "description": "Verifies that an analyst can apply filters and generate the Excel export for paid sales.",
+    "category": "Admin Ventas Confirmadas y Reportes",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/ventas"
+      },
+      {
+        "type": "action",
+        "description": "Select a date range preset"
+      },
+      {
+        "type": "action",
+        "description": "Filter sales by a payment method"
+      },
+      {
+        "type": "action",
+        "description": "Download the Excel report"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the Excel export is generated"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the report download is available"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC020",
+    "title": "Toggle a product between active and inactive",
+    "description": "This test verifies that changing a product's publication state updates its status in the catalog.",
+    "category": "Admin Catálogo de Productos",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/productos"
+      },
+      {
+        "type": "action",
+        "description": "Locate a product"
+      },
+      {
+        "type": "action",
+        "description": "Toggle the product status"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the product status changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the catalog still displays the product"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC021",
+    "title": "Resolve import conflicts and commit products",
+    "description": "This test verifies that a valid bulk import can be committed after selecting a conflict policy and that the imported products become available.",
+    "category": "Admin Importación Masiva Excel",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/importar"
+      },
+      {
+        "type": "action",
+        "description": "Upload a completed Excel file"
+      },
+      {
+        "type": "action",
+        "description": "Start analyzing the file"
+      },
+      {
+        "type": "action",
+        "description": "Select a conflict policy"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the import"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the import completes successfully"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify newly imported products are available"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC022",
+    "title": "Import products from the bulk upload workflow",
+    "description": "Verifies that an operator can open the bulk import flow, review the template, upload a spreadsheet, preview validation results, choose a conflict policy, and commit the import.",
+    "category": "Admin Importación Masiva Excel",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/importar"
+      },
+      {
+        "type": "action",
+        "description": "Download the template"
+      },
+      {
+        "type": "action",
+        "description": "Upload a valid spreadsheet file"
+      },
+      {
+        "type": "action",
+        "description": "Review the import preview"
+      },
+      {
+        "type": "action",
+        "description": "Select a conflict policy"
+      },
+      {
+        "type": "action",
+        "description": "Commit the import"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the import is completed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the imported products are ready to appear in the catalog"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC023",
+    "title": "Preview a completed product import file",
+    "description": "This test verifies that uploading a completed spreadsheet and starting analysis shows a preview and validation summary for the import job.",
+    "category": "Admin Importación Masiva Excel",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/importar"
+      },
+      {
+        "type": "action",
+        "description": "Upload a completed Excel file"
+      },
+      {
+        "type": "action",
+        "description": "Start analyzing the file"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an import preview is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a validation summary is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC024",
+    "title": "Review commercial analytics for the selected period",
+    "description": "Verifies that an analyst can change the reporting period and see the revenue trend, top products, and payment mix for that period.",
+    "category": "Admin Analítica Comercial",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/analitica"
+      },
+      {
+        "type": "action",
+        "description": "Select a reporting period"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify daily revenue data is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify top products and payment distribution are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC025",
+    "title": "Filter and review commercial analytics",
+    "description": "This test verifies that changing the reporting period updates the analytics view with the expected revenue trend, top products, and payment method distribution.",
+    "category": "Admin Analítica Comercial",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/analitica"
+      },
+      {
+        "type": "action",
+        "description": "Select a reporting period"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the daily revenue chart is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the top products ranking is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the payment method distribution is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC026",
+    "title": "Prevent a manual stock adjustment below reserved stock",
+    "description": "Verifies that the inventory adjustment form blocks saving when the new physical stock would fall below reserved stock and shows a validation error.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "action",
+        "description": "Open the manual stock adjustment modal"
+      },
+      {
+        "type": "action",
+        "description": "Select a product variant"
+      },
+      {
+        "type": "action",
+        "description": "Fill a physical stock value below the reserved amount into the stock field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a reason into the adjustment reason field"
+      },
+      {
+        "type": "action",
+        "description": "Save the adjustment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a stock validation error is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC027",
+    "title": "Refresh analytics after changing the period",
+    "description": "This test verifies that refreshing analytics after selecting a different reporting period updates the metrics shown on screen.",
+    "category": "Admin Analítica Comercial",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/analitica"
+      },
+      {
+        "type": "action",
+        "description": "Select a different reporting period"
+      },
+      {
+        "type": "action",
+        "description": "Click to refresh the data"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the analytics metrics are updated"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the daily revenue chart remains visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC028",
+    "title": "Download the official import template",
+    "description": "This test verifies that the bulk import page provides the official spreadsheet template for product imports.",
+    "category": "Admin Importación Masiva Excel",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/importar"
+      },
+      {
+        "type": "action",
+        "description": "Click to download the official template"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the template download action is available"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the import page remains available"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC029",
+    "title": "Review diagnostics for an invalid import file",
+    "description": "This test verifies that uploading an invalid spreadsheet shows diagnostics that help the user correct the file before retrying.",
+    "category": "Admin Importación Masiva Excel",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/importar"
+      },
+      {
+        "type": "action",
+        "description": "Upload an invalid spreadsheet file"
+      },
+      {
+        "type": "action",
+        "description": "Start analyzing the file"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify spreadsheet diagnostics are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify rejected rows are shown"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC030",
+    "title": "Show an empty low-stock state when no items are under the threshold",
+    "description": "Verifies that the low-stock filter can result in an empty state and that the page clearly indicates there are no matching items.",
+    "category": "Admin Inventario y Bodega",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/inventario"
+      },
+      {
+        "type": "action",
+        "description": "Enable the low-stock filter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an empty state message is visible"
+      }
+    ],
+    "priority": "Low"
+  }
+]
