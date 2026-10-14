@@ -1,27 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { formatCOP } from '@/lib/utils';
-import { Trash2, Plus, Minus, ArrowRight, MessageCircleHeart, ShoppingBag, Sparkles } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Sparkles } from 'lucide-react';
 
 export default function CartPage() {
   const router = useRouter();
   const { items, updateQuantity, removeItem, clearCart, totalAmount, totalCount } =
     useCart();
-
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerCity, setCustomerCity] = useState('');
-  const [notes, setNotes] = useState('');
-
-  const handleCheckoutWhatsApp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (items.length === 0) return;
-    router.push('/pedido');
-  };
 
   return (
     <div className="space-y-8">
@@ -147,10 +136,10 @@ export default function CartPage() {
             )}
           </div>
 
-          {/* Right: Checkout Drawer / Summary Panel */}
+          {/* Right: Summary Panel */}
           <div className="bg-white border border-border rounded-3xl p-6 sm:p-8 shadow-soft space-y-6">
             <h2 className="font-serif text-xl sm:text-2xl text-wine font-normal border-b border-border pb-4">
-              Resumen del pedido
+              Resumen de compra
             </h2>
 
             {/* Price Calculations */}
@@ -163,13 +152,13 @@ export default function CartPage() {
               </div>
 
               <div className="flex justify-between text-muted">
-                <span>Envío</span>
-                <span className="text-ink font-medium">Por coordinar</span>
+                <span>Envío (Valledupar)</span>
+                <span className="text-ink font-medium">Contraentrega</span>
               </div>
 
               <div className="border-t border-border pt-3 flex justify-between items-baseline">
                 <span className="font-bold text-base text-ink">
-                  Total estimado
+                  Total productos
                 </span>
                 <span className="font-serif text-2xl font-bold text-wine">
                   {formatCOP(totalAmount)}
@@ -177,77 +166,20 @@ export default function CartPage() {
               </div>
             </div>
 
-            {/* Customer Information Preview */}
-            <form onSubmit={handleCheckoutWhatsApp} className="space-y-3.5 pt-2">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1">
-                  Tu nombre
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Camila Morales"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-cream border border-border rounded-xl px-3.5 py-2.5 text-sm text-ink outline-none focus:border-mauve transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1">
-                  Número de WhatsApp
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="Ej. 310 123 4567"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full bg-cream border border-border rounded-xl px-3.5 py-2.5 text-sm text-ink outline-none focus:border-mauve transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1">
-                  Ciudad o Municipio (opcional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Bogotá, Medellín, Cali..."
-                  value={customerCity}
-                  onChange={(e) => setCustomerCity(e.target.value)}
-                  className="w-full bg-cream border border-border rounded-xl px-3.5 py-2.5 text-sm text-ink outline-none focus:border-mauve transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1">
-                  Nota o tono preferido
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Prefiero tono cálido, confirmar antes de envío"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full bg-cream border border-border rounded-xl px-3.5 py-2.5 text-sm text-ink outline-none focus:border-mauve transition"
-                />
-              </div>
-
-              {/* WhatsApp Checkout CTA */}
-              <button
-                type="submit"
-                disabled={items.length === 0}
-                className="w-full mt-4 py-4 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-glow transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <MessageCircleHeart className="w-5 h-5" />
-                Continuar al pedido y reservar stock ↗
-              </button>
-            </form>
-
-            {/* Architectural Note */}
             <div className="bg-[#FFF8E7] border border-[#F0D597] rounded-2xl p-4 text-xs text-[#8A5C11] leading-relaxed">
-              <strong>Cómo funciona:</strong> En el siguiente paso confirmas el pedido y reservas las existencias por tiempo limitado. Coordinamos el pago por WhatsApp; el pedido solo se marca como pagado cuando nuestro equipo verifica el importe recibido.
+              <strong>Nota sobre envío:</strong> El valor del domicilio en Valledupar se cancela directamente al repartidor al recibir tu pedido. No se cobra en este resumen.
             </div>
+
+            {/* Checkout CTA */}
+            <button
+              type="button"
+              onClick={() => router.push('/pedido')}
+              disabled={items.length === 0}
+              className="w-full py-4 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-glow transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>Continuar con el pedido</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
 

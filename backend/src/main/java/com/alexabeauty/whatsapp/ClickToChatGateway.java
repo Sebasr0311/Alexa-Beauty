@@ -50,7 +50,20 @@ public class ClickToChatGateway implements WhatsAppGateway {
         }
 
         sb.append("Total productos: $ ").append(formatAmount(order.getTotal())).append("\n");
-        sb.append("Entrega: ").append(order.getDeliveryType() != null ? order.getDeliveryType().trim() : "").append("\n");
+        boolean isDelivery = "ENVIO_DOMICILIO".equalsIgnoreCase(order.getDeliveryType())
+                || "DOMICILIO".equalsIgnoreCase(order.getDeliveryType());
+        if (isDelivery) {
+            sb.append("Entrega: Domicilio en Valledupar (costo de envío pagadero contraentrega)\n");
+            if (order.getAddress() != null && !order.getAddress().isBlank()) {
+                sb.append("Dirección: ").append(order.getAddress().trim()).append("\n");
+            }
+            sb.append("Ciudad: Valledupar\n");
+        } else {
+            sb.append("Entrega: Retiro en tienda física (Valledupar)\n");
+        }
+        if (order.getCustomerNotes() != null && !order.getCustomerNotes().isBlank()) {
+            sb.append("Detalles / Pago: ").append(order.getCustomerNotes().trim()).append("\n");
+        }
         sb.append("Nombre: ").append(order.getCustomerName() != null ? order.getCustomerName().trim() : "").append("\n");
         sb.append("¿Me ayudan a confirmar disponibilidad y cómo realizar el pago?");
 

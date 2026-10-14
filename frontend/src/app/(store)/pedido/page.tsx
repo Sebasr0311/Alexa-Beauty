@@ -27,8 +27,9 @@ export default function CheckoutPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryType, setDeliveryType] = useState<'ENVIO_DOMICILIO' | 'RETIRO_TIENDA'>('ENVIO_DOMICILIO');
-  const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
+  const [barrio, setBarrio] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'NEQUI' | 'BANCOLOMBIA' | 'DAVIPLATA' | 'EFECTIVO'>('NEQUI');
   const [customerNotes, setCustomerNotes] = useState('');
 
   // UI state
@@ -55,9 +56,15 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (deliveryType === 'ENVIO_DOMICILIO' && (!city.trim() || !address.trim())) {
-      setErrorMessage('Para entrega a domicilio, por favor indica ciudad y dirección.');
-      return;
+    if (deliveryType === 'ENVIO_DOMICILIO') {
+      if (!address.trim()) {
+        setErrorMessage('Por favor ingresa la dirección de entrega.');
+        return;
+      }
+      if (!barrio.trim()) {
+        setErrorMessage('Por favor indica el barrio de entrega en Valledupar.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -66,22 +73,33 @@ export default function CheckoutPage() {
     try {
       const orderItems: OrderItemRequestDto[] = items.map(item => ({ variantId: item.variantId, quantity: item.quantity }));
 
-      // 2. Prepare payload
+      const fullAddress = deliveryType === 'ENVIO_DOMICILIO'
+        ? `${address.trim()} (Barrio: ${barrio.trim()})`
+        : undefined;
+
+      const notesWithPayment = `Método de pago preferido: ${paymentMethod}${customerNotes.trim() ? ` | Notas: ${customerNotes.trim()}` : ''}`;
+
+      // Prepare payload (city fixed to Valledupar)
       const orderPayload: CreateOrderRequestDto = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         deliveryType,
-        city: deliveryType === 'ENVIO_DOMICILIO' ? city.trim() : undefined,
-        address: deliveryType === 'ENVIO_DOMICILIO' ? address.trim() : undefined,
-        customerNotes: customerNotes.trim() ? customerNotes.trim() : undefined,
+        city: 'Valledupar',
+        address: fullAddress,
+        customerNotes: notesWithPayment,
         items: orderItems,
       };
 
-      // 3. Submit order to backend
+      // Submit order to backend
       const response = await api.createOrder(orderPayload, idempotencyKey);
 
-      // 4. On success: clear cart and redirect to order confirmation
       clearCart();
+
+      // Seamless direct redirect to WhatsApp
+      if (response.whatsappUrl) {
+        window.open(response.whatsappUrl, '_blank');
+      }
+
       router.push(`/pedido/confirmado/${encodeURIComponent(response.reference)}?token=${encodeURIComponent(response.trackingToken)}`);
     } catch (err: any) {
       console.error('Checkout error:', err);
@@ -122,7 +140,7 @@ export default function CheckoutPage() {
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-wine mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Paso final</span>
+            <span>Valledupar · Pedido asistido</span>
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl text-wine font-normal tracking-tight">
             Confirmar pedido y reserva
@@ -145,7 +163,7 @@ export default function CheckoutPage() {
         {/* Customer & Delivery Form */}
         <div className="bg-white border border-border rounded-3xl p-6 sm:p-8 shadow-soft space-y-6">
           <h2 className="font-serif text-xl sm:text-2xl text-wine font-medium border-b border-border pb-4">
-            Datos de contacto y entrega
+            Datos de entrega y pago
           </h2>
 
           {errorMessage && (
@@ -190,7 +208,7 @@ export default function CheckoutPage() {
                 className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
               />
               <span className="text-[11px] text-muted block mt-1">
-                Te contactaremos a este número para validar existencias y compartir datos de pago.
+                A este número enviaremos los datos de seguimiento del pedido.
               </span>
             </div>
 
@@ -205,7 +223,7 @@ export default function CheckoutPage() {
                   onClick={() => setDeliveryType('ENVIO_DOMICILIO')}
                   className={`p-4 rounded-2xl border text-left transition flex items-start gap-3 ${
                     deliveryType === 'ENVIO_DOMICILIO'
-                      ? 'border-wine bg-wine/5 shadow-xs'
+                      ? 'border-wine bg-wine/5 shadow-xs ring-1 ring-wine/30'
                       : 'border-border bg-cream/50 hover:bg-cream'
                   }`}
                 >
@@ -215,7 +233,7 @@ export default function CheckoutPage() {
                       Envío a domicilio
                     </span>
                     <span className="text-[11px] text-muted mt-0.5 block">
-                      Entrega a cualquier ciudad de Colombia
+                      Entrega en Valledupar
                     </span>
                   </div>
                 </button>
@@ -225,7 +243,7 @@ export default function CheckoutPage() {
                   onClick={() => setDeliveryType('RETIRO_TIENDA')}
                   className={`p-4 rounded-2xl border text-left transition flex items-start gap-3 ${
                     deliveryType === 'RETIRO_TIENDA'
-                      ? 'border-wine bg-wine/5 shadow-xs'
+                      ? 'border-wine bg-wine/5 shadow-xs ring-1 ring-wine/30'
                       : 'border-border bg-cream/50 hover:bg-cream'
                   }`}
                 >
@@ -235,47 +253,92 @@ export default function CheckoutPage() {
                       Retiro en tienda
                     </span>
                     <span className="text-[11px] text-muted mt-0.5 block">
-                      Recoge tu pedido sin costo en punto físico
+                      Punto físico · Sin costo adicional
                     </span>
                   </div>
                 </button>
               </div>
             </div>
 
-            {/* Delivery address fields (shown only for ENVIO_DOMICILIO) */}
+            {/* Delivery notice and address fields (shown only for ENVIO_DOMICILIO) */}
             {deliveryType === 'ENVIO_DOMICILIO' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label htmlFor="city" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                    Ciudad / Municipio <span className="text-wine">*</span>
-                  </label>
-                  <input
-                    id="city"
-                    type="text"
-                    required={deliveryType === 'ENVIO_DOMICILIO'}
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="Ej. Medellín, Bogotá, Cali..."
-                    className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
-                  />
+              <div className="space-y-4 pt-1">
+                {/* Notice that customer pays shipping on delivery */}
+                <div className="bg-[#FFF8E7] border border-[#F0D597] rounded-2xl p-3.5 text-xs text-[#8A5C11] leading-relaxed flex items-start gap-2.5">
+                  <Truck className="w-4 h-4 text-[#B37400] flex-shrink-0 mt-0.5" />
+                  <p>
+                    <strong>Costo de envío en Valledupar:</strong> El valor del domicilio corre por cuenta del cliente al recibir el pedido (pago contraentrega al repartidor). <strong>No se suma al total del pedido.</strong>
+                  </p>
                 </div>
 
-                <div>
-                  <label htmlFor="address" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                    Dirección completa <span className="text-wine">*</span>
-                  </label>
-                  <input
-                    id="address"
-                    type="text"
-                    required={deliveryType === 'ENVIO_DOMICILIO'}
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Ej. Carrera 43A # 1-50 Apt 402"
-                    className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="address" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                      Dirección exacta <span className="text-wine">*</span>
+                    </label>
+                    <input
+                      id="address"
+                      type="text"
+                      required={deliveryType === 'ENVIO_DOMICILIO'}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Ej. Calle 12 # 15-40 Casa 3"
+                      className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="barrio" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                      Barrio en Valledupar <span className="text-wine">*</span>
+                    </label>
+                    <input
+                      id="barrio"
+                      type="text"
+                      required={deliveryType === 'ENVIO_DOMICILIO'}
+                      value={barrio}
+                      onChange={(e) => setBarrio(e.target.value)}
+                      placeholder="Ej. Los Cortijos, La Nevada, Novalito..."
+                      className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
+                    />
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* Payment Method Selector */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-2">
+                Método de pago preferido <span className="text-wine">*</span>
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { id: 'NEQUI', label: 'Nequi', icon: '🟣' },
+                  { id: 'BANCOLOMBIA', label: 'Bancolombia', icon: '🟡' },
+                  { id: 'DAVIPLATA', label: 'Daviplata', icon: '🔴' },
+                  { id: 'EFECTIVO', label: 'Efectivo', icon: '💵' },
+                ].map((method) => {
+                  const isSelected = paymentMethod === method.id;
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(method.id as any)}
+                      className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 ${
+                        isSelected
+                          ? 'border-wine bg-wine/10 font-bold text-wine ring-1 ring-wine/30'
+                          : 'border-border bg-cream/40 text-ink hover:bg-cream'
+                      }`}
+                    >
+                      <span className="text-lg">{method.icon}</span>
+                      <span className="text-xs">{method.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[11px] text-muted block mt-1.5">
+                Los datos de transferencia o pago se confirmarán directamente en el chat de WhatsApp.
+              </span>
+            </div>
 
             {/* Customer Notes */}
             <div>
@@ -287,7 +350,7 @@ export default function CheckoutPage() {
                 rows={2}
                 value={customerNotes}
                 onChange={(e) => setCustomerNotes(e.target.value)}
-                placeholder="Ej. Tono específico, horario preferido de entrega o requerimientos especiales"
+                placeholder="Ej. Tono preferido, horario de entrega o instrucciones para el repartidor"
                 className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition resize-none"
               />
             </div>
@@ -307,7 +370,7 @@ export default function CheckoutPage() {
                 ) : (
                   <>
                     <Clock className="w-5 h-5" />
-                    Confirmar pedido y reservar por 45 min ↗
+                    Confirmar pedido y abrir WhatsApp ↗
                   </>
                 )}
               </button>
@@ -341,6 +404,11 @@ export default function CheckoutPage() {
                     <p className="font-semibold text-xs sm:text-sm text-ink truncate">
                       {item.product.name}
                     </p>
+                    {item.variantName && (
+                      <p className="text-[11px] text-wine font-semibold truncate">
+                        Tono: {item.variantName}
+                      </p>
+                    )}
                     <p className="text-[11px] text-muted">
                       {item.quantity} × {formatCOP(item.product.price)}
                     </p>
@@ -362,9 +430,9 @@ export default function CheckoutPage() {
             </div>
 
             <div className="flex justify-between text-muted text-xs sm:text-sm">
-              <span>Costo de envío</span>
+              <span>Costo de envío (Valledupar)</span>
               <span className="text-ink font-medium">
-                {deliveryType === 'RETIRO_TIENDA' ? 'Gratis' : 'Por coordinar'}
+                {deliveryType === 'RETIRO_TIENDA' ? 'Gratis' : 'Contraentrega (no incluido)'}
               </span>
             </div>
 

@@ -3,9 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Product } from '@/lib/data';
+import { api, ProductDetailDto, ProductVariantDto } from '@/lib/api';
 import { formatCOP } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
-import { Check, Plus } from 'lucide-react';
+import { ShadeSelectorModal } from '@/components/catalog/ShadeSelectorModal';
+import { Check, Plus, Loader2 } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -14,9 +16,69 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
   const [justAdded, setJustAdded] = useState(false);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+  const [productDetail, setProductDetail] = useState<ProductDetailDto | null>(null);
+  const [isShadeModalOpen, setIsShadeModalOpen] = useState(false);
   const isOutOfStock = product.stock <= 0;
 
-  const handleAdd = () => { window.location.assign(`/producto/${encodeURIComponent(product.slug)}`); };
+  const handleAdd = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isOutOfStock || loadingVariants) return;
+
+    try {
+      setLoadingVariants(true);
+      const detail = productDetail || (await api.getProductBySlug(product.slug));
+      setProductDetail(detail);
+
+      if (detail.variants && detail.variants.length > 1) {
+        setIsShadeModalOpen(true);
+      } else if (detail.variants && detail.variants.length === 1) {
+        const single = detail.variants[0];
+        addItem(
+          {
+            ...product,
+            price: single.salePrice,
+            stock: single.availableStock,
+            variantId: single.id,
+          },
+          1,
+          single.id,
+          single.shadeName || single.presentation
+        );
+        setJustAdded(true);
+        setTimeout(() => setJustAdded(false), 1500);
+      } else {
+        addItem(product, 1, product.variantId);
+        setJustAdded(true);
+        setTimeout(() => setJustAdded(false), 1500);
+      }
+    } catch (err) {
+      console.error('Error fetching variants on quick-add:', err);
+      window.location.assign(`/producto/${encodeURIComponent(product.slug)}`);
+    } finally {
+      setLoadingVariants(false);
+    }
+  };
+
+  const handleSelectVariant = (variant: ProductVariantDto) => {
+    if (!productDetail) return;
+    addItem(
+      {
+        ...product,
+        name: `${product.name}${variant.shadeName ? ` - ${variant.shadeName}` : ''}`,
+        price: variant.salePrice,
+        stock: variant.availableStock,
+        variantId: variant.id,
+      },
+      1,
+      variant.id,
+      variant.shadeName || variant.presentation
+    );
+    setIsShadeModalOpen(false);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1500);
+  };
 
   const gradientClass =
     product.visual === 'dark'
@@ -83,8 +145,8 @@ export function ProductCard({ product }: ProductCardProps) {
 
         <button
           onClick={handleAdd}
-          disabled={isOutOfStock}
-          aria-label={`Seleccionar variante de ${product.name}`}
+          disabled={isOutOfStock || loadingVariants}
+          aria-label={`Agregar o elegir tono de ${product.name}`}
           className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
             isOutOfStock
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -93,7 +155,9 @@ export function ProductCard({ product }: ProductCardProps) {
               : 'bg-wine hover:bg-wineDark text-white shadow-md active:scale-95'
           }`}
         >
-          {justAdded ? (
+          {loadingVariants ? (
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+          ) : justAdded ? (
             <Check className="w-5 h-5 stroke-[2.5]" />
           ) : isOutOfStock ? (
             <span className="text-sm font-bold">×</span>
@@ -102,6 +166,14 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </button>
       </div>
+
+      {/* Shade Selection Modal for multi-tone products */}
+      <ShadeSelectorModal
+        product={productDetail}
+        isOpen={isShadeModalOpen}
+        onClose={() => setIsShadeModalOpen(false)}
+        onSelectVariant={handleSelectVariant}
+      />
     </article>
   );
 }

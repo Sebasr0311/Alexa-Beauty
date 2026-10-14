@@ -43,3 +43,4 @@ yarn-error.log*
 **/test-results/
 testsprite_tests/tmp/
 testsprite_tests/tmp/config.json
+.playwright-mcp/
