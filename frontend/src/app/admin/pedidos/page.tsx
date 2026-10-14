@@ -39,14 +39,13 @@ import {
   ConfirmPaymentDto,
 } from '@/lib/api';
 
-type FilterTab = 'TODOS' | 'PENDIENTES' | 'PAGADOS' | 'PREPARANDO' | 'DESPACHADOS' | 'CANCELADOS';
+type FilterTab = 'TODOS' | 'PENDIENTES' | 'ENVIADOS' | 'ENTREGADOS' | 'CANCELADOS';
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'TODOS', label: 'Todos los pedidos' },
+  { key: 'TODOS', label: 'Todos' },
   { key: 'PENDIENTES', label: 'Pendientes' },
-  { key: 'PAGADOS', label: 'Pagados' },
-  { key: 'PREPARANDO', label: 'En Preparación' },
-  { key: 'DESPACHADOS', label: 'Despachados' },
+  { key: 'ENVIADOS', label: 'Enviados' },
+  { key: 'ENTREGADOS', label: 'Entregados / Pagados' },
   { key: 'CANCELADOS', label: 'Cancelados' },
 ];
 
@@ -116,18 +115,15 @@ export default function AdminOrdersPage() {
     return orders.filter((order) => {
       // Status filter
       if (activeTab === 'PENDIENTES') {
-        const isPending =
-          order.status === 'PENDIENTE' ||
-          order.status === 'PENDIENTE_CONTACTO' ||
-          order.status === 'PENDIENTE_PAGO' ||
-          order.status === 'PAGO_EN_REVISION';
-        if (!isPending) return false;
-      } else if (activeTab === 'PAGADOS') {
-        if (order.status !== 'PAGADO') return false;
-      } else if (activeTab === 'PREPARANDO') {
-        if (order.status !== 'PREPARANDO') return false;
-      } else if (activeTab === 'DESPACHADOS') {
-        if (order.status !== 'DESPACHADO' && order.status !== 'ENTREGADO') return false;
+        const isCompleted = order.status === 'ENTREGADO' || order.status === 'PAGADO' || !!order.paidAt;
+        const isDispatched = order.status === 'DESPACHADO';
+        const isCancelled = order.status === 'CANCELADO' || order.status === 'EXPIRADO';
+        if (isCompleted || isDispatched || isCancelled) return false;
+      } else if (activeTab === 'ENVIADOS') {
+        if (order.status !== 'DESPACHADO' && order.status !== 'PREPARANDO') return false;
+      } else if (activeTab === 'ENTREGADOS') {
+        const isCompleted = order.status === 'ENTREGADO' || order.status === 'PAGADO' || !!order.paidAt;
+        if (!isCompleted) return false;
       } else if (activeTab === 'CANCELADOS') {
         if (order.status !== 'CANCELADO' && order.status !== 'EXPIRADO') return false;
       }
@@ -218,67 +214,76 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDIENTE':
-      case 'PENDIENTE_CONTACTO':
-      case 'PENDIENTE_PAGO':
-      case 'PAGO_EN_REVISION':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-            <Clock className="w-3.5 h-3.5" />
-            Pendiente de Pago
-          </span>
-        );
-      case 'PAGADO':
+  const isDomicilioOrder = (deliveryType?: string) => {
+    if (!deliveryType) return true;
+    const dt = deliveryType.toUpperCase();
+    return dt.includes('DOMICILIO') || dt.includes('ENVIO') || dt.includes('ENTREGA');
+  };
+
+  const getStatusBadge = (order: AdminOrderDetailDto) => {
+    const isDomicilio = isDomicilioOrder(order.deliveryType);
+    const isPaid = !!order.paidAt || order.status === 'PAGADO';
+
+    if (order.status === 'CANCELADO') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+          <XCircle className="w-3.5 h-3.5" />
+          Cancelado
+        </span>
+      );
+    }
+
+    if (order.status === 'EXPIRADO') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
+          <RotateCcw className="w-3.5 h-3.5" />
+          Expirado
+        </span>
+      );
+    }
+
+    // Para Domicilio: Solo 2 estados: Enviado y Entregado (Pagado)
+    if (isDomicilio) {
+      if (order.status === 'ENTREGADO' || isPaid) {
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            Pagado
+            Entregado (Pagado)
           </span>
         );
-      case 'PREPARANDO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-            <Package className="w-3.5 h-3.5" />
-            En Preparación
-          </span>
-        );
-      case 'DESPACHADO':
+      }
+      if (order.status === 'DESPACHADO' || order.status === 'PREPARANDO') {
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
             <Truck className="w-3.5 h-3.5" />
-            Despachado
+            Enviado
           </span>
         );
-      case 'ENTREGADO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Entregado
-          </span>
-        );
-      case 'CANCELADO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
-            <XCircle className="w-3.5 h-3.5" />
-            Cancelado
-          </span>
-        );
-      case 'EXPIRADO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
-            <RotateCcw className="w-3.5 h-3.5" />
-            Expirado
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
-            {status}
-          </span>
-        );
+      }
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+          <Clock className="w-3.5 h-3.5" />
+          Pendiente de Envío
+        </span>
+      );
     }
+
+    // Para Recoger en Tienda: Pendiente de Pago hasta que el admin confirme
+    if (isPaid || order.status === 'ENTREGADO') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Pagado
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+        <Clock className="w-3.5 h-3.5" />
+        Pendiente de Pago
+      </span>
+    );
   };
 
   return (
@@ -400,14 +405,10 @@ export default function AdminOrdersPage() {
                   </tr>
                 ) : (
                   filteredOrders.map((order) => {
-                    const isPending =
-                      order.status === 'PENDIENTE' ||
-                      order.status === 'PENDIENTE_CONTACTO' ||
-                      order.status === 'PENDIENTE_PAGO' ||
-                      order.status === 'PAGO_EN_REVISION';
-                    const isPaid = order.status === 'PAGADO';
-                    const isPreparing = order.status === 'PREPARANDO';
+                    const isDomicilio = isDomicilioOrder(order.deliveryType);
+                    const isPaid = !!order.paidAt || order.status === 'PAGADO' || order.status === 'ENTREGADO';
                     const isDispatched = order.status === 'DESPACHADO';
+                    const isPending = !isPaid && !isDispatched && order.status !== 'CANCELADO' && order.status !== 'EXPIRADO';
 
                     return (
                       <tr key={order.id} className="hover:bg-cream/40 transition">
@@ -422,13 +423,19 @@ export default function AdminOrdersPage() {
                           </span>
                         </td>
                         <td className="py-4 px-4 hidden md:table-cell text-muted text-xs">
-                          <span className="font-medium text-ink block">{order.deliveryType}</span>
-                          {order.city && <span>{order.city}</span>}
+                          <span className="font-semibold text-ink block">
+                            {isDomicilio ? 'Domicilio' : 'Recoger en Tienda'}
+                          </span>
+                          {order.address && (
+                            <span className="truncate max-w-[160px] block text-[11px] text-muted">
+                              {order.address}
+                            </span>
+                          )}
                         </td>
                         <td className="py-4 px-4 font-bold text-wineDark">
                           {formatCOP(order.total)}
                         </td>
-                        <td className="py-4 px-4">{getStatusBadge(order.status)}</td>
+                        <td className="py-4 px-4">{getStatusBadge(order)}</td>
                         <td className="py-4 px-4 hidden lg:table-cell text-xs text-muted">
                           <div>
                             Creado: {new Date(order.createdAt).toLocaleDateString('es-CO', { hour: '2-digit', minute: '2-digit' })}
@@ -459,78 +466,91 @@ export default function AdminOrdersPage() {
                               <span className="hidden sm:inline">Detalle</span>
                             </button>
 
-                            {isPending && (
+                            {/* Domicilio: Solo 2 estados: Enviado y Entregado */}
+                            {isDomicilio ? (
                               <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenPaymentModal(order)}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-wine hover:bg-wineDark text-white transition shadow-xs"
-                                  title="Verificar Pago"
-                                >
-                                  <CreditCard className="w-3.5 h-3.5" />
-                                  <span>Verificar Pago</span>
-                                </button>
+                                {isPending && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTransitionStatus(order.id, 'DESPACHADO', 'Enviado con mensajería a domicilio')}
+                                      disabled={processingTransition}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-xs disabled:opacity-50"
+                                      title="Marcar pedido como enviado"
+                                    >
+                                      <Truck className="w-3.5 h-3.5" />
+                                      <span>Marcar Enviado</span>
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => setOrderForExtend(order)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 transition shadow-xs"
-                                  title="Extender Reserva"
-                                >
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span className="hidden xl:inline">+Tiempo</span>
-                                </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTransitionStatus(order.id, 'ENTREGADO', 'Entrega a domicilio confirmada y pagada')}
+                                      disabled={processingTransition}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs disabled:opacity-50"
+                                      title="Marcar como entregado (registra pago y descuenta stock)"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span className="hidden xl:inline">Entregar y Cobrar</span>
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (confirm(`¿Seguro que deseas cancelar el pedido ${order.reference}? El stock reservado se liberará.`)) {
-                                      handleTransitionStatus(order.id, 'CANCELADO', 'Cancelado manualmente por administrador');
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition shadow-xs"
-                                  title="Cancelar Pedido"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                  <span className="hidden xl:inline">Cancelar</span>
-                                </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm(`¿Seguro que deseas cancelar el pedido ${order.reference}? El stock reservado se liberará.`)) {
+                                          handleTransitionStatus(order.id, 'CANCELADO', 'Cancelado manualmente por administrador');
+                                        }
+                                      }}
+                                      className="inline-flex items-center p-1.5 rounded-full text-xs text-rose-600 hover:bg-rose-50 transition"
+                                      title="Cancelar Pedido"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+
+                                {isDispatched && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTransitionStatus(order.id, 'ENTREGADO', 'Entrega a domicilio confirmada y pagada')}
+                                    disabled={processingTransition}
+                                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs disabled:opacity-50"
+                                    title="Marcar como entregado (registra pago y descuenta stock)"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Marcar Entregado</span>
+                                  </button>
+                                )}
                               </>
-                            )}
+                            ) : (
+                              /* Recoger en Tienda: Confirmar Pago */
+                              <>
+                                {!isPaid && order.status !== 'CANCELADO' && order.status !== 'EXPIRADO' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenPaymentModal(order)}
+                                      className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-bold bg-wine hover:bg-wineDark text-white transition shadow-xs"
+                                      title="Confirmar Pago y Descontar Stock"
+                                    >
+                                      <CreditCard className="w-3.5 h-3.5" />
+                                      <span>Confirmar Pago</span>
+                                    </button>
 
-                            {isPaid && (
-                              <button
-                                type="button"
-                                onClick={() => handleTransitionStatus(order.id, 'PREPARANDO', 'Pedido en proceso de empaque')}
-                                disabled={processingTransition}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-xs disabled:opacity-50"
-                              >
-                                <Package className="w-3.5 h-3.5" />
-                                <span>Preparar</span>
-                              </button>
-                            )}
-
-                            {isPreparing && (
-                              <button
-                                type="button"
-                                onClick={() => handleTransitionStatus(order.id, 'DESPACHADO', 'Entregado a mensajería / transportadora')}
-                                disabled={processingTransition}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition shadow-xs disabled:opacity-50"
-                              >
-                                <Truck className="w-3.5 h-3.5" />
-                                <span>Despachar</span>
-                              </button>
-                            )}
-
-                            {isDispatched && (
-                              <button
-                                type="button"
-                                onClick={() => handleTransitionStatus(order.id, 'ENTREGADO', 'Pedido entregado al cliente a satisfacción')}
-                                disabled={processingTransition}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white transition shadow-xs disabled:opacity-50"
-                              >
-                                <ShieldCheck className="w-3.5 h-3.5" />
-                                <span>Entregar</span>
-                              </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm(`¿Seguro que deseas cancelar el pedido ${order.reference}? El stock reservado se liberará.`)) {
+                                          handleTransitionStatus(order.id, 'CANCELADO', 'Cancelado manualmente por administrador');
+                                        }
+                                      }}
+                                      className="inline-flex items-center p-1.5 rounded-full text-xs text-rose-600 hover:bg-rose-50 transition"
+                                      title="Cancelar Pedido"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -772,7 +792,7 @@ export default function AdminOrdersPage() {
                   <span className="font-mono text-lg font-bold text-wine">
                     {selectedOrder.reference}
                   </span>
-                  {getStatusBadge(selectedOrder.status)}
+                  {getStatusBadge(selectedOrder)}
                 </div>
                 <span className="text-xs text-muted mt-0.5 block">
                   Canal: {selectedOrder.channel} · Creado el{' '}
@@ -949,48 +969,68 @@ export default function AdminOrdersPage() {
               </button>
 
               <div className="flex items-center gap-2">
-                {(selectedOrder.status === 'PENDIENTE_CONTACTO' ||
-                  selectedOrder.status === 'PENDIENTE_PAGO') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsDetailDrawerOpen(false);
-                      handleOpenPaymentModal(selectedOrder);
-                    }}
-                    className="px-5 py-2 rounded-full text-xs font-bold bg-wine hover:bg-wineDark text-white shadow-glow"
-                  >
-                    Verificar Pago
-                  </button>
-                )}
+                {isDomicilioOrder(selectedOrder.deliveryType) ? (
+                  <>
+                    {(selectedOrder.status === 'PENDIENTE_CONTACTO' ||
+                      selectedOrder.status === 'PENDIENTE_PAGO' ||
+                      selectedOrder.status === 'PREPARANDO') && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleTransitionStatus(selectedOrder.id, 'DESPACHADO', 'Enviado con mensajería a domicilio');
+                            setIsDetailDrawerOpen(false);
+                          }}
+                          disabled={processingTransition}
+                          className="px-5 py-2 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:opacity-50"
+                        >
+                          Marcar Enviado
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleTransitionStatus(selectedOrder.id, 'ENTREGADO', 'Entrega a domicilio confirmada y pagada');
+                            setIsDetailDrawerOpen(false);
+                          }}
+                          disabled={processingTransition}
+                          className="px-5 py-2 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs disabled:opacity-50"
+                        >
+                          Marcar Entregado (y Pagado)
+                        </button>
+                      </>
+                    )}
 
-                {selectedOrder.status === 'PAGADO' && (
-                  <button
-                    type="button"
-                    onClick={() => handleTransitionStatus(selectedOrder.id, 'PREPARANDO', 'Empaque iniciado')}
-                    className="px-5 py-2 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Comenzar Preparación
-                  </button>
-                )}
-
-                {selectedOrder.status === 'PREPARANDO' && (
-                  <button
-                    type="button"
-                    onClick={() => handleTransitionStatus(selectedOrder.id, 'DESPACHADO', 'Despacho registrado')}
-                    className="px-5 py-2 rounded-full text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    Marcar Despachado
-                  </button>
-                )}
-
-                {selectedOrder.status === 'DESPACHADO' && (
-                  <button
-                    type="button"
-                    onClick={() => handleTransitionStatus(selectedOrder.id, 'ENTREGADO', 'Entrega confirmada')}
-                    className="px-5 py-2 rounded-full text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white"
-                  >
-                    Confirmar Entrega
-                  </button>
+                    {selectedOrder.status === 'DESPACHADO' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleTransitionStatus(selectedOrder.id, 'ENTREGADO', 'Entrega a domicilio confirmada y pagada');
+                          setIsDetailDrawerOpen(false);
+                        }}
+                        disabled={processingTransition}
+                        className="px-5 py-2 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs disabled:opacity-50"
+                      >
+                        Marcar Entregado (y Pagado)
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {!selectedOrder.paidAt &&
+                      selectedOrder.status !== 'CANCELADO' &&
+                      selectedOrder.status !== 'EXPIRADO' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDetailDrawerOpen(false);
+                            handleOpenPaymentModal(selectedOrder);
+                          }}
+                          className="px-5 py-2 rounded-full text-xs font-bold bg-wine hover:bg-wineDark text-white shadow-glow"
+                        >
+                          Confirmar Pago
+                        </button>
+                      )}
+                  </>
                 )}
               </div>
             </div>

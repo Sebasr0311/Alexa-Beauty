@@ -25,6 +25,13 @@ import com.alexabeauty.security.UserPrincipal;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.alexabeauty.inventory.domain.InventoryMovement;
+import com.alexabeauty.inventory.domain.MovementType;
+import com.alexabeauty.inventory.repository.InventoryMovementRepository;
+import com.alexabeauty.payment.domain.Payment;
+import com.alexabeauty.payment.domain.PaymentMethod;
+import com.alexabeauty.payment.domain.PaymentStatus;
+import com.alexabeauty.payment.repository.PaymentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -51,6 +58,8 @@ public class AdminOrderServiceImpl implements AdminOrderService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
     private final AuditLogRepository auditLogRepository;
+    private final InventoryMovementRepository inventoryMovementRepository;
+    private final PaymentRepository paymentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -100,20 +109,26 @@ public class AdminOrderServiceImpl implements AdminOrderService {
         OrderStatus newStatus = request.getNewStatus();
 
         // Valid transitions:
-        // PAGADO -> PREPARANDO
-        // PREPARANDO -> DESPACHADO
+        // PAGADO -> PREPARANDO / DESPACHADO / ENTREGADO
+        // PREPARANDO -> DESPACHADO / ENTREGADO
         // DESPACHADO -> ENTREGADO
-        // PENDIENTE_CONTACTO / PENDIENTE_PAGO / PAGO_EN_REVISION -> CANCELADO
+        // PENDIENTE / PENDIENTE_CONTACTO / PENDIENTE_PAGO / PAGO_EN_REVISION -> DESPACHADO / ENTREGADO / CANCELADO
         boolean isValid = switch (currentStatus) {
-            case PAGADO -> newStatus == OrderStatus.PREPARANDO;
-            case PREPARANDO -> newStatus == OrderStatus.DESPACHADO;
+            case PAGADO -> newStatus == OrderStatus.PREPARANDO || newStatus == OrderStatus.DESPACHADO || newStatus == OrderStatus.ENTREGADO;
+            case PREPARANDO -> newStatus == OrderStatus.DESPACHADO || newStatus == OrderStatus.ENTREGADO;
             case DESPACHADO -> newStatus == OrderStatus.ENTREGADO;
-            case PENDIENTE, PENDIENTE_CONTACTO, PENDIENTE_PAGO, PAGO_EN_REVISION -> newStatus == OrderStatus.CANCELADO;
+            case PENDIENTE, PENDIENTE_CONTACTO, PENDIENTE_PAGO, PAGO_EN_REVISION ->
+                newStatus == OrderStatus.DESPACHADO || newStatus == OrderStatus.ENTREGADO || newStatus == OrderStatus.CANCELADO;
             default -> false;
         };
 
         if (!isValid) {
             throw new ConflictException("Transición de estado no permitida: de " + currentStatus + " a " + newStatus);
+        }
+
+        User actorEntity = null;
+        if (actor != null && actor.getId() != null) {
+            actorEntity = userRepository.findById(actor.getId()).orElse(null);
         }
 
         // If transitioning to CANCELADO before payment, release stockReserved on variants (P18 matrix)
@@ -146,12 +161,69 @@ public class AdminOrderServiceImpl implements AdminOrderService {
             log.info("Order reference='{}' cancelled. Stock reservations released without altering stock on hand.", order.getReference());
         }
 
-        order.setStatus(newStatus);
+        // If transitioning to ENTREGADO and order was not yet paid (contraentrega domicilio)
+        if (newStatus == OrderStatus.ENTREGADO && order.getPaidAt() == null) {
+            log.info("Order reference='{}' marked as ENTREGADO without prior payment. Processing auto-payment & stock deduction.", order.getReference());
 
-        User actorEntity = null;
-        if (actor != null && actor.getId() != null) {
-            actorEntity = userRepository.findById(actor.getId()).orElse(null);
+            List<UUID> variantIds = order.getItems().stream()
+                    .map(item -> item.getVariant().getId())
+                    .distinct()
+                    .sorted()
+                    .toList();
+
+            List<ProductVariant> lockedVariants = productVariantRepository.findByIdInOrderByIdForUpdate(variantIds);
+            Map<UUID, ProductVariant> variantMap = lockedVariants.stream()
+                    .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+
+            for (OrderItem item : order.getItems()) {
+                ProductVariant variant = variantMap.get(item.getVariant().getId());
+                if (variant != null) {
+                    int qty = item.getQuantity();
+                    int qtyBefore = variant.getStockOnHand();
+                    int qtyAfter = qtyBefore - qty;
+
+                    variant.setStockReserved(Math.max(0, variant.getStockReserved() - qty));
+                    variant.setStockOnHand(qtyAfter);
+                    productVariantRepository.save(variant);
+
+                    InventoryMovement movement = InventoryMovement.builder()
+                            .variant(variant)
+                            .movementType(MovementType.VENTA)
+                            .quantityDelta(-qty)
+                            .qtyBefore(qtyBefore)
+                            .qtyAfter(qtyAfter)
+                            .reference(order.getReference())
+                            .reason("Venta contraentrega domicilio entregado: " + order.getReference())
+                            .user(actorEntity)
+                            .build();
+                    inventoryMovementRepository.save(movement);
+                }
+            }
+
+            for (StockReservation res : order.getReservations()) {
+                if (res.getStatus() == ReservationStatus.ACTIVE) {
+                    res.setStatus(ReservationStatus.CONSUMED);
+                }
+            }
+            stockReservationRepository.saveAll(order.getReservations());
+
+            Payment payment = Payment.builder()
+                    .order(order)
+                    .paymentMethod(PaymentMethod.EFECTIVO)
+                    .transferReference("DOMICILIO-" + order.getReference())
+                    .amount(order.getTotal())
+                    .status(PaymentStatus.VERIFICADO)
+                    .verifiedBy(actorEntity)
+                    .verifiedAt(Instant.now())
+                    .notes("Pago registrado automáticamente al marcar entrega de domicilio")
+                    .build();
+            Payment savedPayment = paymentRepository.save(payment);
+            order.getPayments().add(savedPayment);
+
+            order.setPaidAt(Instant.now());
         }
+
+        order.setStatus(newStatus);
 
         String notes = request.getNotes() != null && !request.getNotes().isBlank()
                 ? request.getNotes().trim()

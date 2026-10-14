@@ -90,7 +90,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         if (order.getStatus() != OrderStatus.PENDIENTE_CONTACTO
                 && order.getStatus() != OrderStatus.PENDIENTE_PAGO
                 && order.getStatus() != OrderStatus.PAGO_EN_REVISION
-                && order.getStatus() != OrderStatus.PENDIENTE) {
+                && order.getStatus() != OrderStatus.PENDIENTE
+                && order.getStatus() != OrderStatus.DESPACHADO
+                && order.getStatus() != OrderStatus.ENTREGADO) {
             throw new ConflictException("No se puede verificar el pago para un pedido en estado " + order.getStatus());
         }
 
@@ -192,9 +194,12 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         Payment savedPayment = paymentRepository.save(payment);
         order.getPayments().add(savedPayment);
 
-        // 8. Update Order status to PAGADO
+        // 8. Update Order status to PAGADO or ENTREGADO
         OrderStatus previousStatus = order.getStatus();
-        order.setStatus(OrderStatus.PAGADO);
+        OrderStatus targetStatus = (previousStatus == OrderStatus.DESPACHADO || previousStatus == OrderStatus.ENTREGADO)
+                ? OrderStatus.ENTREGADO
+                : OrderStatus.PAGADO;
+        order.setStatus(targetStatus);
         order.setPaidAt(Instant.now());
         orderRepository.save(order);
 
@@ -203,7 +208,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         OrderStatusHistory history = OrderStatusHistory.builder()
                 .order(order)
                 .previousStatus(previousStatus)
-                .newStatus(OrderStatus.PAGADO)
+                .newStatus(targetStatus)
                 .user(actorEntity)
                 .notes("Pago verificado por " + actorEmail)
                 .build();
@@ -216,7 +221,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .entityType("ORDER")
                 .entityId(order.getId().toString())
                 .beforeSnapshot(previousStatus.name())
-                .afterSnapshot("PAGADO | Ref: " + transferRef + " | Monto: " + request.getAmount())
+                .afterSnapshot(targetStatus.name() + " | Ref: " + transferRef + " | Monto: " + request.getAmount())
                 .build();
         auditLogRepository.save(auditLog);
 
