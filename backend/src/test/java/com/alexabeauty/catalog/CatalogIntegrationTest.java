@@ -286,7 +286,8 @@ class CatalogIntegrationTest {
 
         // Now query public catalog filtered by category 'rostro'
         mockMvc.perform(get("/api/v1/catalog/products")
-                        .param("category", "rostro"))
+                        .param("category", "rostro")
+                        .param("size", "100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[?(@.sku == '" + activeSkuRostro + "')]").isNotEmpty())
