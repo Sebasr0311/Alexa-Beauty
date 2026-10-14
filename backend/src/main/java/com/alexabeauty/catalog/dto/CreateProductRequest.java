@@ -25,7 +25,6 @@ public record CreateProductRequest(
 
         String description,
 
-        @NotBlank(message = "El SKU es requerido")
         @Size(max = 50, message = "El SKU no puede superar los 50 caracteres")
         String sku,
 

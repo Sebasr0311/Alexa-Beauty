@@ -8,6 +8,7 @@ import java.util.UUID;
 public record ProductImageResponse(
         UUID id,
         UUID productId,
+        UUID variantId,
         String storagePath,
         String url,
         String altText,
@@ -20,6 +21,7 @@ public record ProductImageResponse(
         return new ProductImageResponse(
                 image.getId(),
                 image.getProduct() != null ? image.getProduct().getId() : null,
+                image.getVariant() != null ? image.getVariant().getId() : null,
                 image.getStoragePath(),
                 publicUrl,
                 image.getAltText(),

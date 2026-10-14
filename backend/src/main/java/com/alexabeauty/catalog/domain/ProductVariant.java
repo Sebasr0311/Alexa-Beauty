@@ -45,8 +45,20 @@ public class ProductVariant {
     @Column(name = "shade_name", length = 100)
     private String shadeName;
 
+    @Column(name = "shade_code", length = 50)
+    private String shadeCode;
+
+    @Column(name = "shade_hex", length = 7)
+    private String shadeHex;
+
     @Column(length = 100)
     private String presentation;
+
+    public String displayName() {
+        return java.util.stream.Stream.of(shadeCode, shadeName, presentation)
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim).collect(java.util.stream.Collectors.joining(" · "));
+    }
 
     @Column(name = "sale_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal salePrice;

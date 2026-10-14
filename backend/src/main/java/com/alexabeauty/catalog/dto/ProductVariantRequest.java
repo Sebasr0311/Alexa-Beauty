@@ -28,5 +28,13 @@ public record ProductVariantRequest(
         @Min(value = 0, message = "El stock en mano no puede ser negativo")
         Integer stockOnHand,
 
-        Boolean active
-) {}
+        Boolean active,
+        @Size(max = 50) String shadeCode,
+        @jakarta.validation.constraints.Pattern(regexp = "^#[0-9a-fA-F]{6}$", message = "El color debe tener formato #RRGGBB")
+        String shadeHex
+) {
+    public ProductVariantRequest(String sku, String shadeName, String presentation, BigDecimal salePrice,
+            BigDecimal referenceCost, Integer minStock, Integer stockOnHand, Boolean active) {
+        this(sku, shadeName, presentation, salePrice, referenceCost, minStock, stockOnHand, active, null, null);
+    }
+}

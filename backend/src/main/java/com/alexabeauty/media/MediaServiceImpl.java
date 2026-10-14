@@ -52,9 +52,20 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     public ProductImage uploadProductImage(UUID productId, MultipartFile file, String altText, Boolean isCover) {
+        return uploadProductImage(productId, file, altText, isCover, null);
+    }
+
+    @Override
+    public ProductImage uploadProductImage(UUID productId, MultipartFile file, String altText, Boolean isCover, UUID variantId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
 
+        var variant = variantId == null ? null : product.getVariants().stream()
+                .filter(v -> v.getId().equals(variantId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("ProductVariant", variantId));
+        if (variant != null && Boolean.TRUE.equals(isCover)) {
+            throw new ValidationException("Una foto de tono no puede reemplazar la portada general.");
+        }
         byte[] bytes = validateFile(file);
 
         String contentType = file.getContentType().toLowerCase(Locale.ROOT);
@@ -64,7 +75,7 @@ public class MediaServiceImpl implements MediaService {
         storageGateway.upload(bytes, storagePath, contentType);
 
         List<ProductImage> existingImages = productImageRepository.findByProductIdOrderBySortOrderAsc(productId);
-        boolean shouldBeCover = existingImages.isEmpty() || Boolean.TRUE.equals(isCover);
+        boolean shouldBeCover = variant == null && (existingImages.stream().noneMatch(img -> img.getVariant() == null && img.isCover()) || Boolean.TRUE.equals(isCover));
 
         if (shouldBeCover) {
             for (ProductImage img : existingImages) {
@@ -77,6 +88,7 @@ public class MediaServiceImpl implements MediaService {
 
         ProductImage productImage = ProductImage.builder()
                 .product(product)
+                .variant(variant)
                 .storagePath(storagePath)
                 .altText(altText != null && !altText.isBlank() ? altText.trim() : product.getName())
                 .sortOrder(existingImages.size())
@@ -101,8 +113,9 @@ public class MediaServiceImpl implements MediaService {
 
         if (wasCover) {
             List<ProductImage> remaining = productImageRepository.findByProductIdOrderBySortOrderAsc(productId);
-            if (!remaining.isEmpty()) {
-                ProductImage nextCover = remaining.get(0);
+            var general = remaining.stream().filter(img -> img.getVariant() == null).findFirst();
+            if (general.isPresent()) {
+                ProductImage nextCover = general.get();
                 nextCover.setCover(true);
                 productImageRepository.save(nextCover);
             }
@@ -118,6 +131,7 @@ public class MediaServiceImpl implements MediaService {
             throw new ResourceNotFoundException("ProductImage", imageId);
         }
 
+        if (target.getVariant() != null) throw new ValidationException("La portada debe ser una imagen general.");
         List<ProductImage> images = productImageRepository.findByProductId(productId);
         for (ProductImage img : images) {
             img.setCover(img.getId().equals(imageId));

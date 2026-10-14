@@ -140,9 +140,7 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
             BigDecimal lineSubtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             subtotal = subtotal.add(lineSubtotal);
 
-            String variantDisplayName = variant.getShadeName() != null && !variant.getShadeName().isBlank()
-                    ? variant.getShadeName().trim()
-                    : (variant.getPresentation() != null ? variant.getPresentation().trim() : null);
+            String variantDisplayName = variant.displayName();
 
             OrderItem item = OrderItem.builder()
                     .variant(variant)

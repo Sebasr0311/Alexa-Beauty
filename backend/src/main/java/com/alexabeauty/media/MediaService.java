@@ -9,6 +9,8 @@ public interface MediaService {
 
     ProductImage uploadProductImage(UUID productId, MultipartFile file, String altText, Boolean isCover);
 
+    ProductImage uploadProductImage(UUID productId, MultipartFile file, String altText, Boolean isCover, UUID variantId);
+
     void deleteProductImage(UUID productId, UUID imageId);
 
     ProductImage setCoverImage(UUID productId, UUID imageId);

@@ -45,7 +45,7 @@ class FlywayMigrationTest {
     @DisplayName("Verify all Flyway migrations are successfully executed and applied")
     void verifyFlywayMigrationsApplied() {
         MigrationInfo[] appliedMigrations = flyway.info().applied();
-        assertThat(appliedMigrations).hasSize(4);
+        assertThat(appliedMigrations).hasSize(5);
 
         assertThat(appliedMigrations[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(appliedMigrations[0].getDescription()).isEqualTo("initial schema");

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { api, ProductDetailDto, ProductVariantDto } from '@/lib/api';
 import { whatsappContact } from '@/lib/contact';
 import { formatCOP } from '@/lib/utils';
+import { ShadeSelector } from '@/components/catalog/ShadeSelector';
+import { initialVariant, variantImages, variantLabel } from '@/lib/shades';
 import { useCart } from '@/context/CartContext';
 import { ArrowLeft, Check, Heart, Minus, Plus, Share2, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 
@@ -29,9 +31,8 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
         setLoading(true);
         const data = await api.getProductBySlug(slug);
         setProduct(data);
-        if (data.variants && data.variants.length > 0) {
-          setSelectedVariant(data.variants[0]);
-        }
+        setSelectedVariant(initialVariant(data.variants));
+        setQuantity(1); setSelectedImageIndex(0);
       } catch {
         setProduct(null); setSelectedVariant(null);
       } finally {
@@ -68,14 +69,14 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
   const isOutOfStock = currentStock <= 0;
 
   const handleAddToCart = () => {
-    if (isOutOfStock) return;
+    if (isOutOfStock || !selectedVariant?.active) return;
     // Map to CartContext format
     const res = addItem(
       {
         id: product.id,
         slug: product.slug,
         brand: product.brand.name,
-        name: `${product.name}${selectedVariant?.shadeName ? ` - ${selectedVariant.shadeName}` : ''}`,
+        name: product.name,
         category: (product.category.name as any) || 'Rostro',
         price: currentPrice,
         stock: currentStock,
@@ -86,7 +87,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
       },
       quantity,
       selectedVariant?.id,
-      selectedVariant?.shadeName || selectedVariant?.presentation
+      selectedVariant ? variantLabel(selectedVariant) : undefined
     );
 
     if (res.success) {
@@ -97,7 +98,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
     }
   };
 
-  const images = product.images.length > 0 ? product.images : [{ id: '1', storagePath: '', url: '', isCover: true, sortOrder: 0 }];
+  const images = variantImages(product.images, selectedVariant?.id);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 sm:py-10">
@@ -112,7 +113,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
         {/* Visual Gallery 1:1 Aspect Ratio */}
         <div className="space-y-4">
           <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#f8e4ea] to-[#ebd0d9] border border-border shadow-[0_12px_36px_rgba(92,26,49,0.06)] grid place-items-center">
-            <span className="text-8xl select-none filter drop-shadow-lg -rotate-6" aria-hidden="true">
+            <span className="text-8xl select-none filter drop-shadow-lg -rotate-6">
               {images[selectedImageIndex]?.url ? <img src={images[selectedImageIndex].url} alt={images[selectedImageIndex].altText || product.name} className="absolute inset-0 h-full w-full object-contain" /> : '💄'}
             </span>
             {isOutOfStock && (
@@ -131,7 +132,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                 <button
                   key={img.id}
                   onClick={() => setSelectedImageIndex(idx)}
-                  className={`w-16 h-16 rounded-xl border-2 overflow-hidden transition ${
+                  aria-label={`Ver imagen ${idx + 1}`} className={`w-16 h-16 shrink-0 rounded-xl border-2 overflow-hidden transition ${
                     selectedImageIndex === idx ? 'border-wine scale-105' : 'border-border/60 hover:border-wine/40'
                   }`}
                 >
@@ -155,7 +156,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
           </div>
 
           {/* Price & Stock status */}
-          <div className="flex items-baseline gap-4 py-2 border-y border-border/60">
+          <div aria-live="polite" className="flex flex-wrap items-baseline gap-4 py-2 border-y border-border/60">
             <span className="font-serif text-3xl sm:text-4xl text-wine font-bold">
               {formatCOP(currentPrice)}
             </span>
@@ -176,48 +177,23 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
             </div>
           </div>
 
-          {/* Variants / Tonos Selector */}
-          {product.variants.length > 1 && (
-            <div>
-              <label className="text-xs font-extrabold uppercase text-ink tracking-wider block mb-2.5">
-                Selecciona tu tono o presentación:
-              </label>
-              <div className="flex flex-wrap gap-2.5">
-                {product.variants.map((v) => {
-                  const isSelected = selectedVariant?.id === v.id;
-                  const varOutOfStock = v.availableStock <= 0;
-                  return (
-                    <button
-                      key={v.id}
-                      onClick={() => {
-                        setSelectedVariant(v);
-                        setQuantity(1);
-                      }}
-                      className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all ${
-                        isSelected
-                          ? 'border-wine bg-wine text-white shadow-md'
-                          : varOutOfStock
-                          ? 'border-border bg-gray-100 text-gray-400 line-through'
-                          : 'border-border bg-white text-ink hover:border-wine/50'
-                      }`}
-                    >
-                      {v.shadeName || v.presentation || 'Opción'}
-                      {varOutOfStock && ' (Agotado)'}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <ShadeSelector variants={product.variants} selectedId={selectedVariant?.id} onSelect={variant => {
+            setSelectedVariant(variant); setQuantity(1); setSelectedImageIndex(0); setJustAdded(false);
+          }} />
+          <div aria-live="polite" className="min-h-16 text-sm break-words">
+            {selectedVariant && <><p>Tono seleccionado: {variantLabel(selectedVariant)}</p>
+              <p>{currentStock > 0 ? `${currentStock} unidades disponibles` : 'Agotado'}</p></>}
+            {!selectedVariant && <p>No hay variantes disponibles.</p>}
+          </div>
 
           {/* Quantity Selector & Add to Cart */}
           <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center border border-border rounded-full bg-white px-2 py-1">
+            <div className="flex flex-col items-stretch sm:flex-row sm:items-center gap-4">
+              <div className="flex w-fit items-center border border-border rounded-full bg-white px-2 py-1">
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1 || isOutOfStock}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-ink hover:bg-cream disabled:opacity-30 transition"
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-ink hover:bg-cream disabled:opacity-30 transition"
                   aria-label="Disminuir cantidad"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -226,7 +202,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                 <button
                   onClick={() => setQuantity((q) => Math.min(currentStock, q + 1))}
                   disabled={quantity >= currentStock || isOutOfStock}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-ink hover:bg-cream disabled:opacity-30 transition"
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-ink hover:bg-cream disabled:opacity-30 transition"
                   aria-label="Aumentar cantidad"
                 >
                   <Plus className="w-3.5 h-3.5" />

@@ -97,7 +97,7 @@ public class CatalogServiceImpl implements CatalogService {
         }
 
         // 3. Validate SKU uniqueness
-        String baseSku = request.sku().trim();
+        String baseSku = VariantRules.sku(request.sku());
         if (productRepository.existsBySku(baseSku) || productVariantRepository.existsBySku(baseSku)) {
             throw new ConflictException("El SKU ya existe: " + baseSku);
         }
@@ -107,12 +107,14 @@ public class CatalogServiceImpl implements CatalogService {
         assignedSkus.add(baseSku);
 
         if (request.variants() != null && !request.variants().isEmpty()) {
+            Set<String> combinationKeys = new HashSet<>();
             for (ProductVariantRequest vr : request.variants()) {
+                if (!combinationKeys.add(VariantRules.key(vr))) throw new ConflictException("Tono y presentación duplicados.");
                 if (vr.salePrice() != null && vr.salePrice().compareTo(BigDecimal.ZERO) < 0) {
                     throw new ValidationException("El precio de venta de la variante no puede ser negativo");
                 }
                 if (vr.sku() != null && !vr.sku().isBlank()) {
-                    String vSku = vr.sku().trim();
+                    String vSku = VariantRules.sku(vr.sku());
                     if (!assignedSkus.add(vSku)) {
                         throw new ConflictException("SKU duplicado en la solicitud: " + vSku);
                     }
@@ -159,9 +161,7 @@ public class CatalogServiceImpl implements CatalogService {
         } else {
             int index = 1;
             for (ProductVariantRequest vr : request.variants()) {
-                String variantSku = vr.sku() != null && !vr.sku().isBlank()
-                        ? vr.sku().trim()
-                        : String.format("%s-%d", baseSku, index);
+                String variantSku = VariantRules.sku(vr.sku());
                 BigDecimal price = vr.salePrice() != null ? vr.salePrice() : request.salePrice();
                 int stock = vr.stockOnHand() != null ? vr.stockOnHand() : (index == 1 && request.stockOnHand() != null ? request.stockOnHand() : 0);
                 int minStock = vr.minStock() != null ? vr.minStock() : (request.minStock() != null ? request.minStock() : 3);
@@ -179,6 +179,7 @@ public class CatalogServiceImpl implements CatalogService {
                         .minStock(minStock)
                         .active(variantActive)
                         .build();
+                VariantRules.metadata(variant, vr);
                 product.getVariants().add(variant);
                 index++;
             }
@@ -266,7 +267,7 @@ public class CatalogServiceImpl implements CatalogService {
             throw new ResourceNotFoundException("Product", slug);
         }
 
-        return toProductDetailResponse(product);
+        return toProductDetailResponse(product, !isAdmin);
     }
 
     @Override
@@ -527,8 +528,11 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     // Helpers
-    private ProductDetailResponse toProductDetailResponse(Product product) {
-        List<ProductVariantResponse> variantResponses = product.getVariants().stream()
+    private ProductDetailResponse toProductDetailResponse(Product product) { return toProductDetailResponse(product, false); }
+
+    private ProductDetailResponse toProductDetailResponse(Product product, boolean publicView) {
+        var visibleVariants = product.getVariants().stream().filter(v -> !publicView || v.isActive()).toList();
+        List<ProductVariantResponse> variantResponses = visibleVariants.stream()
                 .map(ProductVariantResponse::from)
                 .toList();
 
@@ -536,21 +540,21 @@ public class CatalogServiceImpl implements CatalogService {
                 .map(img -> ProductImageResponse.from(img, mediaService.getPublicUrl(img.getStoragePath())))
                 .toList();
 
-        BigDecimal minPrice = product.getVariants().stream()
+        BigDecimal minPrice = visibleVariants.stream()
                 .map(ProductVariant::getSalePrice)
                 .min(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
 
-        BigDecimal maxPrice = product.getVariants().stream()
+        BigDecimal maxPrice = visibleVariants.stream()
                 .map(ProductVariant::getSalePrice)
                 .max(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
 
-        int totalStockOnHand = product.getVariants().stream()
+        int totalStockOnHand = visibleVariants.stream()
                 .mapToInt(ProductVariant::getStockOnHand)
                 .sum();
 
-        int totalAvailableStock = product.getVariants().stream()
+        int totalAvailableStock = visibleVariants.stream()
                 .mapToInt(v -> Math.max(0, v.getStockOnHand() - v.getStockReserved()))
                 .sum();
 
@@ -576,28 +580,29 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     private ProductSummaryResponse toProductSummaryResponse(Product product) {
-        BigDecimal minPrice = product.getVariants().stream()
+        var visibleVariants = product.getVariants().stream().filter(ProductVariant::isActive).toList();
+        BigDecimal minPrice = visibleVariants.stream()
                 .map(ProductVariant::getSalePrice)
                 .min(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
 
-        BigDecimal maxPrice = product.getVariants().stream()
+        BigDecimal maxPrice = visibleVariants.stream()
                 .map(ProductVariant::getSalePrice)
                 .max(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
 
-        int totalStockOnHand = product.getVariants().stream()
+        int totalStockOnHand = visibleVariants.stream()
                 .mapToInt(ProductVariant::getStockOnHand)
                 .sum();
 
-        int totalAvailableStock = product.getVariants().stream()
+        int totalAvailableStock = visibleVariants.stream()
                 .mapToInt(v -> Math.max(0, v.getStockOnHand() - v.getStockReserved()))
                 .sum();
 
         ProductImage coverImg = product.getImages().stream()
-                .filter(ProductImage::isCover)
+                .filter(img -> img.getVariant() == null && img.isCover())
                 .findFirst()
-                .orElse(product.getImages().isEmpty() ? null : product.getImages().get(0));
+                .orElse(product.getImages().stream().filter(img -> img.getVariant() == null).findFirst().orElse(null));
 
         String coverUrl = coverImg != null ? mediaService.getPublicUrl(coverImg.getStoragePath()) : null;
 
@@ -616,6 +621,7 @@ public class CatalogServiceImpl implements CatalogService {
                 totalStockOnHand,
                 totalAvailableStock,
                 coverUrl,
+                visibleVariants.stream().map(ProductVariantResponse::from).toList(),
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );

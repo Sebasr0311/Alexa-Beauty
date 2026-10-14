@@ -123,9 +123,10 @@ public class AdminProductController {
             @PathVariable UUID id,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "altText", required = false) String altText,
-            @RequestParam(value = "isCover", required = false, defaultValue = "false") Boolean isCover
+            @RequestParam(value = "isCover", required = false, defaultValue = "false") Boolean isCover,
+            @RequestParam(value = "variantId", required = false) UUID variantId
     ) {
-        ProductImage image = mediaService.uploadProductImage(id, file, altText, isCover);
+        ProductImage image = mediaService.uploadProductImage(id, file, altText, isCover, variantId);
         String publicUrl = mediaService.getPublicUrl(image.getStoragePath());
         ProductImageResponse response = ProductImageResponse.from(image, publicUrl);
         return ResponseEntity.status(HttpStatus.CREATED)

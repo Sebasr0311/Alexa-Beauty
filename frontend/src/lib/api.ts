@@ -9,6 +9,8 @@ export interface ProductVariantDto {
   id: string;
   sku: string;
   shadeName?: string;
+  shadeCode?: string;
+  shadeHex?: string;
   presentation?: string;
   salePrice: number;
   referenceCost?: number;
@@ -20,6 +22,7 @@ export interface ProductVariantDto {
 }
 
 export interface ProductImageDto {
+  variantId?: string | null;
   id: string;
   storagePath: string;
   url: string;
@@ -33,6 +36,7 @@ export interface ProductSummaryDto {
   sku: string;
   name: string;
   slug: string;
+  variants?: ProductVariantDto[];
   brandName: string;
   categoryName: string;
   brand?: { name: string };
@@ -95,6 +99,11 @@ export interface LoginResponseDto {
   };
 }
 
+export interface VariantInput {
+  sku?: string; shadeCode?: string; shadeName?: string; shadeHex?: string; presentation?: string;
+  salePrice: number; minStock?: number; stockOnHand?: number; active?: boolean;
+}
+
 class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
@@ -118,6 +127,7 @@ class ApiClient {
       try {
         const errorJson = await response.json();
         errorMsg = errorJson.detail || errorJson.message || errorMsg;
+        if (Array.isArray(errorJson.errors)) errorMsg += ': ' + errorJson.errors.map((field: {field:string;message:string}) => `${field.field}: ${field.message}`).join('; ');
       } catch {
         // Ignorar error de parsing
       }
@@ -213,17 +223,19 @@ class ApiClient {
     brandId: string;
     categoryId: string;
     description?: string;
-    sku: string;
+    sku?: string;
     salePrice: number;
     stockOnHand: number;
     minStock?: number;
     featured?: boolean;
     variants?: Array<{
-      sku: string;
+      sku?: string;
+      shadeCode?: string;
+      shadeHex?: string;
       shadeName?: string;
       presentation?: string;
       salePrice: number;
-      stockOnHand: number;
+      stockOnHand?: number;
       minStock?: number;
     }>;
   }): Promise<ProductDetailDto> {
@@ -231,6 +243,16 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async addVariant(productId: string, data: VariantInput): Promise<ProductVariantDto> {
+    return this.request(`/admin/products/${productId}/variants`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateVariant(productId: string, variantId: string, data: Omit<VariantInput, 'stockOnHand'>): Promise<ProductVariantDto> {
+    return this.request(`/admin/products/${productId}/variants/${variantId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async toggleVariantStatus(productId: string, variantId: string, active: boolean): Promise<ProductVariantDto> {
+    return this.request(`/admin/products/${productId}/variants/${variantId}/status`, { method: 'PATCH', body: JSON.stringify({ active }) });
   }
 
   async toggleProductStatus(id: string, active: boolean): Promise<ProductSummaryDto> {
@@ -250,10 +272,11 @@ class ApiClient {
     });
   }
 
-  async uploadProductImage(productId: string, file: File, isCover: boolean = false): Promise<ProductImageDto> {
+  async uploadProductImage(productId: string, file: File, isCover: boolean = false, variantId?: string): Promise<ProductImageDto> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('isCover', isCover.toString());
+    if (variantId) formData.append('variantId', variantId);
     return this.request<ProductImageDto>(`/admin/products/${productId}/images`, {
       method: 'POST',
       body: formData,

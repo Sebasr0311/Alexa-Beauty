@@ -24,6 +24,9 @@ import {
   UploadCloud,
   Loader2,
 } from 'lucide-react';
+import { VariantFields, emptyVariant, variantPayload } from '@/components/admin/VariantFields';
+import { VariantManager } from '@/components/admin/VariantManager';
+import type { VariantInput } from '@/lib/api';
 import AdminShell from '@/components/admin/AdminShell';
 import { formatCOP } from '@/lib/utils';
 import {
@@ -45,6 +48,9 @@ export default function AdminProductosPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const [newVariants, setNewVariants] = useState<VariantInput[]>([]);
+  const [variantsProductId, setVariantsProductId] = useState<string | null>(null);
 
   // Modal Nuevo Producto
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -250,8 +256,8 @@ export default function AdminProductosPage() {
   // Crear Producto
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName.trim() || !newProductSku.trim() || newProductPrice <= 0) {
-      setFeedback({ type: 'error', text: 'Nombre, SKU y precio válido son obligatorios.' });
+    if (!newProductName.trim() || (newVariants.length === 0 && newProductPrice <= 0)) {
+      setFeedback({ type: 'error', text: 'Nombre y precio válido son obligatorios.' });
       return;
     }
 
@@ -264,17 +270,17 @@ export default function AdminProductosPage() {
     try {
       const created = await api.createProduct({
         name: newProductName.trim(),
-        sku: newProductSku.trim().toUpperCase(),
+        sku: newProductSku.trim().toUpperCase() || undefined,
         brandId: brandIdToUse,
         categoryId: categoryIdToUse,
-        salePrice: newProductPrice,
+        salePrice: newVariants.length ? newVariants[0].salePrice : newProductPrice,
         stockOnHand: newProductStock,
         minStock: newProductMinStock,
         description: newProductDescription.trim() || undefined,
-        variants: newProductShade.trim()
+        variants: newVariants.length ? newVariants.map(variantPayload) : newProductShade.trim()
           ? [
               {
-                sku: `${newProductSku.trim().toUpperCase()}-V1`,
+                sku: newProductSku.trim() ? `${newProductSku.trim().toUpperCase()}-V1` : undefined,
                 shadeName: newProductShade.trim(),
                 salePrice: newProductPrice,
                 stockOnHand: newProductStock,
@@ -289,7 +295,8 @@ export default function AdminProductosPage() {
         try {
           await api.uploadProductImage(created.id, newProductImageFile, true);
         } catch {
-          // producto ya fue creado
+          setFeedback({type:'error',text:'Producto creado, pero la foto no se pudo subir. Reintenta desde Fotos.'});
+          setIsModalOpen(false); resetForm(); await loadData(); return;
         }
       }
 
@@ -297,14 +304,15 @@ export default function AdminProductosPage() {
       setIsModalOpen(false);
       resetForm();
       await loadData();
-    } catch {
-      setFeedback({ type: 'error', text: 'No se pudo crear el producto. Verifica que el SKU no esté duplicado.' });
+    } catch (error) {
+      setFeedback({ type: 'error', text: error instanceof Error ? error.message : 'No se pudo crear el producto.' });
     } finally {
       setCreating(false);
     }
   };
 
   const resetForm = () => {
+    setNewVariants([]);
     setNewProductName('');
     setNewProductSku('');
     setNewProductPrice(0);
@@ -502,7 +510,7 @@ export default function AdminProductosPage() {
                     <td className="py-3.5 px-3.5">
                       <div className="flex items-center gap-3">
                         <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-blush border border-border flex-shrink-0">
-                          <Image
+                          <Image unoptimized
                             src={p.coverImageUrl || '/branding/logo.png'}
                             alt={p.name}
                             fill
@@ -565,6 +573,7 @@ export default function AdminProductosPage() {
                     <td className="py-3.5 px-3.5 text-right">
                       <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
                         {/* Fotos Modal Trigger */}
+                        <button type="button" onClick={() => setVariantsProductId(p.id)} className="min-h-11 rounded-xl border border-border px-3 text-xs font-bold text-wine" aria-label={`Gestionar tonos de ${p.name}`}>Tonos</button>
                         <button
                           type="button"
                           onClick={() => handleOpenImagesModal(p)}
@@ -683,7 +692,7 @@ export default function AdminProductosPage() {
                       }`}
                     >
                       <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-white border border-border/50">
-                        <Image
+                        <Image unoptimized
                           src={img.url}
                           alt={img.altText || 'Foto del producto'}
                           fill
@@ -754,7 +763,7 @@ export default function AdminProductosPage() {
               {uploadFilePreview && (
                 <div className="flex items-center gap-3 p-3 bg-cream/40 rounded-xl border border-border">
                   <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                    <Image
+                    <Image unoptimized
                       src={uploadFilePreview}
                       alt="Vista previa"
                       fill
@@ -889,7 +898,7 @@ export default function AdminProductosPage() {
             <form onSubmit={handleCreateProduct} className="space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="font-bold text-ink block mb-1">Nombre del producto *</label>
-                <input
+                <input aria-label="Nombre del producto"
                   type="text"
                   required
                   value={newProductName}
@@ -901,10 +910,9 @@ export default function AdminProductosPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-ink block mb-1">SKU Base *</label>
-                  <input
+                  <label className="font-bold text-ink block mb-1">SKU Base (opcional)</label>
+                  <input aria-label="SKU base"
                     type="text"
-                    required
                     value={newProductSku}
                     onChange={(e) => setNewProductSku(e.target.value)}
                     placeholder="Ej. LAB-RED-01"
@@ -913,9 +921,9 @@ export default function AdminProductosPage() {
                 </div>
                 <div>
                   <label className="font-bold text-ink block mb-1">Precio Venta (COP) *</label>
-                  <input
+                  <input aria-label="Precio general COP"
                     type="number"
-                    required
+                    required={newVariants.length === 0}
                     min={0}
                     step={1000}
                     value={newProductPrice || ''}
@@ -929,7 +937,7 @@ export default function AdminProductosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-ink block mb-1">Stock Inicial</label>
-                  <input
+                  <input aria-label="Stock inicial general"
                     type="number"
                     min={0}
                     value={newProductStock}
@@ -939,7 +947,7 @@ export default function AdminProductosPage() {
                 </div>
                 <div>
                   <label className="font-bold text-ink block mb-1">Stock Mínimo Alerta</label>
-                  <input
+                  <input aria-label="Stock mínimo general"
                     type="number"
                     min={0}
                     value={newProductMinStock}
@@ -976,7 +984,7 @@ export default function AdminProductosPage() {
                 {newProductImagePreview && (
                   <div className="mt-2.5 flex items-center gap-3 p-2 bg-cream/40 rounded-xl border border-border">
                     <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                      <Image
+                      <Image unoptimized
                         src={newProductImagePreview}
                         alt="Previsualización"
                         fill
@@ -1002,7 +1010,16 @@ export default function AdminProductosPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+              <div className="w-full space-y-3 mb-4">
+                    <button type="button" onClick={() => setNewVariants(previous => [...previous,{...emptyVariant(),salePrice:newProductPrice}])} className="min-h-11 px-4 rounded-full border border-wine text-wine font-bold text-sm">Añadir tono al nuevo producto</button>
+                    {newVariants.map((variant,index) => <fieldset key={index} className="p-3 border border-border rounded-xl space-y-2 min-w-0">
+                      <legend className="text-sm font-bold text-wine">Variante {index+1}</legend>
+                      <VariantFields value={variant} onChange={value=>setNewVariants(previous=>previous.map((item,i)=>i===index?value:item))}/>
+                      <button type="button" className="min-h-11 text-sm text-red-700" onClick={()=>setNewVariants(previous=>previous.filter((_,i)=>i!==index))}>Quitar variante del formulario</button>
+                    </fieldset>)}
+                    {newVariants.length>0&&<p className="text-xs text-muted">El precio y stock de cada variante prevalecen sobre los campos generales. Puedes asociar fotos desde Tonos después del alta.</p>}
+                  </div>
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -1022,6 +1039,7 @@ export default function AdminProductosPage() {
           </div>
         </div>
       )}
+    {variantsProductId && <VariantManager productId={variantsProductId} onClose={() => setVariantsProductId(null)} onChanged={() => { void loadData(); }} />}
     </AdminShell>
   );
 }

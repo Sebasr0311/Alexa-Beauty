@@ -46,7 +46,7 @@ public class OrderItem {
     @Column(name = "product_name", nullable = false, length = 200)
     private String productName;
 
-    @Column(name = "variant_name", length = 150)
+    @Column(name = "variant_name", length = 260)
     private String variantName;
 
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)

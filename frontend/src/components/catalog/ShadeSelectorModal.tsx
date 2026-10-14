@@ -1,135 +1,54 @@
 'use client';
-
-import React from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { ProductDetailDto, ProductVariantDto } from '@/lib/api';
 import { formatCOP } from '@/lib/utils';
-import { X, Sparkles, Plus, Check } from 'lucide-react';
+import { variantImages, variantLabel } from '@/lib/shades';
+import { ShadeSelector } from './ShadeSelector';
 
-interface ShadeSelectorModalProps {
-  product: ProductDetailDto | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectVariant: (variant: ProductVariantDto) => void;
-}
-
-export function ShadeSelectorModal({
-  product,
-  isOpen,
-  onClose,
-  onSelectVariant,
-}: ShadeSelectorModalProps) {
-  if (!isOpen || !product) return null;
-
-  const coverImage = product.images.find((img) => img.isCover)?.url || product.images[0]?.url;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="shade-selector-title"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-[#EAD5DC] shadow-[0_25px_60px_rgba(58,26,39,0.18)] p-6 space-y-5 max-h-[85vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#f8eadc] to-[#edd0d9] p-1 flex-shrink-0 flex items-center justify-center overflow-hidden border border-[#E8D4DC]">
-              {coverImage ? (
-                <img src={coverImage} alt={product.name} className="w-full h-full object-cover rounded-xl" />
-              ) : (
-                <span className="text-2xl">💄</span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#af7b89] block">
-                {product.brand.name}
-              </span>
-              <h2 id="shade-selector-title" className="font-serif text-base sm:text-lg font-bold text-ink truncate">
-                {product.name}
-              </h2>
-              <span className="text-xs text-wine font-extrabold">
-                Desde {formatCOP(product.variants[0]?.salePrice || 0)}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-cream hover:bg-blush text-ink hover:text-wine flex items-center justify-center transition"
-            aria-label="Cerrar selector de tonos"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Instructions */}
-        <div className="flex items-center gap-1.5 text-xs text-muted font-medium">
-          <Sparkles className="w-3.5 h-3.5 text-wine" />
-          <span>Selecciona tu tono o presentación para agregar:</span>
-        </div>
-
-        {/* Variants List */}
-        <div className="space-y-2.5">
-          {product.variants.map((variant) => {
-            const isOutOfStock = variant.availableStock <= 0;
-            const displayName =
-              variant.shadeName && variant.shadeName.trim()
-                ? variant.shadeName.trim()
-                : variant.presentation && variant.presentation.trim()
-                ? variant.presentation.trim()
-                : `Variante ${variant.sku}`;
-
-            return (
-              <button
-                key={variant.id}
-                type="button"
-                disabled={isOutOfStock}
-                onClick={() => onSelectVariant(variant)}
-                className={`w-full p-3.5 rounded-2xl border text-left transition flex items-center justify-between gap-3 ${
-                  isOutOfStock
-                    ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
-                    : 'border-[#EAD5DC] bg-[#FFFDFC] hover:border-wine hover:bg-blush/20 active:scale-[0.99] shadow-xs'
-                }`}
-              >
-                <div className="min-w-0">
-                  <span className="block font-bold text-sm text-ink truncate">
-                    {displayName}
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs">
-                    <span className="text-wine font-extrabold">
-                      {formatCOP(variant.salePrice)}
-                    </span>
-                    <span className="text-muted text-[11px]">
-                      {isOutOfStock ? (
-                        <span className="text-red-500 font-semibold">Agotado</span>
-                      ) : variant.availableStock <= 3 ? (
-                        <span className="text-amber-700 font-medium">¡Últimas {variant.availableStock}!</span>
-                      ) : (
-                        <span>{variant.availableStock} disp.</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition ${
-                    isOutOfStock
-                      ? 'bg-gray-200 text-gray-400'
-                      : 'bg-wine hover:bg-wineDark text-white shadow-xs'
-                  }`}
-                >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                </div>
-              </button>
-            );
-          })}
-        </div>
+export function ShadeSelectorModal({product,isOpen,onClose,onSelectVariant,returnFocusRef}: {
+  returnFocusRef?:RefObject<HTMLButtonElement|null>;
+  product:ProductDetailDto|null;isOpen:boolean;onClose:()=>void;onSelectVariant:(variant:ProductVariantDto)=>void;
+}) {
+  const [selected,setSelected]=useState<ProductVariantDto|null>(null);
+  const panel=useRef<HTMLDivElement>(null);
+  const closeRef=useRef(onClose); closeRef.current=onClose;
+  useEffect(()=>{
+    if (!isOpen) return;
+    setSelected(null);
+    const previous=returnFocusRef?.current || document.activeElement as HTMLElement|null;
+    const oldOverflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    function keyboard(event:KeyboardEvent) {
+      if(event.key==='Escape') { event.preventDefault();closeRef.current(); }
+      if(event.key==='Tab') {
+        const nodes=panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]');
+        if(!nodes?.length)return;
+        const first=nodes[0],last=nodes[nodes.length-1];
+        if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
+        if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+      }
+    }
+    document.addEventListener('keydown',keyboard);
+    return ()=>{document.body.style.overflow=oldOverflow;document.removeEventListener('keydown',keyboard);previous?.focus();};
+  },[isOpen,returnFocusRef]);
+  if(!isOpen || !product)return null;
+  const image=variantImages(product.images,selected?.id)[0];
+  return <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+    <div ref={panel} role="dialog" aria-modal="true" aria-labelledby="shade-selector-title" onClick={event=>event.stopPropagation()}
+      className="w-full min-w-0 max-h-[90dvh] overflow-y-auto bg-cream p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl sm:max-w-lg shadow-xl space-y-4">
+      <div className="flex gap-3 justify-between items-start">
+        <div className="min-w-0"><p className="text-xs text-muted">{product.brand.name}</p><h2 id="shade-selector-title" className="font-serif text-xl text-wine break-words">{product.name}</h2></div>
+        <button type="button" onClick={onClose} aria-label="Cerrar selector de tonos" className="h-11 w-11 shrink-0 rounded-full bg-white text-wine focus-visible:outline-wine">✕</button>
       </div>
+      {image && <img src={image.url} alt={image.altText||product.name} className="h-28 w-full object-contain" />}
+      <p className="text-sm text-muted">Elige un tono o presentación antes de agregarlo.</p>
+      <ShadeSelector variants={product.variants} selectedId={selected?.id} onSelect={setSelected}/>
+      <div aria-live="polite" className="min-h-20 text-sm">
+        {selected ? <><p className="font-bold text-wine">{formatCOP(selected.salePrice)}</p><p>{variantLabel(selected)}</p><p>{selected.availableStock>0?`${selected.availableStock} unidades disponibles`:'Agotado'}</p><p className="text-xs text-muted break-all">SKU: {selected.sku}</p></>:<p>Selecciona una opción.</p>}
+      </div>
+      <button type="button" disabled={!selected||!selected.active||selected.availableStock<=0} onClick={()=>selected&&onSelectVariant(selected)}
+        className="w-full min-h-12 rounded-full bg-wine text-white font-bold px-4 py-3 disabled:opacity-50 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-wine">Agregar al carrito</button>
     </div>
-  );
+  </div>;
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Product } from '@/lib/data';
 import { api, ProductDetailDto, ProductVariantDto } from '@/lib/api';
+import { activeVariants, variantLabel } from '@/lib/shades';
 import { formatCOP } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { ShadeSelectorModal } from '@/components/catalog/ShadeSelectorModal';
@@ -15,6 +16,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
+  const addButtonRef = useRef<HTMLButtonElement>(null);
   const [justAdded, setJustAdded] = useState(false);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [productDetail, setProductDetail] = useState<ProductDetailDto | null>(null);
@@ -28,14 +30,15 @@ export function ProductCard({ product }: ProductCardProps) {
 
     try {
       setLoadingVariants(true);
-      const detail = productDetail || (await api.getProductBySlug(product.slug));
+      const detail = await api.getProductBySlug(product.slug);
+      detail.variants = activeVariants(detail.variants);
       setProductDetail(detail);
 
       if (detail.variants && detail.variants.length > 1) {
         setIsShadeModalOpen(true);
       } else if (detail.variants && detail.variants.length === 1) {
         const single = detail.variants[0];
-        addItem(
+        const result = addItem(
           {
             ...product,
             price: single.salePrice,
@@ -44,14 +47,13 @@ export function ProductCard({ product }: ProductCardProps) {
           },
           1,
           single.id,
-          single.shadeName || single.presentation
+          variantLabel(single)
         );
+        if (!result.success) { window.alert(result.message); return; }
         setJustAdded(true);
         setTimeout(() => setJustAdded(false), 1500);
       } else {
-        addItem(product, 1, product.variantId);
-        setJustAdded(true);
-        setTimeout(() => setJustAdded(false), 1500);
+        window.alert('No hay variantes disponibles para este producto.');
       }
     } catch (err) {
       console.error('Error fetching variants on quick-add:', err);
@@ -63,18 +65,19 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const handleSelectVariant = (variant: ProductVariantDto) => {
     if (!productDetail) return;
-    addItem(
+    const result = addItem(
       {
         ...product,
-        name: `${product.name}${variant.shadeName ? ` - ${variant.shadeName}` : ''}`,
+        name: product.name,
         price: variant.salePrice,
         stock: variant.availableStock,
         variantId: variant.id,
       },
       1,
       variant.id,
-      variant.shadeName || variant.presentation
+      variantLabel(variant)
     );
+    if (!result.success) { window.alert(result.message); return; }
     setIsShadeModalOpen(false);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
@@ -125,6 +128,11 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.name}
             </h3>
           </Link>
+          {(product.variants?.filter(variant => variant.active).length || 0) > 1 && <div className="mt-2 text-xs text-wine">
+            <p>Disponible en {product.variants!.filter(variant => variant.active).length} tonos</p>
+            <div className="flex gap-1 mt-1" aria-hidden="true">{product.variants!.filter(variant => variant.active && variant.shadeHex).slice(0,6).map(variant =>
+              <span key={variant.id} className="w-4 h-4 rounded-full border border-black/20" style={{backgroundColor:variant.shadeHex}} />)}</div>
+          </div>}
           <p className="text-muted text-xs mt-1">
             {isOutOfStock ? (
               <span className="text-red-600 font-medium">Agotado temporalmente</span>
@@ -144,10 +152,11 @@ export function ProductCard({ product }: ProductCardProps) {
         </span>
 
         <button
+          ref={addButtonRef}
           onClick={handleAdd}
           disabled={isOutOfStock || loadingVariants}
           aria-label={`Agregar o elegir tono de ${product.name}`}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
             isOutOfStock
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : justAdded
@@ -169,6 +178,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Shade Selection Modal for multi-tone products */}
       <ShadeSelectorModal
+        returnFocusRef={addButtonRef}
         product={productDetail}
         isOpen={isShadeModalOpen}
         onClose={() => setIsShadeModalOpen(false)}

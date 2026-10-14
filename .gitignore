@@ -44,3 +44,6 @@ yarn-error.log*
 testsprite_tests/tmp/
 testsprite_tests/tmp/config.json
 .playwright-mcp/
+
+# Isolated visual-shade verification outputs
+**/.next-shades-*/

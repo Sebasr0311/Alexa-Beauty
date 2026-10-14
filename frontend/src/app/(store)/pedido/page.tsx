@@ -405,7 +405,7 @@ export default function CheckoutPage() {
                       {item.product.name}
                     </p>
                     {item.variantName && (
-                      <p className="text-[11px] text-wine font-semibold truncate">
+                      <p className="text-xs text-wine font-semibold break-words">
                         Tono: {item.variantName}
                       </p>
                     )}

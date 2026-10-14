@@ -48,7 +48,7 @@ export default function CartPage() {
 
             {items.length > 0 ? (
               <div className="divide-y divide-border">
-                {items.map(({ product, quantity, variantId }) => (
+                {items.map(({ product, quantity, variantId, variantName }) => (
                   <div
                     key={variantId}
                     className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -65,6 +65,7 @@ export default function CartPage() {
                         <h3 className="font-semibold text-sm sm:text-base text-ink truncate">
                           {product.name}
                         </h3>
+                        {variantName && <p className="text-xs text-wine font-semibold break-words">{variantName}</p>}
                         <p className="text-xs text-muted mt-0.5">
                           {formatCOP(product.price)} c/u
                         </p>
@@ -78,7 +79,7 @@ export default function CartPage() {
                           type="button"
                           onClick={() => updateQuantity(variantId, -1)}
                           aria-label={`Reducir cantidad de ${product.name}`}
-                          className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-ink hover:text-wine shadow-xs transition"
+                          className="w-11 h-11 rounded-full bg-white flex items-center justify-center text-ink hover:text-wine shadow-xs transition"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -90,7 +91,7 @@ export default function CartPage() {
                           onClick={() => updateQuantity(variantId, 1)}
                           disabled={quantity >= product.stock}
                           aria-label={`Aumentar cantidad de ${product.name}`}
-                          className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-ink hover:text-wine disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition"
+                          className="w-11 h-11 rounded-full bg-white flex items-center justify-center text-ink hover:text-wine disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>

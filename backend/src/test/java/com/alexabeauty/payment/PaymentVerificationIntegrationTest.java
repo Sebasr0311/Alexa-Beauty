@@ -599,7 +599,7 @@ class PaymentVerificationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Invalid State Transition: PENDIENTE_CONTACTO directly to ENTREGADO throws 409 Conflict")
+    @DisplayName("Invalid State Transition: pending directly to PREPARANDO throws 409 Conflict")
     void testInvalidTransition_throwsConflict() throws Exception {
         ProductVariant variant = createTestVariant("INV-" + UUID.randomUUID().toString().substring(0, 8), 10, 0);
         OrderCheckoutResponse checkout = createTestOrder(variant, 1);
@@ -608,7 +608,7 @@ class PaymentVerificationIntegrationTest {
         mockMvc.perform(post("/api/v1/admin/orders/" + orderId + "/transition")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new OrderStatusTransitionRequest(OrderStatus.ENTREGADO, "Intento inválido"))))
+                        .content(objectMapper.writeValueAsString(new OrderStatusTransitionRequest(OrderStatus.PREPARANDO, "Intento inválido"))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Transición de estado no permitida")));
     }

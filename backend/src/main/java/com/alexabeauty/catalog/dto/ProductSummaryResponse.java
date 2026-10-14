@@ -19,6 +19,7 @@ public record ProductSummaryResponse(
         int totalStockOnHand,
         int totalAvailableStock,
         String coverImageUrl,
+        java.util.List<ProductVariantResponse> variants,
         Instant createdAt,
         Instant updatedAt
 ) {}
