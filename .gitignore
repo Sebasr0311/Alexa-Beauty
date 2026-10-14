@@ -46,4 +46,5 @@ testsprite_tests/tmp/config.json
 .playwright-mcp/
 
 # Isolated visual-shade verification outputs
-**/.next-shades-*/
+**/.next-*/
+documentation/evidence/visual-shades/
