@@ -56,12 +56,16 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     @Override
     @Transactional
     public PaymentResponse confirmPayment(UUID orderId, ConfirmPaymentRequest request, String idempotencyKey, UserPrincipal actor) {
-        log.info("Starting confirmPayment for orderId={}, transferReference='{}', idempotencyKey='{}'",
-                orderId, request.getTransferReference(), idempotencyKey);
-
         // 1. Pessimistic lock on Order
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pedido no encontrado: " + orderId));
+
+        String transferRef = (request.getTransferReference() != null && !request.getTransferReference().isBlank())
+                ? request.getTransferReference().trim()
+                : "MANUAL-" + order.getReference();
+
+        log.info("Starting confirmPayment for orderId={}, transferReference='{}', idempotencyKey='{}'",
+                orderId, transferRef, idempotencyKey);
 
         // 2. Idempotency Check: if already PAGADO, return existing verified payment immediately
         if (order.getStatus() == OrderStatus.PAGADO) {
@@ -153,7 +157,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                     .qtyBefore(qtyBefore)
                     .qtyAfter(qtyAfter)
                     .reference(order.getReference())
-                    .reason("Venta verificada pago ref: " + request.getTransferReference().trim())
+                    .reason("Venta verificada pago ref: " + transferRef)
                     .user(actorEntity)
                     .build();
             inventoryMovementRepository.save(movement);
@@ -177,7 +181,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         Payment payment = Payment.builder()
                 .order(order)
                 .paymentMethod(request.getPaymentMethod())
-                .transferReference(request.getTransferReference().trim())
+                .transferReference(transferRef)
                 .amount(request.getAmount())
                 .status(PaymentStatus.VERIFICADO)
                 .verifiedBy(actorEntity)
@@ -212,7 +216,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .entityType("ORDER")
                 .entityId(order.getId().toString())
                 .beforeSnapshot(previousStatus.name())
-                .afterSnapshot("PAGADO | Ref: " + request.getTransferReference().trim() + " | Monto: " + request.getAmount())
+                .afterSnapshot("PAGADO | Ref: " + transferRef + " | Monto: " + request.getAmount())
                 .build();
         auditLogRepository.save(auditLog);
 

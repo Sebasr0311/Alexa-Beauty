@@ -110,6 +110,13 @@ public class AdminProductController {
         return ResponseEntity.ok(ApiResponse.ok("Estado del producto actualizado exitosamente", response));
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar o suspender producto", description = "Elimina un producto del catálogo o lo desactiva si tiene historial de pedidos")
+    public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable UUID id) {
+        catalogService.deleteProduct(id);
+        return ResponseEntity.ok(ApiResponse.empty("Producto procesado exitosamente"));
+    }
+
     @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Subir imagen del producto", description = "Sube una imagen para el producto y la almacena en el gateway configurado")
     public ResponseEntity<ApiResponse<ProductImageResponse>> uploadImage(

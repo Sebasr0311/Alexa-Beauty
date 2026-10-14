@@ -22,7 +22,6 @@ public class ConfirmPaymentRequest {
     @NotNull(message = "El método de pago es requerido")
     private PaymentMethod paymentMethod;
 
-    @NotBlank(message = "La referencia de transferencia es requerida")
     private String transferReference;
 
     @NotNull(message = "El monto es requerido")

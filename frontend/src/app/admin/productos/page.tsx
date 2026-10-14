@@ -15,14 +15,21 @@ import {
   AlertTriangle,
   X,
   Tag,
-  DollarSign,
   Boxes,
+  Image as ImageIcon,
+  Trash2,
+  PauseCircle,
+  PlayCircle,
+  Star,
+  UploadCloud,
+  Loader2,
 } from 'lucide-react';
 import AdminShell from '@/components/admin/AdminShell';
 import { formatCOP } from '@/lib/utils';
 import {
   api,
   ProductSummaryDto,
+  ProductImageDto,
   CategoryDto,
   BrandDto,
 } from '@/lib/api';
@@ -35,6 +42,7 @@ export default function AdminProductosPage() {
   const [brands, setBrands] = useState<BrandDto[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('TODAS');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -50,6 +58,21 @@ export default function AdminProductosPage() {
   const [newProductMinStock, setNewProductMinStock] = useState<number>(3);
   const [newProductShade, setNewProductShade] = useState('');
   const [newProductDescription, setNewProductDescription] = useState('');
+  const [newProductImageFile, setNewProductImageFile] = useState<File | null>(null);
+  const [newProductImagePreview, setNewProductImagePreview] = useState<string | null>(null);
+
+  // Modal Gestionar Fotos
+  const [imageModalProduct, setImageModalProduct] = useState<ProductSummaryDto | null>(null);
+  const [productImages, setProductImages] = useState<ProductImageDto[]>([]);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [uploadFilePreview, setUploadFilePreview] = useState<string | null>(null);
+  const [isCoverUpload, setIsCoverUpload] = useState(false);
+
+  // Modal Confirmar Eliminación
+  const [productToDelete, setProductToDelete] = useState<ProductSummaryDto | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -57,7 +80,7 @@ export default function AdminProductosPage() {
       const [catsRes, brandsRes, prodsRes] = await Promise.allSettled([
         api.getCategories(),
         api.getBrands(),
-        api.getAdminProducts({ q: searchQuery || undefined, size: 50 }),
+        api.getAdminProducts({ q: searchQuery || undefined, size: 100 }),
       ]);
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.length > 0) {
@@ -75,7 +98,9 @@ export default function AdminProductosPage() {
       if (prodsRes.status === 'fulfilled' && prodsRes.value?.content?.length > 0) {
         setProducts(prodsRes.value.content);
       }
-    } catch { setFeedback({ type: "error", text: "La operación no se confirmó en el servidor. No se modificaron datos locales." }); } finally {
+    } catch {
+      setFeedback({ type: 'error', text: 'No se pudieron sincronizar los productos del servidor.' });
+    } finally {
       setLoading(false);
     }
   }, [searchQuery, newProductCategoryId, newProductBrandId]);
@@ -84,19 +109,145 @@ export default function AdminProductosPage() {
     loadData();
   }, [loadData]);
 
+  // Suspender / Activar Producto
   const handleToggleStatus = async (productId: string, currentStatus: boolean) => {
     try {
       await api.toggleProductStatus(productId, !currentStatus);
+      const actionText = !currentStatus ? 'activado' : 'suspendido';
       setFeedback({
         type: 'success',
-        text: `Producto ${!currentStatus ? 'activado' : 'desactivado'} con éxito.`,
+        text: `Producto ${actionText} con éxito.`,
       });
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, active: !currentStatus } : p))
       );
-    } catch { setFeedback({ type: "error", text: "La operación no se confirmó en el servidor. No se modificaron datos locales." }); }
+    } catch {
+      setFeedback({ type: 'error', text: 'Error al cambiar el estado del producto.' });
+    }
   };
 
+  // Eliminar Producto
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteProduct(productToDelete.id);
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
+      setFeedback({
+        type: 'success',
+        text: `El producto "${productToDelete.name}" fue eliminado del catálogo.`,
+      });
+      setProductToDelete(null);
+    } catch {
+      setFeedback({
+        type: 'error',
+        text: 'No se pudo eliminar el producto. Intenta suspenderlo si tiene pedidos asociados.',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Abrir Modal de Fotos
+  const handleOpenImagesModal = async (product: ProductSummaryDto) => {
+    setImageModalProduct(product);
+    setLoadingImages(true);
+    setSelectedUploadFile(null);
+    setUploadFilePreview(null);
+    setIsCoverUpload(false);
+    try {
+      const detail = await api.getAdminProductById(product.id);
+      setProductImages(detail.images || []);
+    } catch {
+      setProductImages([]);
+      setFeedback({ type: 'error', text: 'No se pudieron cargar las fotos del producto.' });
+    } finally {
+      setLoadingImages(false);
+    }
+  };
+
+  // Subir Nueva Foto
+  const handleUploadImage = async () => {
+    if (!imageModalProduct || !selectedUploadFile) return;
+    setUploadingImage(true);
+    try {
+      const uploaded = await api.uploadProductImage(
+        imageModalProduct.id,
+        selectedUploadFile,
+        isCoverUpload || productImages.length === 0
+      );
+      setProductImages((prev) => {
+        if (uploaded.isCover) {
+          return [...prev.map((img) => ({ ...img, isCover: false })), uploaded];
+        }
+        return [...prev, uploaded];
+      });
+      setSelectedUploadFile(null);
+      setUploadFilePreview(null);
+      setFeedback({ type: 'success', text: 'Foto adjuntada correctamente al producto.' });
+      await loadData();
+    } catch {
+      setFeedback({ type: 'error', text: 'Error al subir la imagen. Verifica que sea JPG o PNG (máx 5MB).' });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Marcar Foto como Portada
+  const handleSetCoverImage = async (imageId: string) => {
+    if (!imageModalProduct) return;
+    try {
+      await api.setCoverProductImage(imageModalProduct.id, imageId);
+      setProductImages((prev) =>
+        prev.map((img) => ({ ...img, isCover: img.id === imageId }))
+      );
+      setFeedback({ type: 'success', text: 'Portada principal actualizada.' });
+      await loadData();
+    } catch {
+      setFeedback({ type: 'error', text: 'No se pudo establecer como portada.' });
+    }
+  };
+
+  // Eliminar Foto individual
+  const handleDeleteImage = async (imageId: string) => {
+    if (!imageModalProduct) return;
+    try {
+      await api.deleteProductImage(imageModalProduct.id, imageId);
+      setProductImages((prev) => prev.filter((img) => img.id !== imageId));
+      setFeedback({ type: 'success', text: 'Foto eliminada con éxito.' });
+      await loadData();
+    } catch {
+      setFeedback({ type: 'error', text: 'No se pudo eliminar la imagen.' });
+    }
+  };
+
+  // Manejo de archivo en modal de nuevo producto
+  const handleNewProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewProductImageFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setNewProductImagePreview(objectUrl);
+    } else {
+      setNewProductImageFile(null);
+      setNewProductImagePreview(null);
+    }
+  };
+
+  // Manejo de archivo en modal de fotos
+  const handleUploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedUploadFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setUploadFilePreview(objectUrl);
+    } else {
+      setSelectedUploadFile(null);
+      setUploadFilePreview(null);
+    }
+  };
+
+  // Crear Producto
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName.trim() || !newProductSku.trim() || newProductPrice <= 0) {
@@ -111,7 +262,7 @@ export default function AdminProductosPage() {
     const categoryIdToUse = newProductCategoryId || (categories[0]?.id ?? '00000000-0000-0000-0000-000000000001');
 
     try {
-      await api.createProduct({
+      const created = await api.createProduct({
         name: newProductName.trim(),
         sku: newProductSku.trim().toUpperCase(),
         brandId: brandIdToUse,
@@ -133,11 +284,22 @@ export default function AdminProductosPage() {
           : undefined,
       });
 
+      // Subir imagen si se adjuntó una
+      if (newProductImageFile && created?.id) {
+        try {
+          await api.uploadProductImage(created.id, newProductImageFile, true);
+        } catch {
+          // producto ya fue creado
+        }
+      }
+
       setFeedback({ type: 'success', text: `¡Producto "${newProductName}" creado exitosamente!` });
       setIsModalOpen(false);
       resetForm();
       await loadData();
-    } catch (err: any) { setFeedback({ type: "error", text: "La operación no se confirmó en el servidor. No se modificaron datos locales." }); } finally {
+    } catch {
+      setFeedback({ type: 'error', text: 'No se pudo crear el producto. Verifica que el SKU no esté duplicado.' });
+    } finally {
       setCreating(false);
     }
   };
@@ -150,6 +312,8 @@ export default function AdminProductosPage() {
     setNewProductMinStock(3);
     setNewProductShade('');
     setNewProductDescription('');
+    setNewProductImageFile(null);
+    setNewProductImagePreview(null);
   };
 
   const filteredProducts = products.filter((p) => {
@@ -159,14 +323,18 @@ export default function AdminProductosPage() {
       (p.brandName && p.brandName.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory =
       selectedCategory === 'TODAS' || p.categoryName === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'ACTIVE' && p.active) ||
+      (statusFilter === 'INACTIVE' && !p.active);
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   return (
     <AdminShell
       badge="Epic 2 · Catálogo Oficial"
       title="Catálogo de Productos"
-      subtitle="Administración de fichas comerciales, precios autoritativos, tonos y visibilidad"
+      subtitle="Administración de fichas comerciales, imágenes, precios autoritativos, suspensión y bajas"
       actions={
         <>
           <button
@@ -215,7 +383,7 @@ export default function AdminProductosPage() {
         </div>
       )}
 
-      {/* Barra de Filtros */}
+      {/* Barra de Filtros y Estado */}
       <div className="bg-white border border-border rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -228,43 +396,80 @@ export default function AdminProductosPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
-          <span className="text-xs font-semibold text-muted whitespace-nowrap hidden sm:inline">
-            Categoría:
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('TODAS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-              selectedCategory === 'TODAS'
-                ? 'bg-wine text-white shadow-xs'
-                : 'bg-cream text-muted hover:text-ink'
-            }`}
-          >
-            Todas
-          </button>
-          {['Rostro', 'Labios', 'Ojos', 'Accesorios'].map((cat) => (
+        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+          {/* Status Tabs */}
+          <div className="flex items-center bg-cream rounded-xl p-1 border border-border/70 text-xs font-bold">
             <button
-              key={cat}
               type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                selectedCategory === cat
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-3 py-1 rounded-lg transition ${
+                statusFilter === 'ALL'
                   ? 'bg-wine text-white shadow-xs'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              Todos ({products.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ACTIVE')}
+              className={`px-3 py-1 rounded-lg transition ${
+                statusFilter === 'ACTIVE'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              Activos
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('INACTIVE')}
+              className={`px-3 py-1 rounded-lg transition ${
+                statusFilter === 'INACTIVE'
+                  ? 'bg-rose-700 text-white shadow-xs'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              Suspendidos
+            </button>
+          </div>
+
+          {/* Categorías */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('TODAS')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                selectedCategory === 'TODAS'
+                  ? 'bg-wine/10 text-wine font-extrabold border border-wine/30'
                   : 'bg-cream text-muted hover:text-ink'
               }`}
             >
-              {cat}
+              Todas
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={loadData}
-            title="Recargar catálogo"
-            className="p-2 text-muted hover:text-wine rounded-lg bg-cream hover:bg-blush transition ml-1"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+            {['Rostro', 'Labios', 'Ojos', 'Accesorios'].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                  selectedCategory === cat
+                    ? 'bg-wine/10 text-wine font-extrabold border border-wine/30'
+                    : 'bg-cream text-muted hover:text-ink'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={loadData}
+              title="Recargar catálogo"
+              className="p-1.5 text-muted hover:text-wine rounded-lg bg-cream hover:bg-blush transition ml-1"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -296,12 +501,12 @@ export default function AdminProductosPage() {
                   <tr key={p.id} className="hover:bg-cream/40 transition">
                     <td className="py-3.5 px-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-blush border border-border flex-shrink-0">
+                        <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-blush border border-border flex-shrink-0">
                           <Image
                             src={p.coverImageUrl || '/branding/logo.png'}
                             alt={p.name}
                             fill
-                            sizes="40px"
+                            sizes="44px"
                             className="object-cover"
                           />
                         </div>
@@ -337,13 +542,11 @@ export default function AdminProductosPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-3.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(p.id, p.active)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition ${
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                           p.active
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
                         }`}
                       >
                         {p.active ? (
@@ -354,21 +557,68 @@ export default function AdminProductosPage() {
                         ) : (
                           <>
                             <XCircle className="w-3 h-3" />
-                            Inactivo
+                            Suspendido
                           </>
                         )}
-                      </button>
+                      </span>
                     </td>
                     <td className="py-3.5 px-3.5 text-right">
-                      <Link
-                        href={`/producto/${p.slug}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-1 text-xs font-bold text-wine hover:text-wineDark hover:underline"
-                        title="Ver ficha pública"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Ficha</span>
-                      </Link>
+                      <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                        {/* Fotos Modal Trigger */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenImagesModal(p)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-wine bg-blush/60 hover:bg-blush transition"
+                          title="Gestionar fotos e imagen de portada"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>Fotos</span>
+                        </button>
+
+                        {/* Suspender / Activar Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(p.id, p.active)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                            p.active
+                              ? 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                              : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                          }`}
+                          title={p.active ? 'Suspender producto (ocultar de la tienda)' : 'Activar producto en tienda'}
+                        >
+                          {p.active ? (
+                            <>
+                              <PauseCircle className="w-3.5 h-3.5" />
+                              <span>Suspender</span>
+                            </>
+                          ) : (
+                            <>
+                              <PlayCircle className="w-3.5 h-3.5" />
+                              <span>Activar</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Ficha Pública */}
+                        <Link
+                          href={`/producto/${p.slug}`}
+                          target="_blank"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold text-muted hover:text-ink hover:bg-cream transition"
+                          title="Ver ficha comercial en la tienda"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </Link>
+
+                        {/* Eliminar Producto */}
+                        <button
+                          type="button"
+                          onClick={() => setProductToDelete(p)}
+                          className="inline-flex items-center p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -378,7 +628,242 @@ export default function AdminProductosPage() {
         </div>
       </div>
 
-      {/* Modal Crear Producto */}
+      {/* MODAL: GESTIONAR IMÁGENES */}
+      {imageModalProduct && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5 text-wine">
+                <ImageIcon className="w-5 h-5" />
+                <div>
+                  <h3 className="font-serif text-lg sm:text-xl font-bold">
+                    Fotos de Producto
+                  </h3>
+                  <p className="text-xs text-muted font-sans font-medium">
+                    {imageModalProduct.name} · SKU: {imageModalProduct.sku}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImageModalProduct(null)}
+                className="text-muted hover:text-ink p-1.5 rounded-full hover:bg-cream"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Galería de Fotos Existentes */}
+            <div>
+              <label className="font-bold text-ink text-xs uppercase tracking-wider block mb-2">
+                Fotos Actuales ({productImages.length})
+              </label>
+              {loadingImages ? (
+                <div className="py-10 text-center text-muted flex items-center justify-center gap-2 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin text-wine" />
+                  <span>Cargando fotos del producto...</span>
+                </div>
+              ) : productImages.length === 0 ? (
+                <div className="py-8 text-center text-muted bg-cream/30 border border-dashed border-border rounded-2xl">
+                  <ImageIcon className="w-8 h-8 mx-auto mb-2 text-mauve/40" />
+                  <p className="text-xs font-semibold">Este producto aún no tiene fotos adjuntas.</p>
+                  <p className="text-[11px] text-muted">Sube una imagen abajo para que aparezca en el catálogo.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {productImages.map((img) => (
+                    <div
+                      key={img.id}
+                      className={`relative rounded-2xl overflow-hidden border p-2 bg-[#FCF9F7] flex flex-col items-center gap-2 transition ${
+                        img.isCover ? 'border-wine ring-2 ring-wine/20 shadow-xs' : 'border-border'
+                      }`}
+                    >
+                      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-white border border-border/50">
+                        <Image
+                          src={img.url}
+                          alt={img.altText || 'Foto del producto'}
+                          fill
+                          sizes="200px"
+                          className="object-cover"
+                        />
+                        {img.isCover && (
+                          <span className="absolute top-1.5 left-1.5 bg-wine text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-current" /> Portada
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between w-full pt-1 px-1">
+                        {!img.isCover ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSetCoverImage(img.id)}
+                            className="text-[11px] font-bold text-wine hover:underline inline-flex items-center gap-1"
+                          >
+                            <Star className="w-3 h-3" /> Hacer portada
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-bold text-muted">Principal</span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteImage(img.id)}
+                          className="text-rose-500 hover:text-rose-700 p-1 rounded-md hover:bg-rose-50 transition"
+                          title="Eliminar foto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Zona para Subir Nueva Foto */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <label className="font-bold text-ink text-xs uppercase tracking-wider block">
+                Adjuntar Nueva Foto (JPG o PNG, máx 5MB)
+              </label>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <input
+                  type="file"
+                  id="image-file-input"
+                  accept="image/jpeg,image/png,image/jpg"
+                  onChange={handleUploadFileChange}
+                  className="block w-full text-xs text-muted file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-wine file:text-white hover:file:bg-wineDark cursor-pointer"
+                />
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink whitespace-nowrap cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isCoverUpload}
+                    onChange={(e) => setIsCoverUpload(e.target.checked)}
+                    className="rounded text-wine focus:ring-wine/20 w-4 h-4"
+                  />
+                  <span>Establecer como portada</span>
+                </label>
+              </div>
+
+              {uploadFilePreview && (
+                <div className="flex items-center gap-3 p-3 bg-cream/40 rounded-xl border border-border">
+                  <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                    <Image
+                      src={uploadFilePreview}
+                      alt="Vista previa"
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-ink truncate">{selectedUploadFile?.name}</p>
+                    <p className="text-[10px] text-muted">
+                      {selectedUploadFile ? `${(selectedUploadFile.size / 1024).toFixed(0)} KB` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUploadImage}
+                    disabled={uploadingImage}
+                    className="px-4 py-2 rounded-xl bg-wine hover:bg-wineDark text-white text-xs font-bold transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Subiendo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        <span>Guardar Foto</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setImageModalProduct(null)}
+                className="px-5 py-2.5 rounded-full border border-border text-muted font-bold text-xs hover:bg-cream transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRMAR ELIMINACIÓN DE PRODUCTO */}
+      {productToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-ink">
+                  ¿Eliminar Producto?
+                </h3>
+                <p className="text-xs text-muted">Esta acción afectará la disponibilidad del catálogo.</p>
+              </div>
+            </div>
+
+            <div className="bg-cream/50 rounded-2xl p-4 border border-border space-y-2 text-xs">
+              <p className="font-bold text-ink">{productToDelete.name}</p>
+              <p className="text-muted">SKU: <span className="font-mono text-wine font-semibold">{productToDelete.sku}</span></p>
+              <p className="text-muted leading-relaxed">
+                Si este producto tiene ventas históricas o movimientos contables, será <strong>suspendido de inmediato</strong> para preservar la auditoría fiscal.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setProductToDelete(null)}
+                className="px-4 py-2.5 rounded-full border border-border text-xs font-bold text-muted hover:bg-cream transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteProduct}
+                className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirmar Baja</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREAR PRODUCTO */}
       {isModalOpen && (
         <div
           role="dialog"
@@ -473,6 +958,37 @@ export default function AdminProductosPage() {
                   placeholder="Ej. Tono 01 Nude Rosé"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 focus:ring-2 focus:ring-wine/20 focus:outline-none"
                 />
+              </div>
+
+              {/* Foto de Portada para nuevo producto */}
+              <div>
+                <label className="font-bold text-ink block mb-1">
+                  Foto de Portada (Opcional · JPG/PNG máx 5MB)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/jpg"
+                    onChange={handleNewProductImageChange}
+                    className="block w-full text-xs text-muted file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-wine file:text-white hover:file:bg-wineDark cursor-pointer"
+                  />
+                </div>
+                {newProductImagePreview && (
+                  <div className="mt-2.5 flex items-center gap-3 p-2 bg-cream/40 rounded-xl border border-border">
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                      <Image
+                        src={newProductImagePreview}
+                        alt="Previsualización"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Imagen lista para adjuntar
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>

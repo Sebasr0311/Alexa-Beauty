@@ -35,6 +35,9 @@ export const ADMIN_NAV_ITEMS = [
   { label: 'Inventario', href: '/admin/inventario', icon: Boxes },
 ];
 
+// Module-level cache to eliminate flickering when switching between admin pages
+let globalAdminAuth: boolean | null = null;
+
 export function AdminShell({
   children,
   title,
@@ -43,7 +46,20 @@ export function AdminShell({
   actions,
 }: AdminShellProps) {
   const pathname = usePathname();
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(() => {
+    if (globalAdminAuth !== null) return globalAdminAuth;
+    if (typeof window !== 'undefined') {
+      try {
+        if (sessionStorage.getItem('alexa_admin_auth') === 'true') {
+          globalAdminAuth = true;
+          return true;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return null;
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -53,8 +69,29 @@ export function AdminShell({
   useEffect(() => {
     let cancelled = false;
     api.getMe().then(user => {
-      if (!cancelled) setAuthenticated(user.role === 'ADMIN' || user.role === 'OPERADOR');
+      const isAuth = user.role === 'ADMIN' || user.role === 'OPERADOR';
+      globalAdminAuth = isAuth;
+      if (typeof window !== 'undefined') {
+        try {
+          if (isAuth) {
+            sessionStorage.setItem('alexa_admin_auth', 'true');
+          } else {
+            sessionStorage.removeItem('alexa_admin_auth');
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (!cancelled) setAuthenticated(isAuth);
     }).catch(() => {
+      globalAdminAuth = false;
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('alexa_admin_auth');
+        } catch {
+          // ignore
+        }
+      }
       if (!cancelled) setAuthenticated(false);
     });
     return () => { cancelled = true; };
@@ -112,7 +149,11 @@ export function AdminShell({
                 setLoginError('');
                 try {
                   await api.login(email, password);
-                  window.location.reload();
+                  globalAdminAuth = true;
+                  if (typeof window !== 'undefined') {
+                    try { sessionStorage.setItem('alexa_admin_auth', 'true'); } catch {}
+                  }
+                  setAuthenticated(true);
                 } catch {
                   setLoginError('Credenciales inválidas. Verifica tu correo y contraseña.');
                 } finally {

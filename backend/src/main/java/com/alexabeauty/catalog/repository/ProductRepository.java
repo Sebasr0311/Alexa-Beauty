@@ -19,4 +19,30 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     Page<Product> findByActiveTrue(Pageable pageable);
     Page<Product> findByCategoryIdAndActiveTrue(UUID categoryId, Pageable pageable);
     Page<Product> findByBrandIdAndActiveTrue(UUID brandId, Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query(
+        value = "SELECT COUNT(*) > 0 FROM order_items oi JOIN product_variants pv ON oi.variant_id = pv.id WHERE pv.product_id = :productId",
+        nativeQuery = true
+    )
+    boolean hasOrderItems(@org.springframework.data.repository.query.Param("productId") UUID productId);
+
+    @org.springframework.data.jpa.repository.Query(
+        value = "SELECT COUNT(*) > 0 FROM stock_receipt_items sri JOIN product_variants pv ON sri.variant_id = pv.id WHERE pv.product_id = :productId",
+        nativeQuery = true
+    )
+    boolean hasStockReceipts(@org.springframework.data.repository.query.Param("productId") UUID productId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(
+        value = "DELETE FROM stock_reservations WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = :productId)",
+        nativeQuery = true
+    )
+    void deleteReservationsByProductId(@org.springframework.data.repository.query.Param("productId") UUID productId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(
+        value = "DELETE FROM inventory_movements WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = :productId)",
+        nativeQuery = true
+    )
+    void deleteMovementsByProductId(@org.springframework.data.repository.query.Param("productId") UUID productId);
 }

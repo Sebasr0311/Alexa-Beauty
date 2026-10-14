@@ -161,17 +161,12 @@ export default function AdminOrdersPage() {
     e.preventDefault();
     if (!orderForPayment) return;
 
-    if (!transferReference.trim()) {
-      setErrorMessage('La referencia de transferencia es obligatoria.');
-      return;
-    }
-
     setProcessingPayment(true);
     setErrorMessage(null);
 
     const payload: ConfirmPaymentDto = {
       paymentMethod,
-      transferReference: transferReference.trim(),
+      transferReference: transferReference.trim() || undefined,
       amount: paymentAmount,
       notes: paymentNotes.trim() || undefined,
       receiptImageUrl: paymentReceiptUrl.trim() || undefined,
@@ -605,14 +600,13 @@ export default function AdminOrdersPage() {
 
               <div>
                 <label className="block text-xs font-bold text-wine uppercase tracking-wider mb-1">
-                  Referencia de Transferencia / ID Transacción *
+                  Referencia de Transferencia / ID (Opcional)
                 </label>
                 <input
                   type="text"
-                  required
                   value={transferReference}
                   onChange={(e) => setTransferReference(e.target.value)}
-                  placeholder="Ej: M12345678 o 987654321"
+                  placeholder="Opcional. Ej: M12345678 o 987654321"
                   className="w-full px-3.5 py-2.5 bg-cream/40 border border-border rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-wine/20 focus:border-wine placeholder:text-muted/60"
                 />
               </div>

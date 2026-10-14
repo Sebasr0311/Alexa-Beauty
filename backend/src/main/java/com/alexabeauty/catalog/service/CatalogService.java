@@ -40,6 +40,8 @@ public interface CatalogService {
 
     ProductDetailResponse toggleProductStatus(UUID id, boolean active);
 
+    void deleteProduct(UUID id);
+
     // Brand operations
     BrandResponse createBrand(CreateBrandRequest request);
 

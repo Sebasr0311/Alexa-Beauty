@@ -240,6 +240,16 @@ class ApiClient {
     });
   }
 
+  async getAdminProductById(id: string): Promise<ProductDetailDto> {
+    return this.request<ProductDetailDto>(`/admin/products/${id}`);
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    return this.request<void>(`/admin/products/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   async uploadProductImage(productId: string, file: File, isCover: boolean = false): Promise<ProductImageDto> {
     const formData = new FormData();
     formData.append('file', file);
@@ -247,6 +257,12 @@ class ApiClient {
     return this.request<ProductImageDto>(`/admin/products/${productId}/images`, {
       method: 'POST',
       body: formData,
+    });
+  }
+
+  async setCoverProductImage(productId: string, imageId: string): Promise<ProductImageDto> {
+    return this.request<ProductImageDto>(`/admin/products/${productId}/images/${imageId}/cover`, {
+      method: 'PATCH',
     });
   }
 
@@ -545,7 +561,7 @@ export interface PaymentDto {
 
 export interface ConfirmPaymentDto {
   paymentMethod: 'NEQUI' | 'BANCOLOMBIA' | 'DAVIPLATA' | 'EFECTIVO' | 'OTRO';
-  transferReference: string;
+  transferReference?: string;
   amount: number;
   notes?: string;
   receiptImageUrl?: string;

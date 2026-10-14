@@ -373,6 +373,37 @@ public class CatalogServiceImpl implements CatalogService {
         return toProductDetailResponse(saved);
     }
 
+    @Override
+    public void deleteProduct(UUID id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+
+        boolean hasOrders = productRepository.hasOrderItems(id);
+        boolean hasReceipts = productRepository.hasStockReceipts(id);
+
+        if (hasOrders || hasReceipts) {
+            log.info("Product id={} has orders or receipts. Deactivating (soft-delete) instead of hard-delete.", id);
+            product.setActive(false);
+            productRepository.save(product);
+            return;
+        }
+
+        productRepository.deleteReservationsByProductId(id);
+        productRepository.deleteMovementsByProductId(id);
+
+        List<ProductImage> images = new ArrayList<>(product.getImages());
+        for (ProductImage img : images) {
+            try {
+                mediaService.deleteProductImage(id, img.getId());
+            } catch (Exception e) {
+                log.warn("Could not delete image id={} from storage: {}", img.getId(), e.getMessage());
+            }
+        }
+
+        productRepository.delete(product);
+        log.info("Product id={} deleted permanently.", id);
+    }
+
     // Brand operations
     @Override
     public BrandResponse createBrand(CreateBrandRequest request) {
