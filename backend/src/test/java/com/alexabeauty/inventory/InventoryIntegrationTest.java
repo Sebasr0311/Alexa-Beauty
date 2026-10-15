@@ -468,4 +468,73 @@ class InventoryIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content").isArray());
     }
+
+    @Test
+    @DisplayName("Duplicate receiptNumber with different payload returns 409 Conflict and preserves stock")
+    void duplicateReceiptNumber_withDifferentPayload_returnsConflictAndLeavesStockIntact() throws Exception {
+        String sku = "SKU-CONF-" + UUID.randomUUID().toString().substring(0, 8);
+        ProductVariant variant = createTestVariant(sku, 10, 0, 2);
+        String receiptNumber = "REC-DUP-DIFF-" + UUID.randomUUID().toString().substring(0, 8);
+
+        StockReceiptItemRequest originalItem = new StockReceiptItemRequest(
+                variant.getId(),
+                5,
+                new BigDecimal("15000.00"),
+                "Lote original"
+        );
+        CreateStockReceiptRequest originalReq = new CreateStockReceiptRequest(
+                receiptNumber,
+                "Proveedor A",
+                "FAC-100",
+                "Recepción inicial",
+                List.of(originalItem)
+        );
+
+        // 1. First receipt succeeds
+        mockMvc.perform(post("/api/v1/admin/inventory/receipts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(originalReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.receiptNumber").value(receiptNumber));
+
+        ProductVariant afterFirst = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(afterFirst.getStockOnHand()).isEqualTo(15);
+
+        // 2. Second receipt with SAME receiptNumber but DIFFERENT payload (different units)
+        StockReceiptItemRequest conflictingItem = new StockReceiptItemRequest(
+                variant.getId(),
+                25,
+                new BigDecimal("12000.00"),
+                "Lote diferente"
+        );
+        CreateStockReceiptRequest conflictingReq = new CreateStockReceiptRequest(
+                receiptNumber,
+                "Proveedor B",
+                "FAC-200",
+                "Recepción contradictoria",
+                List.of(conflictingItem)
+        );
+
+        mockMvc.perform(post("/api/v1/admin/inventory/receipts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(conflictingReq)))
+                .andExpect(status().isConflict());
+
+        // 3. Verify stock is completely unchanged (still 15, not 15 + 25 = 40)
+        ProductVariant afterConflict = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(afterConflict.getStockOnHand()).isEqualTo(15);
+
+        // 4. Identical payload replay succeeds idempotently
+        mockMvc.perform(post("/api/v1/admin/inventory/receipts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(originalReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.receiptNumber").value(receiptNumber));
+
+        ProductVariant afterReplay = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(afterReplay.getStockOnHand()).isEqualTo(15);
+    }
 }

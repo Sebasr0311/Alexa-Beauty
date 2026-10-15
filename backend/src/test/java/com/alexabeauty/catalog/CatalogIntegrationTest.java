@@ -340,14 +340,14 @@ class CatalogIntegrationTest {
         variant.setStockReserved(4);
         productVariantRepository.save(variant);
 
-        // Call public detail endpoint
+        // Call public detail endpoint: internal stockOnHand/stockReserved are omitted, availableStock is verified
         mockMvc.perform(get("/api/v1/catalog/products/" + slug))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.variants[0].stockOnHand").value(10))
-                .andExpect(jsonPath("$.data.variants[0].stockReserved").value(4))
+                .andExpect(jsonPath("$.data.variants[0].stockOnHand").doesNotExist())
+                .andExpect(jsonPath("$.data.variants[0].stockReserved").doesNotExist())
                 .andExpect(jsonPath("$.data.variants[0].availableStock").value(6))
-                .andExpect(jsonPath("$.data.totalStockOnHand").value(10))
+                .andExpect(jsonPath("$.data.totalStockOnHand").doesNotExist())
                 .andExpect(jsonPath("$.data.totalAvailableStock").value(6));
     }
 
@@ -427,6 +427,84 @@ class CatalogIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    @DisplayName("Public catalog endpoints do not leak referenceCost, minStock, stockOnHand or stockReserved")
+    void publicCatalogDoesNotLeakInternalCostsOrPhysicalStock() throws Exception {
+        String sku = "SKU-PUBSEC-" + UUID.randomUUID().toString().substring(0, 8);
+        ProductVariantRequest variantReq = new ProductVariantRequest(
+                sku + "-V1",
+                "Rojo Fuego",
+                "3.5g",
+                new BigDecimal("28000.00"),
+                new BigDecimal("15000.00"),
+                3,
+                10,
+                true,
+                "01",
+                "#FF0000"
+        );
+
+        CreateProductRequest createReq = new CreateProductRequest(
+                "Labial Seguro Publico " + sku,
+                defaultBrand.getId(),
+                defaultCategory.getId(),
+                "Descripcion publica",
+                sku,
+                new BigDecimal("28000.00"),
+                10,
+                3,
+                List.of(variantReq),
+                false,
+                true
+        );
+
+        MvcResult createResult = mockMvc.perform(post("/api/v1/admin/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createdJson = objectMapper.readTree(createResult.getResponse().getContentAsString()).path("data");
+        UUID productId = UUID.fromString(createdJson.path("id").asText());
+        String slug = createdJson.path("slug").asText();
+
+        // 1. Verify PUBLIC LIST endpoint (/api/v1/catalog/products): internal costs & physical stock MUST NOT exist
+        mockMvc.perform(get("/api/v1/catalog/products")
+                        .param("query", sku))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].sku").value(sku))
+                .andExpect(jsonPath("$.data.content[0].variants[0].referenceCost").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].variants[0].stockOnHand").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].variants[0].stockReserved").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].variants[0].minStock").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].totalStockOnHand").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].variants[0].availableStock").value(10))
+                .andExpect(jsonPath("$.data.content[0].totalAvailableStock").value(10));
+
+        // 2. Verify PUBLIC DETAIL endpoint (/api/v1/catalog/products/{slug}): internal costs & physical stock MUST NOT exist
+        mockMvc.perform(get("/api/v1/catalog/products/{slug}", slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sku").value(sku))
+                .andExpect(jsonPath("$.data.variants[0].referenceCost").doesNotExist())
+                .andExpect(jsonPath("$.data.variants[0].stockOnHand").doesNotExist())
+                .andExpect(jsonPath("$.data.variants[0].stockReserved").doesNotExist())
+                .andExpect(jsonPath("$.data.variants[0].minStock").doesNotExist())
+                .andExpect(jsonPath("$.data.totalStockOnHand").doesNotExist())
+                .andExpect(jsonPath("$.data.variants[0].availableStock").value(10))
+                .andExpect(jsonPath("$.data.totalAvailableStock").value(10));
+
+        // 3. Verify ADMIN DETAIL endpoint (/api/v1/admin/products/{id}): internal costs & physical stock MUST exist for admin
+        mockMvc.perform(get("/api/v1/admin/products/{id}", productId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.variants[0].referenceCost").value(15000.00))
+                .andExpect(jsonPath("$.data.variants[0].stockOnHand").value(10))
+                .andExpect(jsonPath("$.data.variants[0].minStock").value(3))
+                .andExpect(jsonPath("$.data.totalStockOnHand").value(10));
+    }
+
     private byte[] validPng() throws java.io.IOException {
         var bytes = new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", bytes);

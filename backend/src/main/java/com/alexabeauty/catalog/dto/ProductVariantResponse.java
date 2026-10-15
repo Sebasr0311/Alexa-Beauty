@@ -1,11 +1,13 @@
 package com.alexabeauty.catalog.dto;
 
 import com.alexabeauty.catalog.domain.ProductVariant;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ProductVariantResponse(
         UUID id,
         UUID productId,
@@ -16,15 +18,19 @@ public record ProductVariantResponse(
         String presentation,
         BigDecimal salePrice,
         BigDecimal referenceCost,
-        int minStock,
+        Integer minStock,
         boolean active,
-        int stockOnHand,
-        int stockReserved,
+        Integer stockOnHand,
+        Integer stockReserved,
         int availableStock,
         Instant createdAt,
         Instant updatedAt
 ) {
     public static ProductVariantResponse from(ProductVariant variant) {
+        return adminView(variant);
+    }
+
+    public static ProductVariantResponse adminView(ProductVariant variant) {
         if (variant == null) return null;
         int available = Math.max(0, variant.getStockOnHand() - variant.getStockReserved());
         return new ProductVariantResponse(
@@ -41,6 +47,29 @@ public record ProductVariantResponse(
                 variant.isActive(),
                 variant.getStockOnHand(),
                 variant.getStockReserved(),
+                available,
+                variant.getCreatedAt(),
+                variant.getUpdatedAt()
+        );
+    }
+
+    public static ProductVariantResponse publicView(ProductVariant variant) {
+        if (variant == null) return null;
+        int available = Math.max(0, variant.getStockOnHand() - variant.getStockReserved());
+        return new ProductVariantResponse(
+                variant.getId(),
+                variant.getProduct() != null ? variant.getProduct().getId() : null,
+                variant.getSku(),
+                variant.getShadeName(),
+                variant.getShadeCode(),
+                variant.getShadeHex(),
+                variant.getPresentation(),
+                variant.getSalePrice(),
+                null, // referenceCost omitted for public security
+                null, // minStock omitted
+                variant.isActive(),
+                null, // stockOnHand omitted
+                null, // stockReserved omitted
                 available,
                 variant.getCreatedAt(),
                 variant.getUpdatedAt()

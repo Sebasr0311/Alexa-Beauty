@@ -344,7 +344,7 @@ public class CatalogServiceImpl implements CatalogService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        return productRepository.findAll(spec, pageable).map(this::toProductSummaryResponse);
+        return productRepository.findAll(spec, pageable).map(p -> this.toProductSummaryResponse(p, true));
     }
 
     @Override
@@ -362,7 +362,7 @@ public class CatalogServiceImpl implements CatalogService {
             return cb.or(nameLike, descLike, skuLike, brandLike);
         };
 
-        return productRepository.findAll(spec, pageable).map(this::toProductSummaryResponse);
+        return productRepository.findAll(spec, pageable).map(p -> this.toProductSummaryResponse(p, false));
     }
 
     @Override
@@ -533,11 +533,11 @@ public class CatalogServiceImpl implements CatalogService {
     private ProductDetailResponse toProductDetailResponse(Product product, boolean publicView) {
         var visibleVariants = product.getVariants().stream().filter(v -> !publicView || v.isActive()).toList();
         List<ProductVariantResponse> variantResponses = visibleVariants.stream()
-                .map(ProductVariantResponse::from)
+                .map(v -> publicView ? ProductVariantResponse.publicView(v) : ProductVariantResponse.adminView(v))
                 .toList();
 
         List<ProductImageResponse> imageResponses = product.getImages().stream()
-                .map(img -> ProductImageResponse.from(img, mediaService.getPublicUrl(img.getStoragePath())))
+                .map(img -> ProductImageResponse.from(img, mediaService.getPublicUrl(img.getStoragePath()), publicView))
                 .toList();
 
         BigDecimal minPrice = visibleVariants.stream()
@@ -550,7 +550,7 @@ public class CatalogServiceImpl implements CatalogService {
                 .max(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
 
-        int totalStockOnHand = visibleVariants.stream()
+        Integer totalStockOnHand = publicView ? null : visibleVariants.stream()
                 .mapToInt(ProductVariant::getStockOnHand)
                 .sum();
 
@@ -580,6 +580,10 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     private ProductSummaryResponse toProductSummaryResponse(Product product) {
+        return toProductSummaryResponse(product, false);
+    }
+
+    private ProductSummaryResponse toProductSummaryResponse(Product product, boolean publicView) {
         var visibleVariants = product.getVariants().stream().filter(ProductVariant::isActive).toList();
         BigDecimal minPrice = visibleVariants.stream()
                 .map(ProductVariant::getSalePrice)
@@ -591,7 +595,7 @@ public class CatalogServiceImpl implements CatalogService {
                 .max(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
 
-        int totalStockOnHand = visibleVariants.stream()
+        Integer totalStockOnHand = publicView ? null : visibleVariants.stream()
                 .mapToInt(ProductVariant::getStockOnHand)
                 .sum();
 
@@ -621,7 +625,9 @@ public class CatalogServiceImpl implements CatalogService {
                 totalStockOnHand,
                 totalAvailableStock,
                 coverUrl,
-                visibleVariants.stream().map(ProductVariantResponse::from).toList(),
+                visibleVariants.stream()
+                        .map(v -> publicView ? ProductVariantResponse.publicView(v) : ProductVariantResponse.adminView(v))
+                        .toList(),
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );

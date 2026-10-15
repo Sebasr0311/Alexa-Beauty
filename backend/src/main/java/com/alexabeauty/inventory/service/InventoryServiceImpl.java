@@ -136,9 +136,14 @@ public class InventoryServiceImpl implements InventoryService {
         if (request.receiptNumber() != null && !request.receiptNumber().isBlank()) {
             Optional<StockReceipt> existingByReceiptNumber = stockReceiptRepository.findByReceiptNumber(request.receiptNumber().trim());
             if (existingByReceiptNumber.isPresent()) {
+                StockReceipt existing = existingByReceiptNumber.get();
+                if (existing.getRequestFingerprint() != null && !existing.getRequestFingerprint().equals(fingerprint)) {
+                    throw new ConflictException("El número de recepción '" + request.receiptNumber().trim() +
+                            "' ya fue utilizado para otra recepción de stock con diferente contenido.");
+                }
                 log.info("Duplicate receipt request detected by receiptNumber '{}'. Returning existing receipt id {}",
-                        request.receiptNumber(), existingByReceiptNumber.get().getId());
-                return StockReceiptResponse.from(existingByReceiptNumber.get());
+                        request.receiptNumber(), existing.getId());
+                return StockReceiptResponse.from(existing);
             }
         }
 
