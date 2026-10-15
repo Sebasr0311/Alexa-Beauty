@@ -45,6 +45,10 @@ testsprite_tests/tmp/
 testsprite_tests/tmp/config.json
 .playwright-mcp/
 
+# Local media storage
+**/uploads/
+uploads/
+
 # Isolated visual-shade verification outputs
 **/.next-*/
 documentation/evidence/visual-shades/
