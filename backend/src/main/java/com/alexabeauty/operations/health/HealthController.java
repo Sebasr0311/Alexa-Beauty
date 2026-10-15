@@ -36,12 +36,6 @@ public class HealthController {
         ));
     }
 
-    @GetMapping({"/ping", "/api/v1/ping"})
-    @Operation(summary = "Liveness ping", description = "Returns simple pong string for lightweight pingers")
-    public ResponseEntity<String> ping() {
-        return ResponseEntity.ok("pong");
-    }
-
     public record PublicHealthResponse(
         String status,
         String appName,
