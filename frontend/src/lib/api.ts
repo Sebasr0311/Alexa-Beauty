@@ -59,6 +59,9 @@ export interface ProductDetailDto {
   category: { id: string; name: string; slug: string };
   featured: boolean;
   active: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  totalStockOnHand?: number;
   images: ProductImageDto[];
   variants: ProductVariantDto[];
   totalAvailableStock: number;
@@ -209,11 +212,12 @@ class ApiClient {
   }
 
   // --- Admin Catálogo ---
-  async getAdminProducts(params?: { q?: string; page?: number; size?: number }): Promise<PageDto<ProductSummaryDto>> {
+  async getAdminProducts(params?: { q?: string; page?: number; size?: number; sort?: string }): Promise<PageDto<ProductSummaryDto>> {
     const searchParams = new URLSearchParams();
     if (params?.q) searchParams.set('query', params.q);
     if (params?.page !== undefined) searchParams.set('page', params.page.toString());
     if (params?.size !== undefined) searchParams.set('size', params.size.toString());
+    if (params?.sort) searchParams.set('sort', params.sort);
     const query = searchParams.toString();
     return this.request<PageDto<ProductSummaryDto>>(`/admin/products${query ? `?${query}` : ''}`);
   }

@@ -58,6 +58,7 @@ export default function AdminProductosPage() {
   // Modal Nuevo Producto
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [newProductName, setNewProductName] = useState('');
   const [newProductSku, setNewProductSku] = useState('');
   const [newProductBrandId, setNewProductBrandId] = useState('');
@@ -87,26 +88,23 @@ export default function AdminProductosPage() {
     setCurrentPage(0);
   }, [searchQuery]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (pageOverride?: number) => {
     setLoading(true);
+    const targetPage = pageOverride !== undefined ? pageOverride : currentPage;
     try {
       const [catsRes, brandsRes, prodsRes] = await Promise.allSettled([
         api.getCategories(),
         api.getBrands(),
-        api.getAdminProducts({ q: searchQuery || undefined, page: currentPage, size: 20 }),
+        api.getAdminProducts({ q: searchQuery || undefined, page: targetPage, size: 20, sort: 'createdAt,desc' }),
       ]);
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.length > 0) {
         setCategories(catsRes.value);
-        if (!newProductCategoryId && catsRes.value[0]) {
-          setNewProductCategoryId(catsRes.value[0].id);
-        }
+        setNewProductCategoryId((prev) => prev || catsRes.value[0]?.id || '');
       }
       if (brandsRes.status === 'fulfilled' && brandsRes.value?.length > 0) {
         setBrands(brandsRes.value);
-        if (!newProductBrandId && brandsRes.value[0]) {
-          setNewProductBrandId(brandsRes.value[0].id);
-        }
+        setNewProductBrandId((prev) => prev || brandsRes.value[0]?.id || '');
       }
       if (prodsRes.status === 'fulfilled') {
         setProducts(prodsRes.value?.content || []);
@@ -118,7 +116,7 @@ export default function AdminProductosPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, newProductCategoryId, newProductBrandId, currentPage]);
+  }, [searchQuery, currentPage]);
 
   useEffect(() => {
     loadData();
@@ -262,19 +260,40 @@ export default function AdminProductosPage() {
     }
   };
 
+  // Abrir Modal de Creación
+  const handleOpenCreateModal = () => {
+    setModalError(null);
+    if (!newProductCategoryId && categories.length > 0) {
+      setNewProductCategoryId(categories[0].id);
+    }
+    if (!newProductBrandId && brands.length > 0) {
+      setNewProductBrandId(brands[0].id);
+    }
+    setIsModalOpen(true);
+  };
+
   // Crear Producto
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName.trim() || (newVariants.length === 0 && newProductPrice <= 0)) {
-      setFeedback({ type: 'error', text: 'Nombre y precio válido son obligatorios.' });
+    if (!newProductName.trim()) {
+      setModalError('El nombre del producto es obligatorio.');
+      return;
+    }
+    if (newVariants.length === 0 && (!newProductPrice || newProductPrice <= 0)) {
+      setModalError('Debes ingresar un precio de venta mayor a 0.');
+      return;
+    }
+
+    const brandIdToUse = newProductBrandId || brands[0]?.id;
+    const categoryIdToUse = newProductCategoryId || categories[0]?.id;
+
+    if (!brandIdToUse || !categoryIdToUse) {
+      setModalError('Por favor selecciona una categoría y una marca válidas.');
       return;
     }
 
     setCreating(true);
-    setFeedback(null);
-
-    const brandIdToUse = newProductBrandId || (brands[0]?.id ?? '00000000-0000-0000-0000-000000000001');
-    const categoryIdToUse = newProductCategoryId || (categories[0]?.id ?? '00000000-0000-0000-0000-000000000001');
+    setModalError(null);
 
     try {
       const created = await api.createProduct({
@@ -299,22 +318,51 @@ export default function AdminProductosPage() {
           : undefined,
       });
 
+      let coverUrl: string | undefined;
+
       // Subir imagen si se adjuntó una
       if (newProductImageFile && created?.id) {
         try {
-          await api.uploadProductImage(created.id, newProductImageFile, true);
+          const uploadedImg = await api.uploadProductImage(created.id, newProductImageFile, true);
+          coverUrl = uploadedImg.url;
         } catch {
-          setFeedback({type:'error',text:'Producto creado, pero la foto no se pudo subir. Reintenta desde Fotos.'});
-          setIsModalOpen(false); resetForm(); await loadData(); return;
+          setFeedback({ type: 'error', text: 'Producto creado, pero la foto no se pudo subir. Reintenta desde Fotos.' });
         }
       }
 
-      setFeedback({ type: 'success', text: `¡Producto "${newProductName}" creado exitosamente!` });
+      // Optimistic / Inmediato: reflejar el producto nuevo de inmediato en la tabla
+      const createdSummary: ProductSummaryDto = {
+        id: created.id,
+        sku: created.sku,
+        name: created.name,
+        slug: created.slug,
+        variants: created.variants,
+        brandName: created.brand?.name || brands.find((b) => b.id === brandIdToUse)?.name || 'Alexa Beauty',
+        categoryName: created.category?.name || categories.find((c) => c.id === categoryIdToUse)?.name || 'General',
+        brand: created.brand,
+        category: created.category,
+        minPrice: created.minPrice ?? (newVariants[0]?.salePrice || newProductPrice || 0),
+        maxPrice: created.maxPrice ?? (newVariants[0]?.salePrice || newProductPrice || 0),
+        totalAvailableStock: created.totalAvailableStock,
+        coverImageUrl: coverUrl || created.images?.find((img) => img.isCover)?.url || created.images?.[0]?.url,
+        featured: created.featured,
+        active: created.active,
+      };
+
+      setProducts((prev) => [createdSummary, ...prev.filter((p) => p.id !== created.id)]);
+      setTotalElements((prev) => prev + 1);
+      setCurrentPage(0);
+      setSelectedCategory('TODAS');
+      setStatusFilter('ALL');
+      setSearchQuery('');
       setIsModalOpen(false);
       resetForm();
-      await loadData();
+      setFeedback({ type: 'success', text: `¡Producto "${created.name}" creado y agregado a la lista exitosamente!` });
+
+      // Sincronizar en segundo plano con el servidor en la primera página
+      void loadData(0);
     } catch (error) {
-      setFeedback({ type: 'error', text: error instanceof Error ? error.message : 'No se pudo crear el producto.' });
+      setModalError(error instanceof Error ? error.message : 'No se pudo crear el producto.');
     } finally {
       setCreating(false);
     }
@@ -331,15 +379,20 @@ export default function AdminProductosPage() {
     setNewProductDescription('');
     setNewProductImageFile(null);
     setNewProductImagePreview(null);
+    setModalError(null);
+    if (categories.length > 0) setNewProductCategoryId(categories[0].id);
+    if (brands.length > 0) setNewProductBrandId(brands[0].id);
   };
 
   const filteredProducts = products.filter((p) => {
+    const brandName = p.brand?.name || p.brandName || '';
+    const categoryName = p.category?.name || p.categoryName || '';
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.brandName && p.brandName.toLowerCase().includes(searchQuery.toLowerCase()));
+      brandName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory =
-      selectedCategory === 'TODAS' || p.categoryName === selectedCategory;
+      selectedCategory === 'TODAS' || categoryName.toLowerCase() === selectedCategory.toLowerCase();
     const matchesStatus =
       statusFilter === 'ALL' ||
       (statusFilter === 'ACTIVE' && p.active) ||
@@ -356,7 +409,7 @@ export default function AdminProductosPage() {
         <>
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-glow transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
@@ -480,7 +533,7 @@ export default function AdminProductosPage() {
             ))}
             <button
               type="button"
-              onClick={loadData}
+              onClick={() => void loadData()}
               title="Recargar catálogo"
               className="p-1.5 text-muted hover:text-wine rounded-lg bg-cream hover:bg-blush transition ml-1"
             >
@@ -532,7 +585,7 @@ export default function AdminProductosPage() {
                             {p.name}
                           </span>
                           <span className="text-[11px] text-muted">
-                            {p.brandName || 'Alexa Beauty'}
+                            {p.brand?.name || p.brandName || 'Alexa Beauty'}
                           </span>
                         </div>
                       </div>
@@ -541,7 +594,7 @@ export default function AdminProductosPage() {
                       {p.sku}
                     </td>
                     <td className="py-3.5 px-3.5 hidden sm:table-cell text-muted font-medium">
-                      {p.categoryName || 'General'}
+                      {p.category?.name || p.categoryName || 'General'}
                     </td>
                     <td className="py-3.5 px-3.5 font-bold text-ink">
                       {formatCOP(p.minPrice)}
@@ -930,16 +983,70 @@ export default function AdminProductosPage() {
             </div>
 
             <form onSubmit={handleCreateProduct} className="space-y-4 text-xs sm:text-sm">
+              {modalError && (
+                <div
+                  role="alert"
+                  className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2.5"
+                >
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="font-bold text-ink block mb-1">Nombre del producto *</label>
                 <input aria-label="Nombre del producto"
                   type="text"
                   required
                   value={newProductName}
-                  onChange={(e) => setNewProductName(e.target.value)}
+                  onChange={(e) => {
+                    setNewProductName(e.target.value);
+                    if (modalError) setModalError(null);
+                  }}
                   placeholder="Ej. Labial Matte Velvet Red"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 focus:ring-2 focus:ring-wine/20 focus:outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-ink block mb-1">Categoría *</label>
+                  <select
+                    value={newProductCategoryId}
+                    onChange={(e) => {
+                      setNewProductCategoryId(e.target.value);
+                      if (modalError) setModalError(null);
+                    }}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 focus:ring-2 focus:ring-wine/20 focus:outline-none"
+                  >
+                    <option value="" disabled>Selecciona categoría</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-ink block mb-1">Marca *</label>
+                  <select
+                    value={newProductBrandId}
+                    onChange={(e) => {
+                      setNewProductBrandId(e.target.value);
+                      if (modalError) setModalError(null);
+                    }}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 focus:ring-2 focus:ring-wine/20 focus:outline-none"
+                  >
+                    <option value="" disabled>Selecciona marca</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -959,9 +1066,12 @@ export default function AdminProductosPage() {
                     type="number"
                     required={newVariants.length === 0}
                     min={0}
-                    step={1000}
+                    step="any"
                     value={newProductPrice || ''}
-                    onChange={(e) => setNewProductPrice(Number(e.target.value))}
+                    onChange={(e) => {
+                      setNewProductPrice(Number(e.target.value));
+                      if (modalError) setModalError(null);
+                    }}
                     placeholder="25000"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 focus:ring-2 focus:ring-wine/20 focus:outline-none"
                   />

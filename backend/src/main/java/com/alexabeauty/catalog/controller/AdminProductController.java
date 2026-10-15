@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -67,7 +68,7 @@ public class AdminProductController {
     @Operation(summary = "Listar productos para administración", description = "Retorna productos paginados para el panel de administración")
     public ResponseEntity<ApiResponse<PagedResponse<ProductSummaryResponse>>> listProducts(
             @RequestParam(required = false) String query,
-            @PageableDefault(size = 20) Pageable pageable
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Page<ProductSummaryResponse> page = catalogService.listAdminProducts(query, pageable);
         return ResponseEntity.ok(ApiResponse.ok("Listado de productos obtenido exitosamente", PagedResponse.from(page)));
