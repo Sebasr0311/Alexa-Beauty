@@ -12,6 +12,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+
 @Component
 @ConditionalOnProperty(name = "app.storage.provider", havingValue = "supabase")
 public class SupabaseStorageGateway implements StorageGateway {
@@ -34,6 +37,45 @@ public class SupabaseStorageGateway implements StorageGateway {
         this.restClient = RestClient.builder().build();
     }
 
+    @PostConstruct
+    public void init() {
+        if (supabaseUrl != null && !supabaseUrl.isBlank() && serviceRoleKey != null && !serviceRoleKey.isBlank()) {
+            ensureBucketExists();
+        }
+    }
+
+    public boolean ensureBucketExists() {
+        try {
+            String baseUrl = cleanBaseUrl(this.supabaseUrl);
+            String endpoint = String.format("%s/storage/v1/bucket", baseUrl);
+            restClient.post()
+                    .uri(endpoint)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceRoleKey)
+                    .header("apikey", serviceRoleKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"id\":\"" + bucket + "\",\"name\":\"" + bucket + "\",\"public\":true}")
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully ensured public Supabase storage bucket: '{}'", bucket);
+            return true;
+        } catch (Exception e) {
+            log.info("Supabase storage bucket '{}' verification: {}", bucket, e.getMessage());
+            return false;
+        }
+    }
+
+    private void executeUpload(byte[] content, String endpoint, String contentType) {
+        restClient.post()
+                .uri(endpoint)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceRoleKey)
+                .header("apikey", serviceRoleKey)
+                .header("x-upsert", "true")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(content)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     @Override
     public String upload(byte[] content, String path, String contentType) {
         String cleanPath = sanitizePath(path);
@@ -41,19 +83,22 @@ public class SupabaseStorageGateway implements StorageGateway {
         String endpoint = String.format("%s/storage/v1/object/%s/%s", baseUrl, bucket, cleanPath);
 
         try {
-            restClient.post()
-                    .uri(endpoint)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceRoleKey)
-                    .header("apikey", serviceRoleKey)
-                    .header("x-upsert", "true")
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .body(content)
-                    .retrieve()
-                    .toBodilessEntity();
-
+            executeUpload(content, endpoint, contentType);
             log.info("Uploaded object to Supabase storage: {}/{}", bucket, cleanPath);
             return cleanPath;
         } catch (Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("NoSuchBucket")) {
+                log.warn("Bucket '{}' not found in Supabase. Attempting automatic provisioning...", bucket);
+                if (ensureBucketExists()) {
+                    try {
+                        executeUpload(content, endpoint, contentType);
+                        log.info("Uploaded object to Supabase storage after bucket provisioning: {}/{}", bucket, cleanPath);
+                        return cleanPath;
+                    } catch (Exception retryEx) {
+                        log.error("Retry upload to Supabase storage failed: {}", retryEx.getMessage(), retryEx);
+                    }
+                }
+            }
             log.error("Failed to upload object to Supabase storage at {}: {}", endpoint, e.getMessage(), e);
             throw new ApiException(
                     HttpStatus.INTERNAL_SERVER_ERROR,

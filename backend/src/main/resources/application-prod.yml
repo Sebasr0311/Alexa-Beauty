@@ -39,7 +39,7 @@ app:
     supabase:
       url: ${SUPABASE_URL}
       service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
-      bucket-public: ${SUPABASE_STORAGE_BUCKET}
+      bucket-public: ${SUPABASE_STORAGE_BUCKET:products}
 springdoc:
   api-docs:
     enabled: false
