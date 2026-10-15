@@ -23,4 +23,4 @@ VALUES
 
 INSERT INTO users (id, email, password_hash, role, full_name, active, last_login_at, created_at, updated_at)
 VALUES
-    ('00000000-0000-0000-0000-000000000099', 'admin@alexabeauty.com', '$2a$12$7kS8rWw85K.lU9u06Jc83u/1i45eX02Y4t9Cg43X3rGZ7P75HqfWW', 'ADMIN', 'Administrador Alexa Beauty', TRUE, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('00000000-0000-0000-0000-000000000099', 'admin@alexabeauty.com', '$2a$10$ryX8TURHQpu5yWT5NezzUOGl40NYfL0TOyhxzTtoDD.dKlIfJ8MaC', 'ADMIN', 'Administrador Alexa Beauty', TRUE, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
