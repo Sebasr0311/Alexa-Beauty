@@ -41,6 +41,7 @@ public class VariantManagementService {
     }
     public ProductVariantResponse add(UUID productId, ProductVariantRequest request, UserPrincipal principal) {
         var product=lock(productId);
+        VariantRules.validateCommercialIdentity(request);
         duplicate(productId,null,VariantRules.key(request));
         String sku=VariantRules.sku(request.sku());
         if (variants.existsBySku(sku) || products.existsBySku(sku)) throw new ConflictException("El SKU ya existe: "+sku);
@@ -61,6 +62,12 @@ public class VariantManagementService {
         var variant=owned(productId,variantId);
         if (request.stockOnHand()!=null) throw new ValidationException("stockOnHand: utilice el módulo de inventario para modificar existencias.");
         if (request.sku()!=null && !request.sku().equals(variant.getSku())) throw new ValidationException("El SKU existente no se modifica.");
+        if (request.shadeCode() != null || request.shadeName() != null || request.presentation() != null) {
+            String nextCode = request.shadeCode() != null ? request.shadeCode() : variant.getShadeCode();
+            String nextName = request.shadeName() != null ? request.shadeName() : variant.getShadeName();
+            String nextPres = request.presentation() != null ? request.presentation() : variant.getPresentation();
+            VariantRules.validateCommercialIdentity(nextCode, nextName, nextPres);
+        }
         if (!VariantRules.key(variant).equals(VariantRules.key(request))) duplicate(productId,variantId,VariantRules.key(request));
         VariantRules.metadata(variant,request);
         if (request.salePrice()==null) throw new ValidationException("El precio es obligatorio.");

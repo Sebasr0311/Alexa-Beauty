@@ -43,7 +43,7 @@ export function ShadeSelectorModal({product,isOpen,onClose,onSelectVariant,retur
       </div>
       {image && <img src={image.url} alt={image.altText||product.name} className="h-28 w-full object-contain" />}
       <p className="text-sm text-muted">Elige un tono o presentación antes de agregarlo.</p>
-      <ShadeSelector variants={product.variants} selectedId={selected?.id} onSelect={setSelected}/>
+      <ShadeSelector variants={product.variants} selectedId={selected?.id} onSelect={setSelected} disableExhausted={true}/>
       <div aria-live="polite" className="min-h-20 text-sm">
         {selected ? <><p className="font-bold text-wine">{formatCOP(selected.salePrice)}</p><p>{variantLabel(selected)}</p><p>{selected.availableStock>0?`${selected.availableStock} unidades disponibles`:'Agotado'}</p><p className="text-xs text-muted break-all">SKU: {selected.sku}</p></>:<p>Selecciona una opción.</p>}
       </div>

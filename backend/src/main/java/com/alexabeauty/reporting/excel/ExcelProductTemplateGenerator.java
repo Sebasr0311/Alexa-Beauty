@@ -18,19 +18,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
- * Generates the official Excel bulk product import template workbook (ALEXA_PRODUCTS_V1).
+ * Generates the official Excel bulk product import template workbook (ALEXA_PRODUCTS_V2).
+ * Supports product grouping by producto_codigo, shade variations, and atomic validation.
  * Comprises:
  *  - Sheet 1: PRODUCTOS with exact headers and wine styling (#711A38).
- *  - Sheet 2: INSTRUCCIONES detailing requirements, data types, and safety rules.
- *  - Sheet 3: EJEMPLOS_NO_IMPORTAR with 3 sample rows.
+ *  - Sheet 2: INSTRUCCIONES detailing requirements, data types, grouping rules and safety.
+ *  - Sheet 3: EJEMPLOS_NO_IMPORTAR with 4 sample rows illustrating grouping and variants.
  */
 @Component
 public class ExcelProductTemplateGenerator {
 
-    public static final String TEMPLATE_VERSION = "ALEXA_PRODUCTS_V1";
-    public static final String TEMPLATE_FILENAME = "AlexaBeauty_Plantilla_Productos_v1.xlsx";
+    public static final String TEMPLATE_VERSION = "ALEXA_PRODUCTS_V2";
+    public static final String TEMPLATE_FILENAME = "AlexaBeauty_Plantilla_Productos_v2.xlsx";
 
-    public static final String[] HEADERS = {
+    public static final String[] HEADERS_V1 = {
             "nombre",
             "marca",
             "stock_inicial",
@@ -45,11 +46,31 @@ public class ExcelProductTemplateGenerator {
             "publicado"
     };
 
+    public static final String[] HEADERS = {
+            "producto_codigo",
+            "nombre",
+            "marca",
+            "categoria",
+            "sku_variante",
+            "tono_codigo",
+            "tono_nombre",
+            "tono_hex",
+            "presentacion",
+            "precio_venta_cop",
+            "costo_unitario_cop",
+            "stock_inicial",
+            "stock_minimo",
+            "descripcion",
+            "publicado"
+    };
+
+    public static final String[] HEADERS_V2 = HEADERS;
+
     private static final byte[] WINE_RGB = new byte[]{(byte) 0x71, (byte) 0x1A, (byte) 0x38}; // #711A38
     private static final byte[] GOLD_RGB = new byte[]{(byte) 0xC9, (byte) 0xA2, (byte) 0x27}; // #C9A227
 
     /**
-     * Generates the XLSX template as a byte array.
+     * Generates the XLSX V2 template as a byte array.
      */
     public byte[] generateTemplate() {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
@@ -84,8 +105,8 @@ public class ExcelProductTemplateGenerator {
         sheet.createFreezePane(0, 1);
         sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, HEADERS.length - 1));
 
-        int[] widths = {7000, 5000, 4000, 5000, 5000, 5000, 4500, 4500, 5000, 4000, 9000, 3500};
-        for (int i = 0; i < widths.length; i++) {
+        int[] widths = {5500, 7000, 5000, 5000, 5000, 4000, 5000, 3500, 4000, 5000, 5000, 4000, 4000, 8000, 3500};
+        for (int i = 0; i < widths.length && i < HEADERS.length; i++) {
             sheet.setColumnWidth(i, widths[i]);
         }
     }
@@ -96,55 +117,42 @@ public class ExcelProductTemplateGenerator {
         Row titleRow = sheet.createRow(0);
         titleRow.setHeightInPoints(24);
         Cell titleCell = titleRow.createCell(0);
-        titleCell.setCellValue("ALEXA BEAUTY - GUÍA DE IMPORTACIÓN MASIVA DE PRODUCTOS");
+        titleCell.setCellValue("ALEXA BEAUTY - GUÍA DE IMPORTACIÓN MASIVA DE PRODUCTOS (V2 AGRUPADA)");
 
-        Row versionRow = sheet.createRow(1);
-        versionRow.createCell(0).setCellValue("Versión de Plantilla: " + TEMPLATE_VERSION);
-
-        Row emptyRow = sheet.createRow(2);
-
-        Row guideHeaderRow = sheet.createRow(3);
-        guideHeaderRow.setHeightInPoints(24);
-        String[] guideHeaders = {"Columna", "Obligatorio", "Tipo de Dato", "Descripción y Reglas de Validación"};
-        for (int i = 0; i < guideHeaders.length; i++) {
-            Cell cell = guideHeaderRow.createCell(i);
-            cell.setCellValue(guideHeaders[i]);
-            cell.setCellStyle(headerStyle);
-        }
-
-        String[][] columnRules = {
-                {"nombre", "SÍ", "Texto (2 - 150)", "Nombre del producto. Obligatorio. Debe ser único o representativo."},
-                {"marca", "SÍ", "Texto (2 - 100)", "Marca del producto. Si no existe en el sistema, será creada automáticamente."},
-                {"stock_inicial", "SÍ", "Entero (>= 0)", "Stock físico disponible. Genera un movimiento de Kárdex tipo ENTRADA_INICIAL si es > 0."},
-                {"precio_venta_cop", "SÍ", "Numérico (>= 0)", "Precio de venta en COP. No puede ser negativo."},
-                {"sku", "NO", "Texto (<= 50)", "Código único del producto/variante. Si está vacío, se generará automáticamente (AB-MARCA-XXXX)."},
-                {"categoria", "NO", "Texto (<= 100)", "Categoría del producto. Si no existe, se creará automáticamente. Por defecto 'General'."},
-                {"tono", "NO", "Texto (<= 100)", "Nombre del tono o variante de color (ej. 'Tono 120', 'Rojo Pasión'). Por defecto 'Default'."},
-                {"presentacion", "NO", "Texto (<= 100)", "Tamaño o presentación física (ej. '30ml', '50g', 'Unidad')."},
-                {"costo_unitario_cop", "NO", "Numérico (>= 0)", "Costo de referencia de adquisición por unidad en COP."},
-                {"stock_minimo", "NO", "Entero (>= 0)", "Umbral mínimo para generar alertas de inventario bajo. Por defecto es 3."},
-                {"descripcion", "NO", "Texto", "Descripción detallada del producto para la tienda virtual."},
-                {"publicado", "NO", "SI / NO", "Indica si el producto estará visible inmediatamente en el catálogo. Por defecto es SI."}
+        String[][] instructions = {
+                {"producto_codigo", "OBLIGATORIO en V2. Código que agrupa variantes bajo el mismo producto (ej. BASE-FITME). Filas con el mismo código formarán un único producto con múltiples tonos."},
+                {"nombre", "Obligatorio (2–150 caracteres). Nombre comercial del producto."},
+                {"marca", "Obligatorio (2–100 caracteres). Si la marca no existe, se creará automáticamente."},
+                {"categoria", "Opcional. Categoría principal (ej. Rostro, Labios, Ojos). Por defecto: 'General'."},
+                {"sku_variante", "Opcional. Código SKU único de la variante o tono (máx. 50 caracteres). Si se deja vacío, el sistema generará uno automáticamente."},
+                {"tono_codigo", "Opcional si tiene nombre o presentación. Código de tono comercial (ej. 110, 115, 01)."},
+                {"tono_nombre", "Opcional si tiene código o presentación. Nombre descriptivo del tono (ej. Classic Ivory, Rojo Pasión)."},
+                {"tono_hex", "Opcional. Color hexadecimal para el swatch visual (ej. #E5B899). Debe iniciar con # seguido de 6 dígitos hexadecimales."},
+                {"presentacion", "Opcional si tiene código o nombre de tono. Contenido o presentación (ej. 30ml, 5g)."},
+                {"precio_venta_cop", "Obligatorio. Número decimal mayor o igual a 0. Precio de venta en pesos colombianos."},
+                {"costo_unitario_cop", "Opcional. Costo de referencia para control administrativo y márgenes."},
+                {"stock_inicial", "Obligatorio. Número entero mayor o igual a 0. Cantidad física inicial en mano. Se registrará un movimiento ENTRADA_INICIAL en Kardex."},
+                {"stock_minimo", "Opcional. Entero mayor a 0 para alerta de bajo stock. Por defecto: 3."},
+                {"descripcion", "Opcional. Texto libre para la ficha del producto."},
+                {"publicado", "Opcional (SI / NO). Si el producto estará activo en el catálogo público inmediatamente. Por defecto: SI."}
         };
 
-        for (int i = 0; i < columnRules.length; i++) {
-            Row row = sheet.createRow(4 + i);
-            row.setHeightInPoints(20);
-            for (int j = 0; j < columnRules[i].length; j++) {
-                row.createCell(j).setCellValue(columnRules[i][j]);
-            }
+        Row headerRow = sheet.createRow(2);
+        Cell h1 = headerRow.createCell(0);
+        h1.setCellValue("Columna");
+        h1.setCellStyle(headerStyle);
+        Cell h2 = headerRow.createCell(1);
+        h2.setCellValue("Reglas y Descripción");
+        h2.setCellStyle(headerStyle);
+
+        for (int i = 0; i < instructions.length; i++) {
+            Row row = sheet.createRow(3 + i);
+            row.createCell(0).setCellValue(instructions[i][0]);
+            row.createCell(1).setCellValue(instructions[i][1]);
         }
 
-        int noteStart = 4 + columnRules.length + 1;
-        Row note1 = sheet.createRow(noteStart);
-        note1.createCell(0).setCellValue("SEGURIDAD: Prohibido ingresar fórmulas de Excel (=, +, -, @). Cualquier celda con fórmulas será neutralizada.");
-        Row note2 = sheet.createRow(noteStart + 1);
-        note2.createCell(0).setCellValue("IMPORTANTE: Diligencie únicamente la hoja 'PRODUCTOS' a partir de la fila 2. No renombre ni elimine columnas.");
-
-        sheet.setColumnWidth(0, 5000);
-        sheet.setColumnWidth(1, 3500);
-        sheet.setColumnWidth(2, 5000);
-        sheet.setColumnWidth(3, 16000);
+        sheet.setColumnWidth(0, 6000);
+        sheet.setColumnWidth(1, 24000);
     }
 
     private void createEjemplosSheet(XSSFWorkbook workbook, XSSFCellStyle headerStyle) {
@@ -159,9 +167,10 @@ public class ExcelProductTemplateGenerator {
         }
 
         Object[][] sampleData = {
-                {"Labial Líquido Mate Larga Duración", "Vogue", 12, 18000, "VOG-LIP-MATE-01", "Labios", "Rojo Pasión", "5ml", 9500, 3, "Labial líquido mate de alta fijación indeleble", "SI"},
-                {"Base Líquida HD Acabado Natural", "Maybelline", 8, 48000, "MAY-BAS-HD-120", "Rostro", "Tono 120 Canela", "30ml", 26000, 2, "Base líquida mate con cobertura uniforme y textura ligera", "SI"},
-                {"Serum Hidratante con Ácido Hialurónico", "L'Oréal", 5, 62000, "", "Cuidado Facial", "Original", "30ml", 35000, 3, "Tratamiento facial intensivo para hidratación profunda", "NO"}
+                {"BASE-FITME", "Base Líquida Fit Me Matte", "Maybelline", "Rostro", "MAY-FIT-110", "110", "Porcelain", "#E5B899", "30ml", 48000, 26000, 15, 3, "Base líquida mate con cobertura uniforme", "SI"},
+                {"BASE-FITME", "Base Líquida Fit Me Matte", "Maybelline", "Rostro", "MAY-FIT-115", "115", "Ivory", "#E1AD8B", "30ml", 48000, 26000, 10, 3, "Base líquida mate con cobertura uniforme", "SI"},
+                {"BASE-FITME", "Base Líquida Fit Me Matte", "Maybelline", "Rostro", "MAY-FIT-120", "120", "Classic Ivory", "#DC9F78", "30ml", 48000, 26000, 8, 3, "Base líquida mate con cobertura uniforme", "SI"},
+                {"SERUM-HIAL", "Serum Hidratante Ácido Hialurónico", "L'Oréal", "Cuidado Facial", "LOR-SER-30ML", "", "Original", "", "30ml", 62000, 35000, 5, 3, "Tratamiento facial intensivo para hidratación profunda", "SI"}
         };
 
         for (int i = 0; i < sampleData.length; i++) {

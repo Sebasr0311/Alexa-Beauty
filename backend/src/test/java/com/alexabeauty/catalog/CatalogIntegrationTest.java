@@ -505,6 +505,158 @@ class CatalogIntegrationTest {
                 .andExpect(jsonPath("$.data.totalStockOnHand").value(10));
     }
 
+    @Test
+    @DisplayName("AB-AUD-04: Public catalog searches by shadeCode, shadeName, variant SKU and brand without duplicating products")
+    void searchByShadeCodeNameVariantSkuAndBrandWithoutDuplication() throws Exception {
+        String baseSku = "SKU-SEARCH-" + UUID.randomUUID().toString().substring(0, 8);
+        String uniqueShadeCode = "SHD-" + UUID.randomUUID().toString().substring(0, 4);
+        String uniqueShadeName = "Classic Ivory " + UUID.randomUUID().toString().substring(0, 4);
+        String uniqueVariantSku = baseSku + "-V10";
+
+        ProductVariantRequest v1 = new ProductVariantRequest(
+                uniqueVariantSku,
+                uniqueShadeName,
+                "30ml",
+                new BigDecimal("45000.00"),
+                new BigDecimal("20000.00"),
+                3,
+                15,
+                true,
+                uniqueShadeCode,
+                "#E5B899"
+        );
+        ProductVariantRequest v2 = new ProductVariantRequest(
+                baseSku + "-V20",
+                "Warm Beige",
+                "30ml",
+                new BigDecimal("45000.00"),
+                new BigDecimal("20000.00"),
+                3,
+                10,
+                true,
+                "SHD-WB",
+                "#C68B59"
+        );
+
+        CreateProductRequest createReq = new CreateProductRequest(
+                "Base Fit Me Search " + baseSku,
+                defaultBrand.getId(),
+                defaultCategory.getId(),
+                "Base fluida mate",
+                baseSku,
+                new BigDecimal("45000.00"),
+                25,
+                3,
+                List.of(v1, v2),
+                false,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/admin/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated());
+
+        // A. Search by shade code -> exactly 1 product returned (not duplicated despite 2 variants)
+        mockMvc.perform(get("/api/v1/catalog/products")
+                        .param("query", uniqueShadeCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].sku").value(baseSku));
+
+        // B. Search by shade name -> exactly 1 product returned
+        mockMvc.perform(get("/api/v1/catalog/products")
+                        .param("query", uniqueShadeName))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].sku").value(baseSku));
+
+        // C. Search by variant SKU -> exactly 1 product returned
+        mockMvc.perform(get("/api/v1/catalog/products")
+                        .param("query", uniqueVariantSku))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].sku").value(baseSku));
+
+        // D. Search by brand name
+        mockMvc.perform(get("/api/v1/catalog/products")
+                        .param("query", defaultBrand.getName()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    @DisplayName("AB-AUD-05: Creating additional variant without commercial identity is rejected with 400 ValidationException")
+    void additionalVariantRequiresCommercialIdentity() throws Exception {
+        String baseSku = "SKU-NOID-" + UUID.randomUUID().toString().substring(0, 8);
+
+        // 1. Create product with empty code, name, and presentation in variants list -> rejected
+        ProductVariantRequest emptyVariant = new ProductVariantRequest(
+                baseSku + "-V1",
+                null,
+                null,
+                new BigDecimal("30000.00"),
+                new BigDecimal("10000.00"),
+                3,
+                5,
+                true,
+                null,
+                null
+        );
+
+        CreateProductRequest createReq = new CreateProductRequest(
+                "Producto Invalido " + baseSku,
+                defaultBrand.getId(),
+                defaultCategory.getId(),
+                "Descripcion",
+                baseSku,
+                new BigDecimal("30000.00"),
+                5,
+                3,
+                List.of(emptyVariant),
+                false,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/admin/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isBadRequest());
+
+        // 2. Create simple product (default variant) -> succeeds
+        CreateProductRequest simpleReq = new CreateProductRequest(
+                "Producto Simple " + baseSku,
+                defaultBrand.getId(),
+                defaultCategory.getId(),
+                "Descripcion",
+                baseSku,
+                new BigDecimal("30000.00"),
+                5,
+                3,
+                null,
+                false,
+                true
+        );
+
+        MvcResult createOk = mockMvc.perform(post("/api/v1/admin/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(simpleReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        UUID productId = UUID.fromString(objectMapper.readTree(createOk.getResponse().getContentAsString()).path("data").path("id").asText());
+
+        // 3. Adding an additional variant with no shadeCode, no shadeName, and no presentation -> rejected with 400
+        mockMvc.perform(post("/api/v1/admin/products/{productId}/variants", productId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(emptyVariant)))
+                .andExpect(status().isBadRequest());
+    }
+
     private byte[] validPng() throws java.io.IOException {
         var bytes = new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", bytes);

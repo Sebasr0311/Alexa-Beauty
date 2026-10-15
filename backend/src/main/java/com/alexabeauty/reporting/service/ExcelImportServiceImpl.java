@@ -22,6 +22,8 @@ import com.alexabeauty.reporting.domain.ExcelImportJob;
 import com.alexabeauty.reporting.domain.ImportJobStatus;
 import com.alexabeauty.reporting.dto.ConflictPolicy;
 import com.alexabeauty.reporting.dto.ExcelCommitResponse;
+import com.alexabeauty.reporting.dto.ExcelGroupedProductPreviewDto;
+import com.alexabeauty.reporting.dto.ExcelGroupedVariantPreviewDto;
 import com.alexabeauty.reporting.dto.ExcelImportPreviewItemDto;
 import com.alexabeauty.reporting.dto.ExcelImportPreviewResponse;
 import com.alexabeauty.reporting.dto.ExcelRowErrorResponse;
@@ -62,6 +64,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -151,6 +154,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         List<ExcelImportError> allErrors = new ArrayList<>();
         Set<String> fileSeenSkus = new HashSet<>();
         int duplicateSkuCount = 0;
+        boolean isV2 = false;
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(fileBytes))) {
             XSSFSheet sheet = workbook.getSheet("PRODUCTOS");
@@ -177,6 +181,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
             }
 
+            isV2 = colMap.containsKey("producto_codigo");
+
             // Verify mandatory headers
             if (!colMap.containsKey("nombre") || !colMap.containsKey("marca")
                     || !colMap.containsKey("stock_inicial") || !colMap.containsKey("precio_venta_cop")) {
@@ -192,13 +198,20 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
                 int rowNumber = r + 1; // 1-based index (row 1 is header)
 
+                String productoCodigoRaw = getCellString(row, colMap.get("producto_codigo"));
                 String nombreRaw = getCellString(row, colMap.get("nombre"));
                 String marcaRaw = getCellString(row, colMap.get("marca"));
                 String stockInicialRaw = getCellString(row, colMap.get("stock_inicial"));
                 String precioVentaRaw = getCellString(row, colMap.get("precio_venta_cop"));
-                String skuRaw = getCellString(row, colMap.get("sku"));
+                Integer skuCol = colMap.get("sku_variante") != null ? colMap.get("sku_variante") : colMap.get("sku");
+                String skuRaw = getCellString(row, skuCol);
                 String categoriaRaw = getCellString(row, colMap.get("categoria"));
-                String tonoRaw = getCellString(row, colMap.get("tono"));
+                String tonoCodigoRaw = getCellString(row, colMap.get("tono_codigo"));
+                String tonoNombreRaw = getCellString(row, colMap.get("tono_nombre"));
+                if (tonoNombreRaw == null && colMap.containsKey("tono")) {
+                    tonoNombreRaw = getCellString(row, colMap.get("tono"));
+                }
+                String tonoHexRaw = getCellString(row, colMap.get("tono_hex"));
                 String presentacionRaw = getCellString(row, colMap.get("presentacion"));
                 String costoUnitarioRaw = getCellString(row, colMap.get("costo_unitario_cop"));
                 String stockMinimoRaw = getCellString(row, colMap.get("stock_minimo"));
@@ -206,6 +219,32 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 String publicadoRaw = getCellString(row, colMap.get("publicado"));
 
                 List<RowErrorInternal> rowErrors = new ArrayList<>();
+
+                // Validation: producto_codigo (mandatory if V2)
+                String productCode = null;
+                if (isV2) {
+                    if (productoCodigoRaw == null || productoCodigoRaw.isBlank()) {
+                        rowErrors.add(new RowErrorInternal("producto_codigo", productoCodigoRaw, "El código de producto es obligatorio en la plantilla V2", "Ingrese un código para agrupar las variantes del producto"));
+                    } else {
+                        String cleanCode = productoCodigoRaw.trim();
+                        if (cleanCode.length() < 2 || cleanCode.length() > 50) {
+                            rowErrors.add(new RowErrorInternal("producto_codigo", productoCodigoRaw, "El código de producto debe tener entre 2 y 50 caracteres", "Ajuste la longitud del código"));
+                        } else {
+                            productCode = ExcelSanitizer.sanitize(cleanCode.toUpperCase(Locale.ROOT));
+                        }
+                    }
+                }
+
+                // Validation: tono_hex
+                String shadeHex = null;
+                if (tonoHexRaw != null && !tonoHexRaw.isBlank()) {
+                    String cleanHex = tonoHexRaw.trim().toUpperCase(Locale.ROOT);
+                    if (!cleanHex.matches("^#[0-9A-F]{6}$")) {
+                        rowErrors.add(new RowErrorInternal("tono_hex", tonoHexRaw, "El formato de color debe ser #RRGGBB (ej. #E5B899)", "Ingrese un código HEX válido"));
+                    } else {
+                        shadeHex = cleanHex;
+                    }
+                }
 
                 // Validation: nombre (mandatory, 2–150 chars)
                 String nombre = null;
@@ -324,7 +363,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
 
                 String categoria = categoriaRaw != null && !categoriaRaw.isBlank() ? ExcelSanitizer.sanitize(categoriaRaw.trim()) : null;
-                String tono = tonoRaw != null && !tonoRaw.isBlank() ? ExcelSanitizer.sanitize(tonoRaw.trim()) : null;
+                String shadeCode = tonoCodigoRaw != null && !tonoCodigoRaw.isBlank() ? ExcelSanitizer.sanitize(tonoCodigoRaw.trim()) : null;
+                String shadeName = tonoNombreRaw != null && !tonoNombreRaw.isBlank() ? ExcelSanitizer.sanitize(tonoNombreRaw.trim()) : null;
+                String tono = shadeName != null ? shadeName : (shadeCode != null ? shadeCode : null);
                 String presentacion = presentacionRaw != null && !presentacionRaw.isBlank() ? ExcelSanitizer.sanitize(presentacionRaw.trim()) : null;
                 String descripcion = descripcionRaw != null && !descripcionRaw.isBlank() ? ExcelSanitizer.sanitize(descripcionRaw.trim()) : null;
 
@@ -337,12 +378,16 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                             precioVenta,
                             sku,
                             categoria,
-                            tono,
+                            tono != null ? tono : "Default",
                             presentacion,
                             costoUnitario,
                             stockMinimo,
                             descripcion,
-                            publicado
+                            publicado,
+                            productCode,
+                            shadeCode,
+                            shadeName,
+                            shadeHex
                     ));
                 } else {
                     String errorSummary = rowErrors.stream()
@@ -357,7 +402,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                             precioVentaRaw,
                             skuRaw,
                             categoriaRaw,
-                            tonoRaw,
+                            tonoNombreRaw,
                             presentacionRaw,
                             costoUnitarioRaw,
                             stockMinimoRaw,
@@ -395,11 +440,52 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             throw new IllegalStateException("Error al serializar el diagnóstico de importación", e);
         }
 
+        // Build grouped product preview
+        Map<String, List<ExcelImportPreviewItemDto>> groupedMap = new LinkedHashMap<>();
+        for (ExcelImportPreviewItemDto item : validItems) {
+            String key = item.productCode() != null ? item.productCode() : ("ROW_" + item.rowNumber());
+            groupedMap.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+        }
+
+        List<ExcelGroupedProductPreviewDto> groupedProductDtos = new ArrayList<>();
+        for (Map.Entry<String, List<ExcelImportPreviewItemDto>> entry : groupedMap.entrySet()) {
+            List<ExcelImportPreviewItemDto> groupItems = entry.getValue();
+            ExcelImportPreviewItemDto first = groupItems.get(0);
+            int totalStock = groupItems.stream().mapToInt(ExcelImportPreviewItemDto::stockInicial).sum();
+
+            List<ExcelGroupedVariantPreviewDto> variantDtos = groupItems.stream()
+                    .map(it -> new ExcelGroupedVariantPreviewDto(
+                            it.rowNumber(),
+                            it.sku(),
+                            it.shadeCode(),
+                            it.shadeName(),
+                            it.shadeHex(),
+                            it.presentacion(),
+                            it.precioVentaCop(),
+                            it.costoUnitarioCop(),
+                            it.stockInicial(),
+                            it.stockMinimo()
+                    ))
+                    .toList();
+
+            groupedProductDtos.add(new ExcelGroupedProductPreviewDto(
+                    first.productCode(),
+                    first.nombre(),
+                    first.marca(),
+                    first.categoria(),
+                    first.descripcion(),
+                    first.publicado(),
+                    totalStock,
+                    variantDtos.size(),
+                    variantDtos
+            ));
+        }
+
         ExcelImportJob job = ExcelImportJob.builder()
                 .fileName(originalFilename)
                 .fileHash(fileHash)
                 .user(actor)
-                .templateVersion("ALEXA_PRODUCTS_V1")
+                .templateVersion(isV2 ? "ALEXA_PRODUCTS_V2" : "ALEXA_PRODUCTS_V1")
                 .totalRows(validItems.size() + rejectedRowsData.size())
                 .validRows(validItems.size())
                 .rejectedRows(rejectedRowsData.size())
@@ -435,7 +521,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 duplicateSkuCount,
                 isDuplicateFile,
                 errorDtos,
-                previewItems
+                previewItems,
+                groupedProductDtos.size(),
+                groupedProductDtos
         );
     }
 
@@ -481,19 +569,25 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         int importedCount = 0;
         int totalInitialStockAdded = 0;
 
+        // Group valid items by productCode if present, or by rowNumber if V1
+        Map<String, List<ExcelImportPreviewItemDto>> groupedMap = new LinkedHashMap<>();
         for (ExcelImportPreviewItemDto item : payload.validRows()) {
-            String itemSku = item.sku();
-            if (itemSku != null && !itemSku.isBlank()) {
-                if (effectivePolicy == ConflictPolicy.SKIP_DUPLICATES) {
-                    if (productRepository.existsBySku(itemSku) || productVariantRepository.existsBySku(itemSku) || usedSkus.contains(itemSku)) {
-                        log.warn("Skipping duplicate SKU {} under policy SKIP_DUPLICATES", itemSku);
-                        continue;
-                    }
-                }
+            String key = (item.productCode() != null && !item.productCode().isBlank())
+                    ? item.productCode().trim().toUpperCase(Locale.ROOT)
+                    : ("ROW_" + item.rowNumber());
+            groupedMap.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+        }
+
+        for (Map.Entry<String, List<ExcelImportPreviewItemDto>> entry : groupedMap.entrySet()) {
+            List<ExcelImportPreviewItemDto> groupItems = entry.getValue();
+            if (groupItems.isEmpty()) {
+                continue;
             }
 
+            ExcelImportPreviewItemDto first = groupItems.get(0);
+
             // Find or create Brand
-            String brandName = item.marca().trim();
+            String brandName = first.marca().trim();
             String brandSlug = SlugUtils.toSlug(brandName);
             Brand brand = brandCache.computeIfAbsent(brandSlug, slug ->
                     brandRepository.findBySlug(slug).orElseGet(() ->
@@ -506,7 +600,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             );
 
             // Find or create Category
-            String catName = item.categoria() != null && !item.categoria().isBlank() ? item.categoria().trim() : "General";
+            String catName = first.categoria() != null && !first.categoria().isBlank() ? first.categoria().trim() : "General";
             String catSlug = SlugUtils.toSlug(catName);
             Category category = categoryCache.computeIfAbsent(catSlug, slug ->
                     categoryRepository.findBySlug(slug).orElseGet(() ->
@@ -519,68 +613,100 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     )
             );
 
-            // Generate unique SKU if empty
-            String sku = itemSku;
-            if (sku == null || sku.isBlank()) {
-                String cleanSlug = brand.getSlug().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
-                String brandCode = cleanSlug.length() >= 3 ? cleanSlug.substring(0, 3) : (cleanSlug.isEmpty() ? "GEN" : cleanSlug);
-                do {
-                    sku = String.format("AB-%s-%s", brandCode, UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
-                } while (productRepository.existsBySku(sku) || productVariantRepository.existsBySku(sku) || usedSkus.contains(sku));
-            }
-            usedSkus.add(sku);
-
             // Generate unique product slug
-            String productSlug = SlugUtils.generateUniqueSlug(item.nombre(), s -> productRepository.existsBySlug(s) || usedSlugs.contains(s));
+            String productSlug = SlugUtils.generateUniqueSlug(first.nombre(), s -> productRepository.existsBySlug(s) || usedSlugs.contains(s));
             usedSlugs.add(productSlug);
 
-            // Create Product
+            // Determine product base SKU
+            String productSku;
+            if (first.productCode() != null && !first.productCode().isBlank()) {
+                productSku = first.productCode().trim().toUpperCase(Locale.ROOT);
+            } else if (first.sku() != null && !first.sku().isBlank()) {
+                productSku = first.sku().trim();
+            } else {
+                productSku = generateUniqueProductSku(brand, usedSkus);
+            }
+
             Product product = Product.builder()
-                    .sku(sku)
-                    .name(item.nombre().trim())
+                    .sku(productSku)
+                    .name(first.nombre().trim())
                     .slug(productSlug)
                     .brand(brand)
                     .category(category)
-                    .description(item.descripcion())
-                    .active(item.publicado())
+                    .description(first.descripcion())
+                    .active(first.publicado())
                     .featured(false)
                     .variants(new ArrayList<>())
                     .images(new ArrayList<>())
                     .build();
 
-            // Create ProductVariant
-            String shade = item.tono() != null && !item.tono().isBlank() ? item.tono().trim() : "Default";
-            ProductVariant variant = ProductVariant.builder()
-                    .product(product)
-                    .sku(sku)
-                    .shadeName(shade)
-                    .presentation(item.presentacion())
-                    .salePrice(item.precioVentaCop())
-                    .referenceCost(item.costoUnitarioCop())
-                    .stockOnHand(item.stockInicial())
-                    .stockReserved(0)
-                    .minStock(item.stockMinimo() > 0 ? item.stockMinimo() : 3)
-                    .active(item.publicado())
-                    .build();
-            product.getVariants().add(variant);
+            for (ExcelImportPreviewItemDto item : groupItems) {
+                String itemSku = item.sku();
+                if (itemSku != null && !itemSku.isBlank()) {
+                    if (effectivePolicy == ConflictPolicy.SKIP_DUPLICATES) {
+                        if (productVariantRepository.existsBySku(itemSku) || usedSkus.contains(itemSku)) {
+                            log.warn("Skipping duplicate variant SKU {} under policy SKIP_DUPLICATES", itemSku);
+                            continue;
+                        }
+                    }
+                }
+
+                String variantSku = itemSku;
+                if (variantSku == null || variantSku.isBlank()) {
+                    variantSku = generateUniqueVariantSku(brand, usedSkus);
+                }
+                usedSkus.add(variantSku);
+
+                String shadeCode = item.shadeCode() != null && !item.shadeCode().isBlank() ? item.shadeCode().trim() : null;
+                String shadeName = item.shadeName() != null && !item.shadeName().isBlank()
+                        ? item.shadeName().trim()
+                        : (item.tono() != null && !item.tono().isBlank() ? item.tono().trim() : null);
+                String shadeHex = item.shadeHex() != null && !item.shadeHex().isBlank() ? item.shadeHex().trim() : null;
+                String presentation = item.presentacion() != null && !item.presentacion().isBlank() ? item.presentacion().trim() : null;
+
+                if (groupItems.size() == 1 && shadeCode == null && shadeName == null && presentation == null) {
+                    shadeName = "Default";
+                }
+
+                ProductVariant variant = ProductVariant.builder()
+                        .product(product)
+                        .sku(variantSku)
+                        .shadeCode(shadeCode)
+                        .shadeName(shadeName)
+                        .shadeHex(shadeHex)
+                        .presentation(presentation)
+                        .salePrice(item.precioVentaCop())
+                        .referenceCost(item.costoUnitarioCop())
+                        .stockOnHand(item.stockInicial())
+                        .stockReserved(0)
+                        .minStock(item.stockMinimo() > 0 ? item.stockMinimo() : 3)
+                        .active(item.publicado())
+                        .build();
+
+                product.getVariants().add(variant);
+            }
+
+            if (product.getVariants().isEmpty()) {
+                continue;
+            }
 
             Product savedProduct = productRepository.save(product);
-            ProductVariant savedVariant = savedProduct.getVariants().get(0);
 
-            // KARDEX INITIAL MOVEMENT: If stock_inicial > 0
-            if (item.stockInicial() > 0) {
-                InventoryMovement movement = InventoryMovement.builder()
-                        .variant(savedVariant)
-                        .movementType(MovementType.ENTRADA_INICIAL)
-                        .quantityDelta(item.stockInicial())
-                        .qtyBefore(0)
-                        .qtyAfter(item.stockInicial())
-                        .reference("IMPORT_" + job.getId())
-                        .reason("Importación masiva Excel")
-                        .user(actor)
-                        .build();
-                inventoryMovementRepository.save(movement);
-                totalInitialStockAdded += item.stockInicial();
+            for (ProductVariant savedVariant : savedProduct.getVariants()) {
+                if (savedVariant.getStockOnHand() > 0) {
+                    InventoryMovement movement = InventoryMovement.builder()
+                            .variant(savedVariant)
+                            .movementType(MovementType.ENTRADA_INICIAL)
+                            .quantityDelta(savedVariant.getStockOnHand())
+                            .qtyBefore(0)
+                            .qtyAfter(savedVariant.getStockOnHand())
+                            .reference("IMPORT_" + job.getId())
+                            .reason("Importación masiva Excel")
+                            .user(actor)
+                            .build();
+                    inventoryMovementRepository.save(movement);
+                    totalInitialStockAdded += savedVariant.getStockOnHand();
+                }
             }
 
             importedCount++;
@@ -733,6 +859,26 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 algorithm not available", e);
         }
+    }
+
+    private String generateUniqueProductSku(Brand brand, Set<String> usedSkus) {
+        String cleanSlug = brand.getSlug().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        String brandCode = cleanSlug.length() >= 3 ? cleanSlug.substring(0, 3) : (cleanSlug.isEmpty() ? "GEN" : cleanSlug);
+        String sku;
+        do {
+            sku = String.format("AB-%s-%s", brandCode, UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
+        } while (productRepository.existsBySku(sku) || usedSkus.contains(sku));
+        return sku;
+    }
+
+    private String generateUniqueVariantSku(Brand brand, Set<String> usedSkus) {
+        String cleanSlug = brand.getSlug().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        String brandCode = cleanSlug.length() >= 3 ? cleanSlug.substring(0, 3) : (cleanSlug.isEmpty() ? "GEN" : cleanSlug);
+        String sku;
+        do {
+            sku = String.format("ABV-%s-%s", brandCode, UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
+        } while (productVariantRepository.existsBySku(sku) || usedSkus.contains(sku));
+        return sku;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

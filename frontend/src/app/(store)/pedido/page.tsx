@@ -95,11 +95,7 @@ export default function CheckoutPage() {
 
       clearCart();
 
-      // Seamless direct redirect to WhatsApp
-      if (response.whatsappUrl) {
-        window.open(response.whatsappUrl, '_blank');
-      }
-
+      // Navigate to confirmed screen where the user explicitly triggers WhatsApp submission
       router.push(`/pedido/confirmado/${encodeURIComponent(response.reference)}?token=${encodeURIComponent(response.trackingToken)}`);
     } catch (err: any) {
       console.error('Checkout error:', err);
@@ -208,7 +204,7 @@ export default function CheckoutPage() {
                 className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
               />
               <span className="text-[11px] text-muted block mt-1">
-                A este número enviaremos los datos de seguimiento del pedido.
+                Nos comunicaremos a este número vía WhatsApp para coordinar la entrega y el pago.
               </span>
             </div>
 

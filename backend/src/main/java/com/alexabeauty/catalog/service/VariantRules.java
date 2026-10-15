@@ -29,6 +29,15 @@ public final class VariantRules {
     }
     public static String key(ProductVariant v) { return key(v.getShadeCode(), v.getShadeName(), v.getPresentation()); }
     public static String key(ProductVariantRequest r) { return key(r.shadeCode(), r.shadeName(), r.presentation()); }
+    public static void validateCommercialIdentity(String code, String name, String presentation) {
+        if (clean(code) == null && clean(name) == null && clean(presentation) == null) {
+            throw new ValidationException("Cada variante debe especificar al menos un identificador comercial: código de tono, nombre de tono o presentación.");
+        }
+    }
+    public static void validateCommercialIdentity(ProductVariantRequest request) {
+        if (request == null) throw new ValidationException("Los datos de la variante son obligatorios.");
+        validateCommercialIdentity(request.shadeCode(), request.shadeName(), request.presentation());
+    }
     public static void metadata(ProductVariant variant, ProductVariantRequest request) {
         String hex = clean(request.shadeHex());
         if (hex != null && !hex.matches("#[0-9a-fA-F]{6}")) throw new ValidationException("El color debe tener formato #RRGGBB.");

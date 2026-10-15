@@ -185,7 +185,7 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
             className="flex-1 py-4 px-6 rounded-full bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all active:scale-98"
           >
             <MessageCircle className="w-5 h-5 fill-current" />
-            Continuar pedido en WhatsApp ↗
+            Enviar pedido por WhatsApp ↗
           </a> : <p role="alert">El contacto de WhatsApp no está configurado. Copia el mensaje y contacta a la tienda.</p>}
 
           {/* Secondary Clipboard Fallback Button (P24 Matrix) */}

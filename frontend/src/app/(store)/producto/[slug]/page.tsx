@@ -182,7 +182,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
           }} />
           <div aria-live="polite" className="min-h-16 text-sm break-words">
             {selectedVariant && <><p>Tono seleccionado: {variantLabel(selectedVariant)}</p>
-              <p>{currentStock > 0 ? `${currentStock} unidades disponibles` : 'Agotado'}</p></>}
+              <p className={currentStock > 0 ? 'text-emerald-700 font-medium' : 'text-rose-700 font-semibold'}>{currentStock > 0 ? `${currentStock} unidades disponibles` : 'Agotado (no disponible para compra)'}</p></>}
             {!selectedVariant && <p>No hay variantes disponibles.</p>}
           </div>
 

@@ -390,16 +390,174 @@ class ExcelImportIntegrationTest {
         assertThat(product.getDescription()).startsWith("'");
     }
 
+    @Test
+    @DisplayName("AB-AUD-02: Import V2 Excel with 1 product and 4 shades -> creates 1 product, 4 variants, and 4 ENTRADA_INICIAL Kardex movements")
+    void v2_importOneProductWithFourShades_createsOneProductFourVariantsAndFourMovements() throws Exception {
+        String batchSuffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase(java.util.Locale.ROOT);
+        String productCode = "PRD-V2-" + batchSuffix;
+
+        List<List<Object>> rows = List.of(
+                List.of(productCode, "Base Liquida Fit Me " + batchSuffix, "Maybelline", "Rostro", "SKU-V2-" + batchSuffix + "-110", "110", "Porcelain", "#F5E0D0", "30ml", 45000, 22000, 10, 3, "Base acabado mate", "SI"),
+                List.of(productCode, "Base Liquida Fit Me " + batchSuffix, "Maybelline", "Rostro", "SKU-V2-" + batchSuffix + "-120", "120", "Classic Ivory", "#ECCBB0", "30ml", 45000, 22000, 15, 3, "Base acabado mate", "SI"),
+                List.of(productCode, "Base Liquida Fit Me " + batchSuffix, "Maybelline", "Rostro", "SKU-V2-" + batchSuffix + "-220", "220", "Natural Beige", "#DFB28A", "30ml", 45000, 22000, 8, 3, "Base acabado mate", "SI"),
+                List.of(productCode, "Base Liquida Fit Me " + batchSuffix, "Maybelline", "Rostro", "SKU-V2-" + batchSuffix + "-310", "310", "Sun Beige", "#C69065", "30ml", 45000, 22000, 12, 3, "Base acabado mate", "SI")
+        );
+
+        byte[] excelBytes = createTestWorkbookV2(rows);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "fit_me_4_tonos.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                excelBytes
+        );
+
+        // 1. Preview
+        MvcResult previewResult = mockMvc.perform(multipart("/api/v1/admin/products/imports/preview")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalRows").value(4))
+                .andExpect(jsonPath("$.data.validRows").value(4))
+                .andExpect(jsonPath("$.data.rejectedRows").value(0))
+                .andExpect(jsonPath("$.data.totalProducts").value(1))
+                .andExpect(jsonPath("$.data.groupedProducts[0].productCode").value(productCode))
+                .andExpect(jsonPath("$.data.groupedProducts[0].variantCount").value(4))
+                .andExpect(jsonPath("$.data.groupedProducts[0].totalStock").value(45))
+                .andReturn();
+
+        UUID jobId = UUID.fromString(objectMapper.readTree(previewResult.getResponse().getContentAsString())
+                .path("data").path("jobId").asText());
+
+        // 2. Commit
+        mockMvc.perform(post("/api/v1/admin/products/imports/{jobId}/commit", jobId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.importedProductsCount").value(1))
+                .andExpect(jsonPath("$.data.totalInitialStockAdded").value(45));
+
+        // 3. Database assertions
+        Product product = productRepository.findBySku(productCode).orElseThrow();
+        assertThat(product.getName()).isEqualTo("Base Liquida Fit Me " + batchSuffix);
+        List<com.alexabeauty.catalog.domain.ProductVariant> variants = productVariantRepository.findByProductId(product.getId());
+        assertThat(variants).hasSize(4);
+
+        for (int i = 0; i < 4; i++) {
+            com.alexabeauty.catalog.domain.ProductVariant variant = variants.get(i);
+            assertThat(variant.getShadeCode()).isNotBlank();
+            assertThat(variant.getShadeName()).isNotBlank();
+            assertThat(variant.getShadeHex()).startsWith("#");
+            assertThat(variant.getStockOnHand()).isGreaterThan(0);
+        }
+
+        // 4. Kardex movements: exactly 4 ENTRADA_INICIAL
+        List<InventoryMovement> movements = inventoryMovementRepository.findAll().stream()
+                .filter(m -> ("IMPORT_" + jobId).equals(m.getReference()))
+                .toList();
+        assertThat(movements).hasSize(4);
+        int totalMovementStock = movements.stream().mapToInt(InventoryMovement::getQuantityDelta).sum();
+        assertThat(totalMovementStock).isEqualTo(45);
+    }
+
+    @Test
+    @DisplayName("AB-AUD-02: V2 scale test with 500 rows processes correctly in preview")
+    void v2_scale500Rows_previewValidatesEfficiently() throws Exception {
+        String batchSuffix = UUID.randomUUID().toString().substring(0, 6);
+        List<List<Object>> rows = new ArrayList<>();
+
+        // 50 products x 10 shades each = 500 rows
+        for (int p = 1; p <= 50; p++) {
+            String pCode = "PRD-SCALE-" + batchSuffix + "-" + p;
+            for (int s = 1; s <= 10; s++) {
+                String sku = "SKU-SCALE-" + batchSuffix + "-" + p + "-" + s;
+                rows.add(List.of(
+                        pCode,
+                        "Producto Escala " + p,
+                        "MarcaEscala",
+                        "Maquillaje",
+                        sku,
+                        "T" + s,
+                        "Tono " + s,
+                        "#AABBCC",
+                        "Unidad",
+                        30000,
+                        15000,
+                        5,
+                        2,
+                        "Descripcion escala",
+                        "SI"
+                ));
+            }
+        }
+
+        byte[] excelBytes = createTestWorkbookV2(rows);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "scale_500.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                excelBytes
+        );
+
+        long start = System.currentTimeMillis();
+        MvcResult previewResult = mockMvc.perform(multipart("/api/v1/admin/products/imports/preview")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalRows").value(500))
+                .andExpect(jsonPath("$.data.validRows").value(500))
+                .andExpect(jsonPath("$.data.totalProducts").value(50))
+                .andReturn();
+        long duration = System.currentTimeMillis() - start;
+        assertThat(duration).isLessThan(15000); // Must complete within 15s
+    }
+
+    @Test
+    @DisplayName("AB-AUD-02: V2 preview rejects missing producto_codigo and invalid tono_hex")
+    void v2_invalidHexAndMissingProductCode_reportedInPreview() throws Exception {
+        List<List<Object>> rows = List.of(
+                // Missing product code
+                List.of("", "Labial Sin Codigo", "Vogue", "Labios", "SKU-BAD-1", "01", "Rojo", "#FFFFFF", "4g", 20000, 10000, 5, 2, "Desc", "SI"),
+                // Invalid hex color
+                List.of("PRD-BAD-HEX", "Labial Color Raro", "Vogue", "Labios", "SKU-BAD-2", "02", "Azul", "NO-HEX", "4g", 20000, 10000, 5, 2, "Desc", "SI")
+        );
+
+        byte[] excelBytes = createTestWorkbookV2(rows);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "invalid_v2.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                excelBytes
+        );
+
+        mockMvc.perform(multipart("/api/v1/admin/products/imports/preview")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalRows").value(2))
+                .andExpect(jsonPath("$.data.rejectedRows").value(2))
+                .andExpect(jsonPath("$.data.errors[0].columnName").value("producto_codigo"))
+                .andExpect(jsonPath("$.data.errors[1].columnName").value("tono_hex"));
+    }
+
     private byte[] createTestWorkbook(List<List<Object>> rows) throws IOException {
+        return createTestWorkbook(ExcelProductTemplateGenerator.HEADERS_V1, rows);
+    }
+
+    private byte[] createTestWorkbookV2(List<List<Object>> rows) throws IOException {
+        return createTestWorkbook(ExcelProductTemplateGenerator.HEADERS, rows);
+    }
+
+    private byte[] createTestWorkbook(String[] headers, List<List<Object>> rows) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             XSSFSheet sheet = workbook.createSheet("PRODUCTOS");
             Row headerRow = sheet.createRow(0);
 
-            for (int i = 0; i < ExcelProductTemplateGenerator.HEADERS.length; i++) {
+            for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
-                cell.setCellValue(ExcelProductTemplateGenerator.HEADERS[i]);
+                cell.setCellValue(headers[i]);
             }
 
             for (int r = 0; r < rows.size(); r++) {

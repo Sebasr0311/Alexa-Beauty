@@ -109,6 +109,7 @@ public class CatalogServiceImpl implements CatalogService {
         if (request.variants() != null && !request.variants().isEmpty()) {
             Set<String> combinationKeys = new HashSet<>();
             for (ProductVariantRequest vr : request.variants()) {
+                VariantRules.validateCommercialIdentity(vr);
                 if (!combinationKeys.add(VariantRules.key(vr))) throw new ConflictException("Tono y presentación duplicados.");
                 if (vr.salePrice() != null && vr.salePrice().compareTo(BigDecimal.ZERO) < 0) {
                     throw new ValidationException("El precio de venta de la variante no puede ser negativo");
@@ -311,7 +312,27 @@ public class CatalogServiceImpl implements CatalogService {
                 Predicate nameLike = cb.like(cb.lower(root.get("name")), pattern);
                 Predicate descLike = cb.like(cb.lower(root.get("description")), pattern);
                 Predicate skuLike = cb.like(cb.lower(root.get("sku")), pattern);
-                predicates.add(cb.or(nameLike, descLike, skuLike));
+                Predicate brandLike = cb.like(cb.lower(root.join("brand", JoinType.LEFT).get("name")), pattern);
+
+                // Subquery with EXISTS to search active variants by shadeCode, shadeName, and variant SKU
+                // This guarantees no product duplication in pagination and accurate counts
+                Subquery<UUID> variantSearchSub = cq.subquery(UUID.class);
+                Root<ProductVariant> varRoot = variantSearchSub.from(ProductVariant.class);
+                variantSearchSub.select(varRoot.get("id"));
+                variantSearchSub.where(
+                        cb.and(
+                                cb.equal(varRoot.get("product").get("id"), root.get("id")),
+                                cb.isTrue(varRoot.get("active")),
+                                cb.or(
+                                        cb.like(cb.lower(varRoot.get("shadeCode")), pattern),
+                                        cb.like(cb.lower(varRoot.get("shadeName")), pattern),
+                                        cb.like(cb.lower(varRoot.get("sku")), pattern)
+                                )
+                        )
+                );
+                Predicate variantMatches = cb.exists(variantSearchSub);
+
+                predicates.add(cb.or(nameLike, descLike, skuLike, brandLike, variantMatches));
             }
 
             // 5. Price & Stock filters via Subquery on variants
@@ -359,7 +380,23 @@ public class CatalogServiceImpl implements CatalogService {
             Predicate descLike = cb.like(cb.lower(root.get("description")), pattern);
             Predicate skuLike = cb.like(cb.lower(root.get("sku")), pattern);
             Predicate brandLike = cb.like(cb.lower(root.join("brand", JoinType.LEFT).get("name")), pattern);
-            return cb.or(nameLike, descLike, skuLike, brandLike);
+
+            Subquery<UUID> varSubquery = cq.subquery(UUID.class);
+            Root<ProductVariant> varRoot = varSubquery.from(ProductVariant.class);
+            varSubquery.select(varRoot.get("id"));
+            varSubquery.where(
+                    cb.and(
+                            cb.equal(varRoot.get("product").get("id"), root.get("id")),
+                            cb.or(
+                                    cb.like(cb.lower(varRoot.get("shadeCode")), pattern),
+                                    cb.like(cb.lower(varRoot.get("shadeName")), pattern),
+                                    cb.like(cb.lower(varRoot.get("sku")), pattern)
+                            )
+                    )
+            );
+            Predicate variantMatches = cb.exists(varSubquery);
+
+            return cb.or(nameLike, descLike, skuLike, brandLike, variantMatches);
         };
 
         return productRepository.findAll(spec, pageable).map(p -> this.toProductSummaryResponse(p, false));

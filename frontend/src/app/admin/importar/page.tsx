@@ -29,14 +29,46 @@ interface ErrorRow {
   suggestion: string;
 }
 
+interface GroupedVariant {
+  rowNumber: number;
+  sku?: string;
+  shadeCode?: string;
+  shadeName?: string;
+  shadeHex?: string;
+  presentation?: string;
+  salePrice: number;
+  referenceCost?: number;
+  initialStock: number;
+  minStock: number;
+}
+
+interface GroupedProduct {
+  productCode?: string;
+  name: string;
+  brand: string;
+  category?: string;
+  description?: string;
+  active: boolean;
+  totalStock: number;
+  variantCount: number;
+  variants: GroupedVariant[];
+}
+
 interface PreviewItem {
+  rowNumber?: number;
   nombre: string;
   marca: string;
   sku?: string;
-  precio: number;
-  stock: number;
+  precioVentaCop?: number;
+  precio?: number;
+  stockInicial?: number;
+  stock?: number;
   categoria?: string;
   tono?: string;
+  productCode?: string;
+  shadeCode?: string;
+  shadeName?: string;
+  shadeHex?: string;
 }
 
 interface PreviewResponse {
@@ -49,7 +81,10 @@ interface PreviewResponse {
   duplicateSkuCount: number;
   isDuplicateFile: boolean;
   errors: ErrorRow[];
-  previewSample: PreviewItem[];
+  previewSample?: PreviewItem[];
+  previewItems?: PreviewItem[];
+  totalProducts?: number;
+  groupedProducts?: GroupedProduct[];
 }
 
 export default function AdminImportPage() {
@@ -261,15 +296,21 @@ export default function AdminImportPage() {
             )}
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-2 ${preview.totalProducts != null && preview.totalProducts > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-4`}>
               <div className="p-4 rounded-2xl bg-cream/70 border border-border">
                 <span className="text-muted text-[11px] font-bold uppercase tracking-wider block">Total filas</span>
                 <span className="font-serif text-2xl text-ink font-bold mt-1 block">{preview.totalRows}</span>
               </div>
               <div className="p-4 rounded-2xl bg-green-50 border border-green-200">
-                <span className="text-green-800 text-[11px] font-bold uppercase tracking-wider block">Válidas</span>
+                <span className="text-green-800 text-[11px] font-bold uppercase tracking-wider block">Filas válidas</span>
                 <span className="font-serif text-2xl text-green-700 font-bold mt-1 block">{preview.validRows}</span>
               </div>
+              {preview.totalProducts != null && preview.totalProducts > 0 && (
+                <div className="p-4 rounded-2xl bg-wine/10 border border-wine/20">
+                  <span className="text-wine text-[11px] font-bold uppercase tracking-wider block">Fichas a crear</span>
+                  <span className="font-serif text-2xl text-wine font-bold mt-1 block">{preview.totalProducts}</span>
+                </div>
+              )}
               <div className="p-4 rounded-2xl bg-red-50 border border-red-200">
                 <span className="text-red-800 text-[11px] font-bold uppercase tracking-wider block">Rechazadas</span>
                 <span className="font-serif text-2xl text-red-700 font-bold mt-1 block">{preview.rejectedRows}</span>
@@ -279,6 +320,65 @@ export default function AdminImportPage() {
                 <span className="font-serif text-2xl text-amber-700 font-bold mt-1 block">{preview.duplicateSkuCount}</span>
               </div>
             </div>
+
+            {/* Grouped Products Preview */}
+            {preview.groupedProducts && preview.groupedProducts.length > 0 && (
+              <div className="border border-border rounded-2xl overflow-hidden bg-white shadow-sm">
+                <div className="p-4 bg-cream/50 border-b border-border flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-wineDark font-bold text-xs sm:text-sm">
+                    <FileSpreadsheet className="w-4 h-4 text-wine" />
+                    <span>Previsualización de fichas y variantes ({preview.groupedProducts.length} producto{preview.groupedProducts.length > 1 ? 's' : ''})</span>
+                  </div>
+                  <span className="text-xs text-muted">
+                    Total stock: <strong>{preview.groupedProducts.reduce((acc, p) => acc + p.totalStock, 0)} uds</strong>
+                  </span>
+                </div>
+                <div className="divide-y divide-border/60 max-h-96 overflow-y-auto">
+                  {preview.groupedProducts.map((prod, pIdx) => (
+                    <div key={pIdx} className="p-4 space-y-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono font-bold bg-wine/10 text-wine px-2 py-0.5 rounded">
+                            {prod.productCode || 'SIN CÓDIGO'}
+                          </span>
+                          <h4 className="font-serif text-base font-bold text-ink">{prod.name}</h4>
+                        </div>
+                        <p className="text-xs text-muted mt-1">
+                          Marca: <strong className="text-ink">{prod.brand}</strong> · Categoría: <strong className="text-ink">{prod.category || 'General'}</strong> · Stock inicial: <strong className="text-ink">{prod.totalStock} unidades</strong> ({prod.variantCount} variante{prod.variantCount > 1 ? 's' : ''})
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {prod.variants.map((v, vIdx) => (
+                          <div key={vIdx} className="p-2.5 rounded-xl bg-cream/30 border border-border/80 text-xs flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {v.shadeHex ? (
+                                <span
+                                  className="w-4 h-4 rounded-full border border-black/20 shrink-0"
+                                  style={{ backgroundColor: v.shadeHex }}
+                                  title={v.shadeHex}
+                                />
+                              ) : (
+                                <span className="w-4 h-4 rounded-full bg-border shrink-0" />
+                              )}
+                              <div className="truncate">
+                                <span className="font-semibold text-ink block truncate">
+                                  {v.shadeCode ? `${v.shadeCode} - ` : ''}{v.shadeName || v.presentation || 'Por defecto'}
+                                </span>
+                                <span className="text-[10px] text-muted font-mono">{v.sku || 'SKU Auto'}</span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-bold text-wine block">{formatCOP(v.salePrice)}</span>
+                              <span className="text-[10px] text-muted">{v.initialStock} uds</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Errors List */}
             {preview.errors && preview.errors.length > 0 && (
@@ -346,7 +446,7 @@ export default function AdminImportPage() {
                 disabled={committing || (preview.rejectedRows > 0 && conflictPolicy === 'CANCEL_ON_ERROR')}
                 className="bg-wine hover:bg-wineDark text-white px-8 py-3.5 rounded-full text-xs sm:text-sm font-bold transition shadow-lg disabled:opacity-40"
               >
-                {committing ? 'Procesando en base de datos...' : `Confirmar e importar ${preview.validRows} productos`}
+                {committing ? 'Procesando en base de datos...' : `Confirmar e importar ${preview.totalProducts ?? preview.validRows} producto(s)`}
               </button>
             </div>
           </div>

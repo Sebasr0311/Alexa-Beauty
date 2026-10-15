@@ -12,6 +12,8 @@ test('select first active in-stock shade, preserve exhausted choices',()=>{
   assert.equal(initialVariant([a,{...b,id:'hidden',active:false},b]).id,'b');
   assert.equal(activeVariants([a,b,{...b,active:false}]).length,2);
   assert.equal(initialVariant([{...a,active:false}]),null);
+  // When all active shades are exhausted, fallback to first active
+  assert.equal(initialVariant([a,{...a,id:'c',shadeCode:'115'}]).id,'a');
 });
 test('labels retain commercial code name and size, never manufacture metadata',()=>{
   assert.equal(variantLabel(a),'107 · Ivory · 30 ml');
@@ -24,3 +26,4 @@ test('photos never leak other shade, fall back only to general cover',()=>{
   assert.equal(variantImages(images,'missing')[0].id,'general');
   assert.deepEqual(variantImages([images[0]],'a'),[]);
 });
+
