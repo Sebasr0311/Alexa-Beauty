@@ -10,6 +10,10 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: false
   servlet:
     multipart:
       max-file-size: 5MB
