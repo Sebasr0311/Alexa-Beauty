@@ -16,6 +16,8 @@ import {
   X,
   Clock,
   ShieldAlert,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import AdminShell from '@/components/admin/AdminShell';
 import {
@@ -52,6 +54,11 @@ export default function AdminInventarioPage() {
   const [receiptQuantity, setReceiptQuantity] = useState<number>(10);
   const [receiptUnitCost, setReceiptUnitCost] = useState<number>(15000);
   const [receiving, setReceiving] = useState(false);
+
+  // Modal Eliminar Producto con Doble Confirmación
+  const [productToDelete, setProductToDelete] = useState<InventorySummaryDto | null>(null);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deletingProduct, setDeletingProduct] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -161,6 +168,35 @@ export default function AdminInventarioPage() {
       await loadData();
     } catch { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setReceiving(false);
+    }
+  };
+
+  const handleOpenDelete = (item: InventorySummaryDto) => {
+    setProductToDelete(item);
+    setDeleteStep(1);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    setDeletingProduct(true);
+    try {
+      await api.deleteProduct(productToDelete.productId);
+      setSummaryList((prev) => prev.filter((s) => s.productId !== productToDelete.productId));
+      setFeedback({
+        type: 'success',
+        text: `El producto "${productToDelete.productName}" fue eliminado del catálogo y del inventario.`,
+      });
+      setProductToDelete(null);
+      setDeleteStep(1);
+      await loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo eliminar el producto.';
+      setFeedback({
+        type: 'error',
+        text: msg,
+      });
+    } finally {
+      setDeletingProduct(false);
     }
   };
 
@@ -332,7 +368,7 @@ export default function AdminInventarioPage() {
                     <th className="py-3 px-3.5 text-center">Reservado</th>
                     <th className="py-3 px-3.5 text-center">Disponible</th>
                     <th className="py-3 px-3.5 text-center">Mínimo</th>
-                    <th className="py-3 px-3.5 text-right rounded-r-xl">Ajustar</th>
+                    <th className="py-3 px-3.5 text-right rounded-r-xl">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -382,15 +418,26 @@ export default function AdminInventarioPage() {
                         <td className="py-3.5 px-3.5 text-center text-muted">
                           {s.minStock} un.
                         </td>
-                        <td className="py-3.5 px-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenAdjust(s)}
-                            className="inline-flex items-center gap-1 text-xs font-bold text-wine hover:text-wineDark bg-blush/60 hover:bg-blush px-3 py-1.5 rounded-full transition"
-                          >
-                            <SlidersHorizontal className="w-3.5 h-3.5" />
-                            <span>Ajustar</span>
-                          </button>
+                        <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAdjust(s)}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-wine hover:text-wineDark bg-blush/60 hover:bg-blush px-3 py-1.5 rounded-full transition"
+                              title="Ajustar stock físico"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5" />
+                              <span>Ajustar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDelete(s)}
+                              className="inline-flex items-center p-1.5 rounded-full text-xs text-rose-600 hover:bg-rose-50 transition"
+                              title="Eliminar producto del inventario"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -699,6 +746,154 @@ export default function AdminInventarioPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ELIMINAR PRODUCTO CON DOBLE CONFIRMACIÓN */}
+      {productToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-border space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            {/* Step 1: Primera advertencia */}
+            {deleteStep === 1 ? (
+              <>
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700">
+                        Paso 1 de 2 · Advertencia
+                      </span>
+                      <h2 className="font-serif text-xl text-wineDark font-normal">
+                        ¿Dar de baja producto?
+                      </h2>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductToDelete(null);
+                      setDeleteStep(1);
+                    }}
+                    className="text-muted hover:text-ink p-1 rounded-full hover:bg-cream"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs text-muted">
+                  <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-1.5 text-amber-900">
+                    <p className="font-bold text-sm text-ink">{productToDelete.productName}</p>
+                    <p className="font-mono text-[11px] text-muted">SKU: {productToDelete.sku}</p>
+                    <div className="flex items-center gap-3 pt-1 text-xs">
+                      <span>Stock físico: <strong>{productToDelete.stockOnHand} un.</strong></span>
+                      <span>Reservado: <strong>{productToDelete.stockReserved} un.</strong></span>
+                    </div>
+                  </div>
+                  <p>
+                    Estás a punto de solicitar la eliminación de este producto en el sistema de inventario y catálogo.
+                  </p>
+                  <p className="text-[11px] text-muted/90 italic">
+                    * Si el producto cuenta con historial de pedidos o recepciones, se desactivará de forma segura para no romper la auditoría de ventas.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-3 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductToDelete(null);
+                      setDeleteStep(1);
+                    }}
+                    className="px-4 py-2 rounded-full text-xs font-semibold text-muted hover:text-ink"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStep(2)}
+                    className="px-5 py-2 rounded-full text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs inline-flex items-center gap-1.5"
+                  >
+                    <span>Continuar al Paso 2</span>
+                    <ArrowDownRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Step 2: Confirmación definitiva */
+              <>
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-700">
+                        Paso 2 de 2 · Confirmación Final
+                      </span>
+                      <h2 className="font-serif text-xl text-wineDark font-normal">
+                        ¿Confirmar eliminación?
+                      </h2>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductToDelete(null);
+                      setDeleteStep(1);
+                    }}
+                    className="text-muted hover:text-ink p-1 rounded-full hover:bg-cream"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs text-muted">
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-rose-900 space-y-1">
+                    <p className="font-bold text-sm">Esta acción dará de baja el producto:</p>
+                    <p className="font-serif text-base text-wine font-semibold">
+                      {productToDelete.productName}
+                    </p>
+                    <p className="text-[11px] text-rose-700 pt-1">
+                      Se removerá de la lista de existencias activas y no estará disponible para venta pública.
+                    </p>
+                  </div>
+                  <p className="font-medium text-ink">
+                    ¿Estás totalmente seguro de proceder con la eliminación definitiva?
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-3 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStep(1)}
+                    className="px-4 py-2 rounded-full text-xs font-semibold text-muted hover:text-ink"
+                  >
+                    ← Volver al Paso 1
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletingProduct}
+                    onClick={handleConfirmDelete}
+                    className="px-5 py-2.5 rounded-full text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {deletingProduct ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Eliminando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Sí, Eliminar Producto</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
