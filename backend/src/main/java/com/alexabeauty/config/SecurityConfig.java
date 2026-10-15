@@ -63,9 +63,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public Health, Ping and Actuator endpoints
                 .requestMatchers(
+                    "/api/v1/health",
                     "/api/v1/health/**",
-                    "/api/v1/ping", "/ping",
-                    "/actuator/health", "/actuator/health/**"
+                    "/api/v1/ping",
+                    "/ping",
+                    "/health",
+                    "/actuator/health",
+                    "/actuator/health/**"
                 ).permitAll()
                 // Public OpenAPI / Swagger Documentation
                 .requestMatchers(

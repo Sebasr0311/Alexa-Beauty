@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 
 @RestController
-@RequestMapping("/api/v1/health")
 @Tag(name = "Health", description = "Public system liveness and health diagnostics")
 public class HealthController {
 
@@ -26,7 +25,7 @@ public class HealthController {
         this.version = version;
     }
 
-    @GetMapping("/public")
+    @GetMapping({"/api/v1/health", "/api/v1/health/public", "/health"})
     @Operation(summary = "Public health check", description = "Returns basic liveness and version info without authentication")
     public ResponseEntity<PublicHealthResponse> getPublicHealth() {
         return ResponseEntity.ok(new PublicHealthResponse(
@@ -35,6 +34,12 @@ public class HealthController {
             version,
             Instant.now()
         ));
+    }
+
+    @GetMapping({"/ping", "/api/v1/ping"})
+    @Operation(summary = "Liveness ping", description = "Returns simple pong string for lightweight pingers")
+    public ResponseEntity<String> ping() {
+        return ResponseEntity.ok("pong");
     }
 
     public record PublicHealthResponse(
