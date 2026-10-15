@@ -61,9 +61,10 @@ public class SecurityConfig {
                 .accessDeniedHandler(jwtAccessDeniedHandler)
             )
             .authorizeHttpRequests(auth -> auth
-                // Public Health and Actuator endpoints
+                // Public Health, Ping and Actuator endpoints
                 .requestMatchers(
                     "/api/v1/health/**",
+                    "/api/v1/ping", "/ping",
                     "/actuator/health", "/actuator/health/**"
                 ).permitAll()
                 // Public OpenAPI / Swagger Documentation
