@@ -2,7 +2,7 @@
 import type { VariantInput } from '@/lib/api';
 export function emptyVariant(): VariantInput { return {shadeCode:'',shadeName:'',shadeHex:'',presentation:'',salePrice:0,stockOnHand:0,minStock:3,active:true}; }
 export function variantPayload(value:VariantInput):VariantInput {
-  return {...value,sku:value.sku?.trim()||undefined,shadeCode:value.shadeCode?.trim()||undefined,
+  return {...value,clearReferenceCost:value.referenceCost===null,sku:value.sku?.trim()||undefined,shadeCode:value.shadeCode?.trim()||undefined,
     shadeName:value.shadeName?.trim()||undefined,shadeHex:value.shadeHex?.trim()||undefined,presentation:value.presentation?.trim()||undefined};
 }
 export function VariantFields({value,onChange,editing=false}: {value:VariantInput;onChange:(value:VariantInput)=>void;editing?:boolean}) {
@@ -21,6 +21,7 @@ export function VariantFields({value,onChange,editing=false}: {value:VariantInpu
       </div><p className="font-normal text-muted mt-1">Dejar vacío si no conoces el color; no se inventará una muestra.</p>
     </div>
     <label className="text-xs font-semibold">Precio de venta COP<input type="number" required min="0" step="0.01" className={input} value={value.salePrice} onChange={e=>change('salePrice',Number(e.target.value))}/></label>
+    <label className="text-xs font-semibold">Costo de compra unitario COP (opcional)<input type="number" min="0" step="0.01" className={input} value={value.referenceCost??''} onChange={e=>onChange({...value,referenceCost:e.target.value===''?null:Number(e.target.value)})}/><span className="font-normal text-muted">Vacío: costo no informado; 0: costo cero confirmado.</span></label>
     {!editing&&<label className="text-xs font-semibold">Stock inicial<input type="number" min="0" step="1" required className={input} value={value.stockOnHand??0} onChange={e=>change('stockOnHand',Number(e.target.value))}/></label>}
     <label className="text-xs font-semibold">Stock mínimo<input type="number" min="0" step="1" required className={input} value={value.minStock??3} onChange={e=>change('minStock',Number(e.target.value))}/></label>
   </div>;

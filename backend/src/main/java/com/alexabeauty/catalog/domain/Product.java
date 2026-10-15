@@ -65,6 +65,11 @@ public class Product {
     @Builder.Default
     private boolean featured = false;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    public boolean isDeleted() { return deletedAt != null; }
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

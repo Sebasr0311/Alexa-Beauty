@@ -197,6 +197,7 @@ export default function AdminAnaliticaPage() {
         </button>
       }
     >
+      {!loading&&!loadError&&analyticsData.summary.grossProfit!==undefined&&<section className="bg-white border border-border rounded-2xl p-5 space-y-2" aria-label="Utilidad bruta"><h2 className="font-bold text-wine">Utilidad bruta de productos</h2><p className="text-xl font-bold">{formatCOP(analyticsData.summary.grossProfit)}{(analyticsData.summary.unitsWithoutCost||0)>0?' (parcial)':''}</p><p className="text-sm">Ingresos con costo conocido: {formatCOP(analyticsData.summary.coveredMerchandiseRevenue||0)} · Costo histórico: {formatCOP(analyticsData.summary.knownCostTotal||0)}</p><p className="text-sm">Margen sobre ingresos cubiertos: {analyticsData.summary.grossMarginPercentage==null?'No disponible':`${analyticsData.summary.grossMarginPercentage}%`} · Unidades sin costo histórico: {analyticsData.summary.unitsWithoutCost||0}</p><p className="text-xs text-muted">Solo ventas confirmadas con costo registrado al crear el pedido. No incluye envío ni gastos operativos; no es utilidad neta. Los costos desconocidos no se estiman.</p></section>}
       {loadError && <p role="alert" className="text-red-700">{loadError}</p>}
       <div className="space-y-6">
 

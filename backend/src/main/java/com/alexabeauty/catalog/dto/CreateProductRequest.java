@@ -44,8 +44,17 @@ public record CreateProductRequest(
         @JsonAlias("isFeatured")
         Boolean featured,
 
-        Boolean active
+        Boolean active,
+
+        @DecimalMin(value = "0.0", message = "El costo no puede ser negativo")
+        BigDecimal referenceCost
 ) {
+    public CreateProductRequest(String name, UUID brandId, UUID categoryId, String description, String sku,
+            BigDecimal salePrice, Integer stockOnHand, Integer minStock, List<ProductVariantRequest> variants,
+            Boolean featured, Boolean active) {
+        this(name, brandId, categoryId, description, sku, salePrice, stockOnHand, minStock, variants, featured, active, null);
+    }
+
     public boolean isFeaturedProduct() {
         return Boolean.TRUE.equals(featured);
     }

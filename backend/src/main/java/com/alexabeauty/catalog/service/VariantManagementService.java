@@ -24,11 +24,11 @@ public class VariantManagementService {
     }
     @Transactional(readOnly=true)
     public List<ProductVariantResponse> list(UUID productId) {
-        if (!products.existsById(productId)) throw new ResourceNotFoundException("Product", productId);
+        if (products.findById(productId).filter(p -> !p.isDeleted()).isEmpty()) throw new ResourceNotFoundException("Product", productId);
         return variants.findByProductId(productId).stream().map(ProductVariantResponse::from).toList();
     }
     private Product lock(UUID productId) {
-        return products.findByIdForUpdate(productId).orElseThrow(() -> new ResourceNotFoundException("Product", productId));
+        return products.findByIdForUpdate(productId).filter(p -> !p.isDeleted()).orElseThrow(() -> new ResourceNotFoundException("Product", productId));
     }
     private ProductVariant owned(UUID productId, UUID variantId) {
         var variant=variants.findByIdForUpdate(variantId).orElseThrow(() -> new ResourceNotFoundException("ProductVariant",variantId));
@@ -73,7 +73,8 @@ public class VariantManagementService {
         if (request.salePrice()==null) throw new ValidationException("El precio es obligatorio.");
         variant.setSalePrice(request.salePrice());
         if(request.minStock()!=null)variant.setMinStock(request.minStock());
-        if(request.referenceCost()!=null)variant.setReferenceCost(request.referenceCost());
+        if(Boolean.TRUE.equals(request.clearReferenceCost())) variant.setReferenceCost(null);
+        else if(request.referenceCost()!=null)variant.setReferenceCost(request.referenceCost());
         if(request.active()!=null)variant.setActive(request.active());
         return ProductVariantResponse.from(variants.saveAndFlush(variant));
     }

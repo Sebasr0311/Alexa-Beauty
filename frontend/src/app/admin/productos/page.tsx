@@ -25,6 +25,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { VariantFields, emptyVariant, variantPayload } from '@/components/admin/VariantFields';
+import { BrandPicker } from '@/components/admin/BrandPicker';
+import { ProductEditor } from '@/components/admin/ProductEditor';
 import { VariantManager } from '@/components/admin/VariantManager';
 import type { VariantInput } from '@/lib/api';
 import AdminShell from '@/components/admin/AdminShell';
@@ -52,6 +54,9 @@ export default function AdminProductosPage() {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [imageError, setImageError] = useState('');
+  const [newProductCost, setNewProductCost] = useState<number | undefined>(undefined);
   const [newVariants, setNewVariants] = useState<VariantInput[]>([]);
   const [variantsProductId, setVariantsProductId] = useState<string | null>(null);
 
@@ -94,7 +99,7 @@ export default function AdminProductosPage() {
     try {
       const [catsRes, brandsRes, prodsRes] = await Promise.allSettled([
         api.getCategories(),
-        api.getBrands(),
+        api.getAdminBrands(),
         api.getAdminProducts({ q: searchQuery || undefined, page: targetPage, size: 20, sort: 'createdAt,desc' }),
       ]);
 
@@ -154,7 +159,7 @@ export default function AdminProductosPage() {
     } catch {
       setFeedback({
         type: 'error',
-        text: 'No se pudo eliminar el producto. Intenta suspenderlo si tiene pedidos asociados.',
+        text: 'No se pudo eliminar el producto. Revisa si tiene unidades reservadas en pedidos pendientes.',
       });
     } finally {
       setDeleting(false);
@@ -165,6 +170,7 @@ export default function AdminProductosPage() {
   const handleOpenImagesModal = async (product: ProductSummaryDto) => {
     setImageModalProduct(product);
     setLoadingImages(true);
+    setImageError('');
     setSelectedUploadFile(null);
     setUploadFilePreview(null);
     setIsCoverUpload(false);
@@ -183,24 +189,20 @@ export default function AdminProductosPage() {
   const handleUploadImage = async () => {
     if (!imageModalProduct || !selectedUploadFile) return;
     setUploadingImage(true);
+    setImageError('');
     try {
       const uploaded = await api.uploadProductImage(
         imageModalProduct.id,
         selectedUploadFile,
         isCoverUpload || productImages.length === 0
       );
-      setProductImages((prev) => {
-        if (uploaded.isCover) {
-          return [...prev.map((img) => ({ ...img, isCover: false })), uploaded];
-        }
-        return [...prev, uploaded];
-      });
+      setProductImages((prev) => uploaded.isCover ? [...prev.map(img => ({...img,isCover:false})),uploaded] : [...prev,uploaded]);
       setSelectedUploadFile(null);
       setUploadFilePreview(null);
       setFeedback({ type: 'success', text: 'Foto adjuntada correctamente al producto.' });
       await loadData();
-    } catch {
-      setFeedback({ type: 'error', text: 'Error al subir la imagen. Verifica que sea JPG o PNG (máx 5MB).' });
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'No se pudo guardar la foto. Reintenta sin cerrar esta ventana.');
     } finally {
       setUploadingImage(false);
     }
@@ -302,6 +304,7 @@ export default function AdminProductosPage() {
         brandId: brandIdToUse,
         categoryId: categoryIdToUse,
         salePrice: newVariants.length ? newVariants[0].salePrice : newProductPrice,
+        referenceCost: newProductCost,
         stockOnHand: newProductStock,
         minStock: newProductMinStock,
         description: newProductDescription.trim() || undefined,
@@ -311,6 +314,7 @@ export default function AdminProductosPage() {
                 sku: newProductSku.trim() ? `${newProductSku.trim().toUpperCase()}-V1` : undefined,
                 shadeName: newProductShade.trim(),
                 salePrice: newProductPrice,
+                referenceCost: newProductCost,
                 stockOnHand: newProductStock,
                 minStock: newProductMinStock,
               },
@@ -319,14 +323,15 @@ export default function AdminProductosPage() {
       });
 
       let coverUrl: string | undefined;
+      let photoError = '';
 
       // Subir imagen si se adjuntó una
       if (newProductImageFile && created?.id) {
         try {
           const uploadedImg = await api.uploadProductImage(created.id, newProductImageFile, true);
           coverUrl = uploadedImg.url;
-        } catch {
-          setFeedback({ type: 'error', text: 'Producto creado, pero la foto no se pudo subir. Reintenta desde Fotos.' });
+        } catch (error) {
+          photoError = error instanceof Error ? error.message : 'No se pudo guardar la foto.';
         }
       }
 
@@ -356,8 +361,18 @@ export default function AdminProductosPage() {
       setStatusFilter('ALL');
       setSearchQuery('');
       setIsModalOpen(false);
+      if (photoError && newProductImageFile) {
+        setImageModalProduct(createdSummary);
+        setProductImages(created.images || []);
+        setSelectedUploadFile(newProductImageFile);
+        setUploadFilePreview(newProductImagePreview);
+        setIsCoverUpload(true);
+        setImageError(`Producto creado. La foto no se guardó: ${photoError} Puedes reintentar aquí sin crear otro producto.`);
+        setFeedback({type:'error',text:'Producto creado sin foto. Completa la carga desde la ventana de fotos.'});
+      } else {
+        setFeedback({ type: 'success', text: `Producto "${created.name}" creado correctamente.` });
+      }
       resetForm();
-      setFeedback({ type: 'success', text: `¡Producto "${created.name}" creado y agregado a la lista exitosamente!` });
 
       // Sincronizar en segundo plano con el servidor en la primera página
       void loadData(0);
@@ -373,6 +388,7 @@ export default function AdminProductosPage() {
     setNewProductName('');
     setNewProductSku('');
     setNewProductPrice(0);
+    setNewProductCost(undefined);
     setNewProductStock(10);
     setNewProductMinStock(3);
     setNewProductShade('');
@@ -634,6 +650,7 @@ export default function AdminProductosPage() {
                     </td>
                     <td className="py-3.5 px-3.5 text-right">
                       <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                        <button type="button" onClick={()=>setEditingProductId(p.id)} className="min-h-11 rounded-xl border border-border px-3 text-xs font-bold text-wine">Editar</button>
                         {/* Fotos Modal Trigger */}
                         <button type="button" onClick={() => setVariantsProductId(p.id)} className="min-h-11 rounded-xl border border-border px-3 text-xs font-bold text-wine" aria-label={`Gestionar tonos de ${p.name}`}>Tonos</button>
                         <button
@@ -732,6 +749,7 @@ export default function AdminProductosPage() {
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
         >
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            {imageError&&<p role="alert" className="bg-red-50 text-red-800 border border-red-200 p-3 rounded-xl">{imageError}</p>}
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2.5 text-wine">
                 <ImageIcon className="w-5 h-5" />
@@ -746,6 +764,7 @@ export default function AdminProductosPage() {
               </div>
               <button
                 type="button"
+                disabled={uploadingImage}
                 onClick={() => setImageModalProduct(null)}
                 className="text-muted hover:text-ink p-1.5 rounded-full hover:bg-cream"
               >
@@ -823,7 +842,7 @@ export default function AdminProductosPage() {
 
             {/* Zona para Subir Nueva Foto */}
             <div className="border-t border-border pt-4 space-y-3">
-              <label className="font-bold text-ink text-xs uppercase tracking-wider block">
+              <label htmlFor="image-file-input" className="font-bold text-ink text-xs uppercase tracking-wider block">
                 Adjuntar Nueva Foto (JPG o PNG, máx 5MB)
               </label>
 
@@ -889,6 +908,7 @@ export default function AdminProductosPage() {
             <div className="flex justify-end pt-3 border-t border-border">
               <button
                 type="button"
+                disabled={uploadingImage}
                 onClick={() => setImageModalProduct(null)}
                 className="px-5 py-2.5 rounded-full border border-border text-muted font-bold text-xs hover:bg-cream transition"
               >
@@ -899,6 +919,7 @@ export default function AdminProductosPage() {
         </div>
       )}
 
+      {editingProductId&&<ProductEditor id={editingProductId} onClose={()=>setEditingProductId(null)} onSaved={()=>{void loadData();}}/>}
       {/* MODAL: CONFIRMAR ELIMINACIÓN DE PRODUCTO */}
       {productToDelete && (
         <div
@@ -923,7 +944,7 @@ export default function AdminProductosPage() {
               <p className="font-bold text-ink">{productToDelete.name}</p>
               <p className="text-muted">SKU: <span className="font-mono text-wine font-semibold">{productToDelete.sku}</span></p>
               <p className="text-muted leading-relaxed">
-                Si este producto tiene ventas históricas o movimientos contables, será <strong>suspendido de inmediato</strong> para preservar la auditoría fiscal.
+                Se eliminará de las listas y operaciones actuales. Los pedidos vendidos, recibos y movimientos históricos se conservarán. No se podrá reactivar. Si tiene unidades reservadas, primero debes finalizar o cancelar los pedidos pendientes.
               </p>
             </div>
 
@@ -1028,25 +1049,7 @@ export default function AdminProductosPage() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="font-bold text-ink block mb-1">Marca *</label>
-                  <select
-                    value={newProductBrandId}
-                    onChange={(e) => {
-                      setNewProductBrandId(e.target.value);
-                      if (modalError) setModalError(null);
-                    }}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 focus:ring-2 focus:ring-wine/20 focus:outline-none"
-                  >
-                    <option value="" disabled>Selecciona marca</option>
-                    {brands.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <BrandPicker brands={brands} value={newProductBrandId} onChange={setNewProductBrandId} disabled={creating} onCreated={brand=>{setBrands(prev=>[...prev,brand]);setNewProductBrandId(brand.id);}}/>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1078,6 +1081,7 @@ export default function AdminProductosPage() {
                 </div>
               </div>
 
+              <label className="block font-bold">Costo de compra unitario COP (opcional)<input aria-label="Costo de compra general COP" type="number" min="0" step="0.01" value={newProductCost??''} onChange={e=>setNewProductCost(e.target.value===''?undefined:Number(e.target.value))} className="block w-full px-3.5 py-2.5 rounded-xl border border-border mt-1"/><span className="block text-xs text-muted font-normal">Vacío: costo no informado. Cero: costo cero confirmado. Para varios tonos, informa el costo en cada variante.</span></label>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-ink block mb-1">Stock Inicial</label>
@@ -1121,6 +1125,7 @@ export default function AdminProductosPage() {
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/jpg"
+                    aria-label="Foto del nuevo producto"
                     onChange={handleNewProductImageChange}
                     className="block w-full text-xs text-muted file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-wine file:text-white hover:file:bg-wineDark cursor-pointer"
                   />

@@ -17,7 +17,7 @@ class MediaSecurityTest {
         ProductRepository products = mock(ProductRepository.class);
         StorageGateway storage = mock(StorageGateway.class);
         UUID id = UUID.randomUUID();
-        when(products.findById(id)).thenReturn(Optional.of(Product.builder().id(id).build()));
+        when(products.findByIdForUpdate(id)).thenReturn(Optional.of(Product.builder().id(id).build()));
         MediaServiceImpl media = new MediaServiceImpl(storage, products, mock(ProductImageRepository.class));
         MockMultipartFile fake = new MockMultipartFile("file", "photo.jpg", "image/jpeg", "MZ executable".getBytes());
         assertThatThrownBy(() -> media.uploadProductImage(id, fake, "photo", true))

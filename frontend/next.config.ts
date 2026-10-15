@@ -6,7 +6,7 @@ if (process.env.NODE_ENV === 'production' && (!process.env.API_BACKEND_URL || !b
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   distDir: process.env.NEXT_BUILD_DIR || '.next',
-  async rewrites() { return [{ source: '/api/backend/:path*', destination: `${backend}/:path*` }]; },
+  async rewrites() { return [{ source: '/api/backend/:path*', destination: `${backend}/:path*` }, { source: '/uploads/:path*', destination: `${backend.replace(/\/api\/v1\/?$/, '')}/uploads/:path*` }]; },
   async headers() { return [{ source: '/:path*', headers: [
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

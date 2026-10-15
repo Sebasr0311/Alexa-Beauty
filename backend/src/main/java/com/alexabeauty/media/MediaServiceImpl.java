@@ -57,8 +57,7 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     public ProductImage uploadProductImage(UUID productId, MultipartFile file, String altText, Boolean isCover, UUID variantId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
+        Product product = lockOperationalProduct(productId);
 
         var variant = variantId == null ? null : product.getVariants().stream()
                 .filter(v -> v.getId().equals(variantId)).findFirst()
@@ -100,10 +99,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     public void deleteProductImage(UUID productId, UUID imageId) {
+        lockOperationalProduct(productId);
         ProductImage image = productImageRepository.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProductImage", imageId));
 
-        if (!image.getProduct().getId().equals(productId)) {
+        if (image.getProduct().isDeleted() || !image.getProduct().getId().equals(productId)) {
             throw new ResourceNotFoundException("ProductImage", imageId);
         }
 
@@ -124,10 +124,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     public ProductImage setCoverImage(UUID productId, UUID imageId) {
+        lockOperationalProduct(productId);
         ProductImage target = productImageRepository.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProductImage", imageId));
 
-        if (!target.getProduct().getId().equals(productId)) {
+        if (target.getProduct().isDeleted() || !target.getProduct().getId().equals(productId)) {
             throw new ResourceNotFoundException("ProductImage", imageId);
         }
 
@@ -146,6 +147,11 @@ public class MediaServiceImpl implements MediaService {
     @Transactional(readOnly = true)
     public String getPublicUrl(String storagePath) {
         return storageGateway.getPublicUrl(storagePath);
+    }
+
+    private Product lockOperationalProduct(UUID productId) {
+        return productRepository.findByIdForUpdate(productId).filter(product -> !product.isDeleted())
+                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
     }
 
     private byte[] validateFile(MultipartFile file) {

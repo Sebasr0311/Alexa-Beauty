@@ -199,6 +199,7 @@ public class InventoryServiceImpl implements InventoryService {
         // 7. Process each item: update stockOnHand and record ENTRADA movement
         for (StockReceiptItemRequest itemReq : request.items()) {
             ProductVariant variant = variantMap.get(itemReq.variantId());
+            if (variant.getProduct().isDeleted()) throw new ConflictException("El producto fue eliminado del catálogo.");
             int qtyBefore = variant.getStockOnHand();
             int qtyAfter = qtyBefore + itemReq.quantity();
 
@@ -254,6 +255,7 @@ public class InventoryServiceImpl implements InventoryService {
         // 1. Lock variant
         ProductVariant variant = productVariantRepository.findByIdForUpdate(request.variantId())
                 .orElseThrow(() -> new ResourceNotFoundException("ProductVariant", request.variantId()));
+        if (variant.getProduct().isDeleted()) throw new ConflictException("El producto fue eliminado del catálogo.");
 
         // 2. INVIOLABLE BUSINESS INVARIANT: newStockOnHand cannot be less than stockReserved
         if (request.newStockOnHand() < variant.getStockReserved()) {

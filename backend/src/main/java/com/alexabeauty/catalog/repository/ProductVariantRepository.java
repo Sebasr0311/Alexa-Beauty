@@ -20,6 +20,8 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     Optional<ProductVariant> findBySku(String sku);
     List<ProductVariant> findByProductId(UUID productId);
     boolean existsBySku(String sku);
+    @Query("SELECT pv.id FROM ProductVariant pv WHERE pv.product.id = :productId ORDER BY pv.id")
+    List<UUID> findIdsByProductId(@Param("productId") UUID productId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT pv FROM ProductVariant pv WHERE pv.id = :id")
@@ -33,14 +35,14 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
             "JOIN FETCH pv.product p " +
             "LEFT JOIN FETCH p.brand b " +
             "LEFT JOIN FETCH p.category c " +
-            "WHERE (:query IS NULL OR :query = '' " +
+            "WHERE p.deletedAt IS NULL AND (:query IS NULL OR :query = '' " +
             "       OR LOWER(pv.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "       OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "       OR LOWER(pv.shadeName) LIKE LOWER(CONCAT('%', :query, '%'))) " +
             "AND (:lowStockOnly = false OR (pv.stockOnHand - pv.stockReserved) <= pv.minStock)",
             countQuery = "SELECT COUNT(pv) FROM ProductVariant pv " +
             "JOIN pv.product p " +
-            "WHERE (:query IS NULL OR :query = '' " +
+            "WHERE p.deletedAt IS NULL AND (:query IS NULL OR :query = '' " +
             "       OR LOWER(pv.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "       OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "       OR LOWER(pv.shadeName) LIKE LOWER(CONCAT('%', :query, '%'))) " +

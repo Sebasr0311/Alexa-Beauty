@@ -153,6 +153,7 @@ public class CatalogServiceImpl implements CatalogService {
                     .sku(baseSku)
                     .shadeName("Default")
                     .salePrice(request.salePrice())
+                    .referenceCost(request.referenceCost())
                     .stockOnHand(stockOnHand)
                     .stockReserved(0)
                     .minStock(minStock)
@@ -217,8 +218,7 @@ public class CatalogServiceImpl implements CatalogService {
 
     @Override
     public ProductDetailResponse updateProduct(UUID id, UpdateProductRequest request) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+        Product product = lockOperationalProduct(id);
 
         if (request.brandId() != null) {
             Brand brand = brandRepository.findById(request.brandId())
@@ -261,7 +261,7 @@ public class CatalogServiceImpl implements CatalogService {
     @Override
     @Transactional(readOnly = true)
     public ProductDetailResponse getProductDetailBySlug(String slug, boolean isAdmin) {
-        Product product = productRepository.findBySlug(slug)
+        Product product = productRepository.findBySlug(slug).filter(p -> !p.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", slug));
 
         if (!product.isActive() && !isAdmin) {
@@ -274,7 +274,7 @@ public class CatalogServiceImpl implements CatalogService {
     @Override
     @Transactional(readOnly = true)
     public ProductDetailResponse getProductById(UUID id) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findById(id).filter(p -> !p.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
         return toProductDetailResponse(product);
     }
@@ -295,6 +295,7 @@ public class CatalogServiceImpl implements CatalogService {
 
             // 1. Only active products
             predicates.add(cb.isTrue(root.get("active")));
+            predicates.add(cb.isNull(root.get("deletedAt")));
 
             // 2. Category filter
             if (categorySlug != null && !categorySlug.isBlank()) {
@@ -373,7 +374,7 @@ public class CatalogServiceImpl implements CatalogService {
     public Page<ProductSummaryResponse> listAdminProducts(String query, Pageable pageable) {
         Specification<Product> spec = (root, cq, cb) -> {
             if (query == null || query.isBlank()) {
-                return cb.conjunction();
+                return cb.isNull(root.get("deletedAt"));
             }
             String pattern = "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
             Predicate nameLike = cb.like(cb.lower(root.get("name")), pattern);
@@ -396,7 +397,7 @@ public class CatalogServiceImpl implements CatalogService {
             );
             Predicate variantMatches = cb.exists(varSubquery);
 
-            return cb.or(nameLike, descLike, skuLike, brandLike, variantMatches);
+            return cb.and(cb.isNull(root.get("deletedAt")), cb.or(nameLike, descLike, skuLike, brandLike, variantMatches));
         };
 
         return productRepository.findAll(spec, pageable).map(p -> this.toProductSummaryResponse(p, false));
@@ -404,8 +405,7 @@ public class CatalogServiceImpl implements CatalogService {
 
     @Override
     public ProductDetailResponse toggleProductStatus(UUID id, boolean active) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+        Product product = lockOperationalProduct(id);
         product.setActive(active);
         Product saved = productRepository.save(product);
         return toProductDetailResponse(saved);
@@ -413,38 +413,35 @@ public class CatalogServiceImpl implements CatalogService {
 
     @Override
     public void deleteProduct(UUID id) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
 
-        boolean hasOrders = productRepository.hasOrderItems(id);
-        boolean hasReceipts = productRepository.hasStockReceipts(id);
-        boolean hasMovements = productRepository.hasInventoryMovements(id);
+        if (product.isDeleted()) return;
 
-        if (hasOrders || hasReceipts || hasMovements) {
-            log.info("Product id={} has orders, receipts, or inventory movements. Deactivating (soft-delete) instead of hard-delete.", id);
-            product.setActive(false);
-            productRepository.save(product);
-            return;
+        // Lock the same variant rows as checkout before checking reservations.
+        // No stock, reservations or historical relations are removed by deletion.
+        List<UUID> ids = productVariantRepository.findIdsByProductId(id);
+        List<ProductVariant> locked = ids.isEmpty() ? List.of() : productVariantRepository.findByIdInOrderByIdForUpdate(ids);
+        if (locked.stream().anyMatch(v -> v.getStockReserved() > 0)) {
+            throw new ConflictException("El producto tiene unidades reservadas. Finaliza o cancela los pedidos pendientes antes de eliminarlo.");
         }
+        product.setDeletedAt(java.time.Instant.now());
+        product.setActive(false);
+        productRepository.save(product);
+        log.info("Product id={} removed from operational catalog; history retained.", id);
+    }
 
-        productRepository.deleteReservationsByProductId(id);
-
-        List<ProductImage> images = new ArrayList<>(product.getImages());
-        for (ProductImage img : images) {
-            try {
-                mediaService.deleteProductImage(id, img.getId());
-            } catch (Exception e) {
-                log.warn("Could not delete image id={} from storage: {}", img.getId(), e.getMessage());
-            }
-        }
-
-        productRepository.delete(product);
-        log.info("Product id={} deleted permanently.", id);
+    private Product lockOperationalProduct(UUID id) {
+        return productRepository.findByIdForUpdate(id).filter(p -> !p.isDeleted())
+                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
     }
 
     // Brand operations
     @Override
     public BrandResponse createBrand(CreateBrandRequest request) {
+        if (brandRepository.findAll().stream().anyMatch(b -> b.getName().trim().equalsIgnoreCase(request.name().trim()))) {
+            throw new ConflictException("Ya existe una marca con ese nombre.");
+        }
         String slug = (request.slug() != null && !request.slug().isBlank())
                 ? SlugUtils.toSlug(request.slug())
                 : SlugUtils.generateUniqueSlug(request.name(), brandRepository::existsBySlug);

@@ -104,7 +104,7 @@ export interface LoginResponseDto {
 
 export interface VariantInput {
   sku?: string; shadeCode?: string; shadeName?: string; shadeHex?: string; presentation?: string;
-  salePrice: number; minStock?: number; stockOnHand?: number; active?: boolean;
+  salePrice: number; referenceCost?: number | null; clearReferenceCost?: boolean; minStock?: number; stockOnHand?: number; active?: boolean;
 }
 
 class ApiClient {
@@ -229,6 +229,7 @@ class ApiClient {
     description?: string;
     sku?: string;
     salePrice: number;
+    referenceCost?: number;
     stockOnHand: number;
     minStock?: number;
     featured?: boolean;
@@ -239,6 +240,7 @@ class ApiClient {
       shadeName?: string;
       presentation?: string;
       salePrice: number;
+      referenceCost?: number | null;
       stockOnHand?: number;
       minStock?: number;
     }>;
@@ -247,6 +249,14 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async createBrand(name: string): Promise<BrandDto> {
+    return this.request('/admin/brands', {method: 'POST', body: JSON.stringify({name: name.trim()})});
+  }
+  async getAdminBrands(): Promise<BrandDto[]> { return this.request('/admin/brands'); }
+  async updateProduct(id: string, data: {name: string; brandId: string; categoryId: string; description?: string}): Promise<ProductDetailDto> {
+    return this.request(`/admin/products/${id}`, {method: 'PUT', body: JSON.stringify(data)});
   }
 
   async addVariant(productId: string, data: VariantInput): Promise<ProductVariantDto> {
@@ -664,6 +674,12 @@ export interface SalesSummaryDto {
   averageTicket: number;
   startDate: string;
   endDate: string;
+  merchandiseRevenue?: number;
+  coveredMerchandiseRevenue?: number;
+  knownCostTotal?: number;
+  grossProfit?: number;
+  grossMarginPercentage?: number | null;
+  unitsWithoutCost?: number;
 }
 
 export interface SaleOrderItemDto {

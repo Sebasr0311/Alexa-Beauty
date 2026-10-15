@@ -118,7 +118,7 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
 
         for (Map.Entry<UUID, Integer> entry : totalRequestedByVariant.entrySet()) {
             ProductVariant variant = variantMap.get(entry.getKey());
-            if (!variant.isActive() || !variant.getProduct().isActive()) {
+            if (!variant.isActive() || !variant.getProduct().isActive() || variant.getProduct().isDeleted()) {
                 throw new ConflictException("El producto o variante ya no está disponible.");
             }
             int available = variant.getStockOnHand() - variant.getStockReserved();

@@ -272,7 +272,8 @@ public class ExcelSalesReportGenerator {
 
                 // Col 8: Costo unitario COP
                 Cell c8 = row.createCell(8);
-                c8.setCellValue(item.costSnapshot() != null ? item.costSnapshot().doubleValue() : 0.0);
+                if (item.costSnapshot() != null) c8.setCellValue(item.costSnapshot().doubleValue());
+                else c8.setCellValue("Sin costo histórico");
                 c8.setCellStyle(styles.currencyStyle);
             }
         }
@@ -469,6 +470,18 @@ public class ExcelSalesReportGenerator {
         r14b.setCellValue(TIMEZONE);
         r14b.setCellStyle(styles.textStyle);
 
+        String[] profitLabels = {"Ingresos por productos (COP)", "Ingresos con costo conocido (COP)",
+                "Costo histórico conocido (COP)", "Utilidad bruta parcial (COP)", "Margen sobre ingresos cubiertos (%)", "Unidades sin costo histórico"};
+        BigDecimal[] profitValues = {summary.merchandiseRevenue(), summary.coveredMerchandiseRevenue(),
+                summary.knownCostTotal(), summary.grossProfit(), summary.grossMarginPercentage(), BigDecimal.valueOf(summary.unitsWithoutCost())};
+        for (int i = 0; i < profitLabels.length; i++) {
+            Row row = sheet.createRow(15 + i);
+            row.createCell(0).setCellValue(profitLabels[i]);
+            Cell value = row.createCell(1);
+            if (profitValues[i] == null) value.setCellValue("No disponible");
+            else value.setCellValue(profitValues[i].doubleValue());
+        }
+        sheet.createRow(22).createCell(0).setCellValue("Utilidad bruta solo sobre ventas con costo histórico; no incluye envío ni gastos operativos.");
         sheet.setColumnWidth(0, 9500);
         sheet.setColumnWidth(1, 14000);
     }

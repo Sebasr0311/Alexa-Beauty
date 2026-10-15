@@ -134,14 +134,35 @@ public class SalesServiceImpl implements SalesService {
         BigDecimal totalSales = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         long paidOrdersCount = orders.size();
         long totalUnitsSold = 0;
+        long unitsWithoutCost = 0;
+        BigDecimal merchandiseRevenue = BigDecimal.ZERO;
+        BigDecimal coveredRevenue = BigDecimal.ZERO;
+        BigDecimal knownCost = BigDecimal.ZERO;
 
         for (Order order : orders) {
             if (order.getTotal() != null) {
                 totalSales = totalSales.add(order.getTotal());
             }
             if (order.getItems() != null) {
+                BigDecimal orderMerchandise = order.getItems().stream().map(item -> item.getSubtotal() == null ? BigDecimal.ZERO : item.getSubtotal()).reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal orderCovered = BigDecimal.ZERO;
                 for (OrderItem item : order.getItems()) {
                     totalUnitsSold += item.getQuantity();
+                    BigDecimal lineRevenue = item.getSubtotal() == null ? BigDecimal.ZERO : item.getSubtotal();
+
+                    if (item.getCostSnapshot() == null) {
+                        unitsWithoutCost += item.getQuantity();
+                    } else {
+                        orderCovered = orderCovered.add(lineRevenue);
+                        knownCost = knownCost.add(item.getCostSnapshot().multiply(BigDecimal.valueOf(item.getQuantity())));
+                    }
+                }
+                BigDecimal discount = order.getDiscount() == null ? BigDecimal.ZERO : order.getDiscount();
+                BigDecimal netMerchandise = orderMerchandise.subtract(discount);
+                merchandiseRevenue = merchandiseRevenue.add(netMerchandise);
+                // Allocate an order-level discount proportionally; shipping is excluded.
+                if (orderMerchandise.signum() != 0) {
+                    coveredRevenue = coveredRevenue.add(orderCovered.multiply(netMerchandise).divide(orderMerchandise, 2, RoundingMode.HALF_UP));
                 }
             }
         }
@@ -156,7 +177,11 @@ public class SalesServiceImpl implements SalesService {
                 totalUnitsSold,
                 averageTicket,
                 startDate,
-                endDate
+                endDate,
+                merchandiseRevenue, coveredRevenue, knownCost, coveredRevenue.subtract(knownCost),
+                coveredRevenue.signum() == 0 ? null : coveredRevenue.subtract(knownCost).multiply(BigDecimal.valueOf(100))
+                        .divide(coveredRevenue, 2, RoundingMode.HALF_UP),
+                unitsWithoutCost
         );
     }
 
@@ -309,18 +334,12 @@ public class SalesServiceImpl implements SalesService {
                     if (variant.getShadeName() != null) {
                         shadeName = variant.getShadeName();
                     }
-                    if (costSnapshot == null && variant.getReferenceCost() != null) {
-                        costSnapshot = variant.getReferenceCost();
-                    }
                     if (variant.getProduct() != null && variant.getProduct().getBrand() != null) {
                         brandName = variant.getProduct().getBrand().getName();
                     }
                 }
                 if (shadeName.isBlank() && item.getVariantName() != null) {
                     shadeName = item.getVariantName();
-                }
-                if (costSnapshot == null) {
-                    costSnapshot = BigDecimal.ZERO;
                 }
 
                 itemResponses.add(new SaleOrderItemResponse(
