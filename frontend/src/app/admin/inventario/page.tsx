@@ -48,6 +48,7 @@ export default function AdminInventarioPage() {
 
   // Modal Recepción de Mercancía
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptIdempotencyKey, setReceiptIdempotencyKey] = useState<string>('');
   const [receiptProvider, setReceiptProvider] = useState('');
   const [receiptInvoice, setReceiptInvoice] = useState('');
   const [receiptVariantId, setReceiptVariantId] = useState('');
@@ -60,6 +61,14 @@ export default function AdminInventarioPage() {
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [deletingProduct, setDeletingProduct] = useState(false);
 
+  const [summaryPage, setSummaryPage] = useState<number>(0);
+  const [summaryTotalPages, setSummaryTotalPages] = useState<number>(1);
+  const [summaryTotalElements, setSummaryTotalElements] = useState<number>(0);
+
+  useEffect(() => {
+    setSummaryPage(0);
+  }, [searchQuery, lowStockFilter]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -67,21 +76,24 @@ export default function AdminInventarioPage() {
         api.getInventorySummary({
           query: searchQuery || undefined,
           lowStockOnly: lowStockFilter || undefined,
-          size: 50,
+          page: summaryPage,
+          size: 20,
         }),
         api.getInventoryMovements({ size: 50 }),
       ]);
 
-      if (sumRes.status === 'fulfilled' && sumRes.value?.content?.length > 0) {
-        setSummaryList(sumRes.value.content);
+      if (sumRes.status === 'fulfilled') {
+        setSummaryList(sumRes.value?.content || []);
+        setSummaryTotalPages(sumRes.value?.totalPages || 1);
+        setSummaryTotalElements(sumRes.value?.totalElements || 0);
       }
-      if (movRes.status === 'fulfilled' && movRes.value?.content?.length > 0) {
-        setMovementsList(movRes.value.content);
+      if (movRes.status === 'fulfilled') {
+        setMovementsList(movRes.value?.content || []);
       }
     } catch { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setLoading(false);
     }
-  }, [searchQuery, lowStockFilter]);
+  }, [searchQuery, lowStockFilter, summaryPage]);
 
   useEffect(() => {
     loadData();
@@ -151,6 +163,11 @@ export default function AdminInventarioPage() {
     setReceiving(true);
     setFeedback(null);
 
+    const idempotencyKey = receiptIdempotencyKey || crypto.randomUUID();
+    if (!receiptIdempotencyKey) {
+      setReceiptIdempotencyKey(idempotencyKey);
+    }
+
     try {
       await api.createStockReceipt({
         providerName: receiptProvider.trim() || 'Proveedor General',
@@ -162,9 +179,10 @@ export default function AdminInventarioPage() {
             unitCost: receiptUnitCost > 0 ? receiptUnitCost : undefined,
           },
         ],
-      });
+      }, idempotencyKey);
       setFeedback({ type: 'success', text: `Recepción de mercancía registrada exitosamente (+${receiptQuantity} unidades).` });
       setReceiptModalOpen(false);
+      setReceiptIdempotencyKey('');
       await loadData();
     } catch { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setReceiving(false);
@@ -218,7 +236,10 @@ export default function AdminInventarioPage() {
         <>
           <button
             type="button"
-            onClick={() => setReceiptModalOpen(true)}
+            onClick={() => {
+              setReceiptIdempotencyKey(crypto.randomUUID());
+              setReceiptModalOpen(true);
+            }}
             className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-glow transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
@@ -444,6 +465,31 @@ export default function AdminInventarioPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-4 mt-4">
+              <span className="text-xs text-muted">
+                Página {summaryPage + 1} de {Math.max(1, summaryTotalPages)} ({summaryTotalElements} variantes en total)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={summaryPage === 0 || loading}
+                  onClick={() => setSummaryPage((p) => Math.max(0, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  disabled={summaryPage >= summaryTotalPages - 1 || loading}
+                  onClick={() => setSummaryPage((p) => p + 1)}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
           </div>
         </div>

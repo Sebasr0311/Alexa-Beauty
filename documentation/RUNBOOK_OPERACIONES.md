@@ -91,21 +91,39 @@ Para restaurar el respaldo en un entorno de staging o recuperación:
 - **Recuperación manual (si el job fallase):**
   Ejecutar el script SQL de reconciliación:
   ```sql
-  -- Liberar reservas vencidas manualmente
-  UPDATE product_variants pv
-  SET stock_reserved = GREATEST(0, pv.stock_reserved - sr.quantity)
-  FROM stock_reservations sr
-  WHERE sr.variant_id = pv.id
-    AND sr.status = 'ACTIVE'
-    AND sr.expires_at < NOW();
+  BEGIN;
 
+  -- 1. Bloquear variantes afectadas para evitar carreras concurrentes
+  SELECT id FROM product_variants
+  WHERE id IN (
+    SELECT DISTINCT variant_id FROM stock_reservations
+    WHERE status = 'ACTIVE' AND expires_at < NOW()
+  )
+  FOR UPDATE;
+
+  -- 2. Restar la suma total agrupada de reservas vencidas por variante
+  WITH expired_aggregates AS (
+    SELECT variant_id, SUM(quantity) AS total_expired_qty
+    FROM stock_reservations
+    WHERE status = 'ACTIVE' AND expires_at < NOW()
+    GROUP BY variant_id
+  )
+  UPDATE product_variants pv
+  SET stock_reserved = GREATEST(0, pv.stock_reserved - ea.total_expired_qty)
+  FROM expired_aggregates ea
+  WHERE pv.id = ea.variant_id;
+
+  -- 3. Marcar reservas como liberadas
   UPDATE stock_reservations
   SET status = 'RELEASED', updated_at = NOW()
   WHERE status = 'ACTIVE' AND expires_at < NOW();
 
+  -- 4. Expirar las órdenes asociadas
   UPDATE orders
   SET status = 'EXPIRADO', updated_at = NOW()
   WHERE status IN ('PENDIENTE_CONTACTO', 'PENDIENTE_PAGO') AND expires_at < NOW();
+
+  COMMIT;
   ```
 
 ### Incidente 3: Caída de la Red de WhatsApp (Matriz P24)

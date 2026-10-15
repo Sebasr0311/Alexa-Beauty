@@ -55,6 +55,9 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderDetailDto[]>(EMPTY_ORDERS);
   const [activeTab, setActiveTab] = useState<FilterTab>('TODOS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalElements, setTotalElements] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -81,30 +84,40 @@ export default function AdminOrdersPage() {
   // Transition form state
   const [processingTransition, setProcessingTransition] = useState(false);
 
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [searchQuery]);
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setErrorMessage(null);
     try {
       const pageResult = await api.getAdminOrders({
         search: searchQuery || undefined,
-        size: 50,
+        page: currentPage,
+        size: 20,
       });
 
-      if (pageResult && pageResult.content && pageResult.content.length > 0) {
-        // Fetch full details for the returned summaries
-        const details = await Promise.all(
-          pageResult.content.map(async (sum) => {
-            try {
-              return await api.getAdminOrderDetail(sum.id);
-            } catch { throw new Error("No se pudo consultar el detalle del pedido."); }
-          })
-        );
-        setOrders(details);
+      if (pageResult) {
+        setTotalPages(pageResult.totalPages || 1);
+        setTotalElements(pageResult.totalElements || 0);
+        if (pageResult.content && pageResult.content.length > 0) {
+          const details = await Promise.all(
+            pageResult.content.map(async (sum) => {
+              try {
+                return await api.getAdminOrderDetail(sum.id);
+              } catch { throw new Error("No se pudo consultar el detalle del pedido."); }
+            })
+          );
+          setOrders(details);
+        } else {
+          setOrders([]);
+        }
       }
     } catch { setErrorMessage("No se confirmó la operación en el servidor. Actualiza e intenta nuevamente."); setSuccessMessage(null); } finally {
       setLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, currentPage]);
 
   useEffect(() => {
     fetchOrders();
@@ -560,6 +573,31 @@ export default function AdminOrdersPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-4 mt-4">
+            <span className="text-xs text-muted">
+              Página {currentPage + 1} de {Math.max(1, totalPages)} ({totalElements} pedidos en total)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 0 || loading}
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages - 1 || loading}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         </div>
 

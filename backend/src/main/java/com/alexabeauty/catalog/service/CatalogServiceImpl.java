@@ -381,16 +381,16 @@ public class CatalogServiceImpl implements CatalogService {
 
         boolean hasOrders = productRepository.hasOrderItems(id);
         boolean hasReceipts = productRepository.hasStockReceipts(id);
+        boolean hasMovements = productRepository.hasInventoryMovements(id);
 
-        if (hasOrders || hasReceipts) {
-            log.info("Product id={} has orders or receipts. Deactivating (soft-delete) instead of hard-delete.", id);
+        if (hasOrders || hasReceipts || hasMovements) {
+            log.info("Product id={} has orders, receipts, or inventory movements. Deactivating (soft-delete) instead of hard-delete.", id);
             product.setActive(false);
             productRepository.save(product);
             return;
         }
 
         productRepository.deleteReservationsByProductId(id);
-        productRepository.deleteMovementsByProductId(id);
 
         List<ProductImage> images = new ArrayList<>(product.getImages());
         for (ProductImage img : images) {

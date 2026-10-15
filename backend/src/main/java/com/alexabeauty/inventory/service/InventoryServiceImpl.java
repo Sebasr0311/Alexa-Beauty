@@ -33,6 +33,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alexabeauty.common.error.ConflictException;
+import com.alexabeauty.common.error.ValidationException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -57,6 +63,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final StockReceiptItemRepository stockReceiptItemRepository;
     private final UserRepository userRepository;
     private final AuditLogRepository auditLogRepository;
+    private final ObjectMapper objectMapper;
 
     public InventoryServiceImpl(
             ProductVariantRepository productVariantRepository,
@@ -64,7 +71,8 @@ public class InventoryServiceImpl implements InventoryService {
             StockReceiptRepository stockReceiptRepository,
             StockReceiptItemRepository stockReceiptItemRepository,
             UserRepository userRepository,
-            AuditLogRepository auditLogRepository
+            AuditLogRepository auditLogRepository,
+            ObjectMapper objectMapper
     ) {
         this.productVariantRepository = productVariantRepository;
         this.inventoryMovementRepository = inventoryMovementRepository;
@@ -72,6 +80,25 @@ public class InventoryServiceImpl implements InventoryService {
         this.stockReceiptItemRepository = stockReceiptItemRepository;
         this.userRepository = userRepository;
         this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper;
+    }
+
+    private String hashFingerprint(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
     }
 
     @Override
@@ -80,23 +107,29 @@ public class InventoryServiceImpl implements InventoryService {
         log.info("Processing goods receipt with idempotencyKey='{}', requestReceiptNumber='{}'",
                 idempotencyKey, request.receiptNumber());
 
-        // 1. Idempotency Check: if idempotencyKey or receiptNumber already exists, return existing receipt without mutating stock
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            Optional<StockReceipt> existingByKey = stockReceiptRepository.findByReceiptNumber(idempotencyKey.trim());
-            if (existingByKey.isPresent()) {
-                log.info("Duplicate receipt request detected by idempotencyKey '{}'. Returning existing receipt id {}",
-                        idempotencyKey, existingByKey.get().getId());
-                return StockReceiptResponse.from(existingByKey.get());
-            }
+        String trimmedKey = (idempotencyKey != null && !idempotencyKey.isBlank()) ? idempotencyKey.trim() : null;
+        if (trimmedKey != null && (trimmedKey.length() > 128 || !trimmedKey.matches("[A-Za-z0-9_-]+"))) {
+            throw new ValidationException("Idempotency-Key inválida; máximo 128 caracteres alfanuméricos.");
+        }
 
-            // Check if stored in notes
-            Optional<StockReceipt> existingByNotes = stockReceiptRepository.findAll().stream()
-                    .filter(r -> r.getNotes() != null && r.getNotes().contains("[Idempotency-Key: " + idempotencyKey.trim() + "]"))
-                    .findFirst();
-            if (existingByNotes.isPresent()) {
-                log.info("Duplicate receipt request detected by notes key '{}'. Returning existing receipt id {}",
-                        idempotencyKey, existingByNotes.get().getId());
-                return StockReceiptResponse.from(existingByNotes.get());
+        String fingerprint;
+        try {
+            fingerprint = hashFingerprint(objectMapper.writeValueAsString(request));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Unable to fingerprint stock receipt", e);
+        }
+
+        // 1. Idempotency Check
+        if (trimmedKey != null) {
+            Optional<StockReceipt> existingByKey = stockReceiptRepository.findByIdempotencyKey(trimmedKey);
+            if (existingByKey.isPresent()) {
+                StockReceipt existing = existingByKey.get();
+                if (existing.getRequestFingerprint() != null && !existing.getRequestFingerprint().equals(fingerprint)) {
+                    throw new ConflictException("La clave de idempotencia ya se utilizó con otra recepción de stock.");
+                }
+                log.info("Duplicate receipt request detected by idempotencyKey '{}'. Returning existing receipt id {}",
+                        trimmedKey, existing.getId());
+                return StockReceiptResponse.from(existing);
             }
         }
 
@@ -113,22 +146,12 @@ public class InventoryServiceImpl implements InventoryService {
         String receiptNumber;
         if (request.receiptNumber() != null && !request.receiptNumber().isBlank()) {
             receiptNumber = request.receiptNumber().trim();
-        } else if (idempotencyKey != null && !idempotencyKey.isBlank() && idempotencyKey.trim().length() <= 50) {
-            receiptNumber = idempotencyKey.trim();
         } else {
             receiptNumber = generateReceiptNumber();
         }
 
-        // 3. Resolve notes with idempotency tag
+        // 3. Resolve notes
         String notes = request.notes();
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            String idTag = "[Idempotency-Key: " + idempotencyKey.trim() + "]";
-            if (notes == null || notes.isBlank()) {
-                notes = idTag;
-            } else if (!notes.contains(idTag)) {
-                notes = idTag + " " + notes.trim();
-            }
-        }
 
         // 4. Resolve actor user entity
         User actorEntity = null;
@@ -156,6 +179,8 @@ public class InventoryServiceImpl implements InventoryService {
         // 6. Build StockReceipt entity
         StockReceipt receipt = StockReceipt.builder()
                 .receiptNumber(receiptNumber)
+                .idempotencyKey(trimmedKey)
+                .requestFingerprint(fingerprint)
                 .providerName(request.providerName())
                 .invoiceNumber(request.invoiceNumber())
                 .notes(notes)

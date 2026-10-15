@@ -442,12 +442,16 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     @Override
     @Transactional
     public ExcelCommitResponse commitImport(UUID jobId, ConflictPolicy policy, UserPrincipal principal) {
-        ExcelImportJob job = jobRepository.findById(jobId)
+        ExcelImportJob job = jobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("ExcelImportJob", jobId));
 
         // IDEMPOTENCY / P06 MATRIX:
         if (job.getStatus() == ImportJobStatus.COMPLETED) {
             throw new ConflictException("Este archivo ya fue importado exitosamente.");
+        }
+
+        if (job.getFileHash() != null && jobRepository.existsByFileHashAndStatusAndIdNot(job.getFileHash(), ImportJobStatus.COMPLETED, jobId)) {
+            throw new ConflictException("Este archivo ya fue importado exitosamente en otro trabajo.");
         }
 
         ConflictPolicy effectivePolicy = policy != null ? policy : ConflictPolicy.CANCEL_ON_ERROR;

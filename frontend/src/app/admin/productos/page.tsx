@@ -44,6 +44,9 @@ export default function AdminProductosPage() {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [brands, setBrands] = useState<BrandDto[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalElements, setTotalElements] = useState<number>(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('TODAS');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [loading, setLoading] = useState(false);
@@ -80,13 +83,17 @@ export default function AdminProductosPage() {
   const [productToDelete, setProductToDelete] = useState<ProductSummaryDto | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [searchQuery]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [catsRes, brandsRes, prodsRes] = await Promise.allSettled([
         api.getCategories(),
         api.getBrands(),
-        api.getAdminProducts({ q: searchQuery || undefined, size: 100 }),
+        api.getAdminProducts({ q: searchQuery || undefined, page: currentPage, size: 20 }),
       ]);
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.length > 0) {
@@ -101,15 +108,17 @@ export default function AdminProductosPage() {
           setNewProductBrandId(brandsRes.value[0].id);
         }
       }
-      if (prodsRes.status === 'fulfilled' && prodsRes.value?.content?.length > 0) {
-        setProducts(prodsRes.value.content);
+      if (prodsRes.status === 'fulfilled') {
+        setProducts(prodsRes.value?.content || []);
+        setTotalPages(prodsRes.value?.totalPages || 1);
+        setTotalElements(prodsRes.value?.totalElements || 0);
       }
     } catch {
       setFeedback({ type: 'error', text: 'No se pudieron sincronizar los productos del servidor.' });
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, newProductCategoryId, newProductBrandId]);
+  }, [searchQuery, newProductCategoryId, newProductBrandId, currentPage]);
 
   useEffect(() => {
     loadData();
@@ -634,6 +643,31 @@ export default function AdminProductosPage() {
               )}
             </tbody>
           </table>
+
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-4 mt-4">
+            <span className="text-xs text-muted">
+              Página {currentPage + 1} de {Math.max(1, totalPages)} ({totalElements} productos en total)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 0 || loading}
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages - 1 || loading}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

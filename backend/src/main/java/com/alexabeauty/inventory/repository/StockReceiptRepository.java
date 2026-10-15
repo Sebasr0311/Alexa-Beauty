@@ -12,6 +12,7 @@ import java.util.UUID;
 @Repository
 public interface StockReceiptRepository extends JpaRepository<StockReceipt, UUID> {
     Optional<StockReceipt> findByReceiptNumber(String receiptNumber);
+    Optional<StockReceipt> findByIdempotencyKey(String idempotencyKey);
     boolean existsByReceiptNumber(String receiptNumber);
     Page<StockReceipt> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

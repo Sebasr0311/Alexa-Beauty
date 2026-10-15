@@ -1,25 +1,30 @@
 package com.alexabeauty.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Custom Flyway migration strategy that runs repair before migration.
- * This automatically heals historical checksum discrepancies and removes failed entries
- * across environment deploys without breaking the Spring Boot ApplicationContext.
+ * Standard Flyway migration strategy enforcing forward-only immutable migrations and schema validation.
+ * Emergency repair is strictly gated behind the 'app.flyway.repair' flag.
  */
 @Slf4j
 @Configuration
 public class FlywayConfig {
 
+    @Value("${app.flyway.repair:false}")
+    private boolean repairOnStartup;
+
     @Bean
     public FlywayMigrationStrategy flywayMigrationStrategy() {
         return flyway -> {
-            log.info("Executing Flyway repair to align migration checksums with schema history...");
-            flyway.repair();
-            log.info("Executing Flyway migrate...");
+            if (repairOnStartup) {
+                log.warn("Emergency Flyway repair requested via app.flyway.repair=true. Repairing schema history...");
+                flyway.repair();
+            }
+            log.info("Executing Flyway migrate with validation...");
             flyway.migrate();
         };
     }

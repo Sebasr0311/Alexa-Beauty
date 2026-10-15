@@ -43,10 +43,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     )
     void deleteReservationsByProductId(@org.springframework.data.repository.query.Param("productId") UUID productId);
 
-    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query(
-        value = "DELETE FROM inventory_movements WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = :productId)",
+        value = "SELECT COUNT(*) > 0 FROM inventory_movements im JOIN product_variants pv ON im.variant_id = pv.id WHERE pv.product_id = :productId",
         nativeQuery = true
     )
-    void deleteMovementsByProductId(@org.springframework.data.repository.query.Param("productId") UUID productId);
+    boolean hasInventoryMovements(@org.springframework.data.repository.query.Param("productId") UUID productId);
 }

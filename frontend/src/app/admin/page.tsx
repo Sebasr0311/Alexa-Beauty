@@ -33,22 +33,22 @@ export default function AdminDashboardPage() {
     async function loadDashboardData() {
       setLoading(true);
       try {
-        const [salesRes, ordersRes, invRes] = await Promise.allSettled([
+        const [salesRes, ordersRes, pendingRes, invRes] = await Promise.allSettled([
           api.getAdminSales({ size: 5 }),
           api.getAdminOrders({ size: 5 }),
+          api.getAdminOrders({ status: 'PENDIENTE_PAGO', size: 1 }),
           api.getInventorySummary({ lowStockOnly: true, size: 5 }),
         ]);
 
-        if ([salesRes, ordersRes, invRes].some(result => result.status === 'rejected')) setError('No pudimos consultar todos los indicadores. Los datos faltantes no están disponibles.');
+        if ([salesRes, ordersRes, pendingRes, invRes].some(result => result.status === 'rejected')) setError('No pudimos consultar todos los indicadores. Los datos faltantes no están disponibles.');
         if (salesRes.status === 'fulfilled' && salesRes.value?.summary) {
           setSalesSummary(salesRes.value.summary);
         }
         if (ordersRes.status === 'fulfilled' && ordersRes.value?.content) {
           setRecentOrders(ordersRes.value.content);
-          const pending = ordersRes.value.content.filter(
-            (o) => o.status === 'PENDIENTE_CONTACTO' || o.status === 'PENDIENTE_PAGO'
-          ).length;
-          setPendingOrdersCount(pending);
+        }
+        if (pendingRes.status === 'fulfilled' && pendingRes.value?.totalElements !== undefined) {
+          setPendingOrdersCount(pendingRes.value.totalElements);
         }
         if (invRes.status === 'fulfilled' && invRes.value?.totalElements !== undefined) {
           setLowStockAlerts(invRes.value.totalElements);
@@ -154,68 +154,21 @@ export default function AdminDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {recentOrders.length === 0 ? (
-                <>
-                  <tr className="hover:bg-cream/50 transition">
-                    <td className="py-3.5 px-3.5 font-mono font-semibold text-wine">
-                      AB-2026-000101
-                    </td>
-                    <td className="py-3.5 px-3.5 font-medium text-ink">
-                      Camila Morales
-                    </td>
-                    <td className="py-3.5 px-3.5 text-muted hidden sm:table-cell">
-                      Hoy 14:20
-                    </td>
-                    <td className="py-3.5 px-3.5 font-bold text-ink">
-                      $ 65.000
-                    </td>
-                    <td className="py-3.5 px-3.5">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#E2F5EA] text-[#24734E]">
-                        Pagado
-                      </span>
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-cream/50 transition">
-                    <td className="py-3.5 px-3.5 font-mono font-semibold text-wine">
-                      AB-2026-000102
-                    </td>
-                    <td className="py-3.5 px-3.5 font-medium text-ink">
-                      Valeria Restrepo
-                    </td>
-                    <td className="py-3.5 px-3.5 text-muted hidden sm:table-cell">
-                      Hoy 11:05
-                    </td>
-                    <td className="py-3.5 px-3.5 font-bold text-ink">
-                      $ 118.000
-                    </td>
-                    <td className="py-3.5 px-3.5">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF3D8] text-[#8A5C11]">
-                        Pendiente
-                      </span>
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-cream/50 transition">
-                    <td className="py-3.5 px-3.5 font-mono font-semibold text-wine">
-                      AB-2026-000103
-                    </td>
-                    <td className="py-3.5 px-3.5 font-medium text-ink">
-                      Daniela Gómez
-                    </td>
-                    <td className="py-3.5 px-3.5 text-muted hidden sm:table-cell">
-                      Ayer 18:45
-                    </td>
-                    <td className="py-3.5 px-3.5 font-bold text-ink">
-                      $ 185.000
-                    </td>
-                    <td className="py-3.5 px-3.5">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#E2F5EA] text-[#24734E]">
-                        Pagado
-                      </span>
-                    </td>
-                  </tr>
-                </>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-muted">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-wine mb-2" />
+                    <p className="text-sm text-muted">Cargando pedidos recientes...</p>
+                  </td>
+                </tr>
+              ) : recentOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-muted">
+                    <Package className="w-8 h-8 mx-auto mb-2 opacity-40 text-wine" />
+                    <p className="font-medium text-ink">No hay pedidos registrados aún</p>
+                    <p className="text-xs text-muted mt-1">Los pedidos generados desde la tienda o WhatsApp aparecerán aquí.</p>
+                  </td>
+                </tr>
               ) : (
                 recentOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-cream/50 transition">

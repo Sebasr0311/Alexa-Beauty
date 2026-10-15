@@ -55,6 +55,12 @@ public class StockReceipt {
     @Builder.Default
     private BigDecimal totalCost = BigDecimal.ZERO;
 
+    @Column(name = "idempotency_key", unique = true, length = 128)
+    private String idempotencyKey;
+
+    @Column(name = "request_fingerprint", length = 64)
+    private String requestFingerprint;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

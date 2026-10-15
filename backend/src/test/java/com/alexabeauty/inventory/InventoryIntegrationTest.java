@@ -240,6 +240,45 @@ class InventoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("P10-b: Stock receipt with same Idempotency-Key but different payload returns 409 Conflict")
+    void createReceipt_withSameIdempotencyKeyDifferentPayload_returns409Conflict() throws Exception {
+        String uniqueSku = "SKU-REC-CONF-" + UUID.randomUUID().toString().substring(0, 8);
+        ProductVariant variant = createTestVariant(uniqueSku, 20, 0, 5);
+
+        String idempotencyKey = "IDEMP-KEY-" + UUID.randomUUID();
+
+        CreateStockReceiptRequest receiptReq1 = new CreateStockReceiptRequest(
+                null,
+                "Proveedor A",
+                "FAC-001",
+                "Recepción inicial",
+                List.of(new StockReceiptItemRequest(variant.getId(), 5, new BigDecimal("10000.00"), null))
+        );
+
+        mockMvc.perform(post("/api/v1/admin/inventory/receipts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(receiptReq1)))
+                .andExpect(status().isCreated());
+
+        CreateStockReceiptRequest receiptReq2 = new CreateStockReceiptRequest(
+                null,
+                "Proveedor B",
+                "FAC-002",
+                "Recepción diferente",
+                List.of(new StockReceiptItemRequest(variant.getId(), 10, new BigDecimal("12000.00"), null))
+        );
+
+        mockMvc.perform(post("/api/v1/admin/inventory/receipts")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(receiptReq2)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     @DisplayName("Manual adjustment rejects newStockOnHand < stock_reserved with 422 Unprocessable Entity")
     void adjustStock_whenNewStockLessThanReserved_rejectsWith422UnprocessableEntity() throws Exception {
         String uniqueSku = "SKU-ADJ-FAIL-" + UUID.randomUUID().toString().substring(0, 8);

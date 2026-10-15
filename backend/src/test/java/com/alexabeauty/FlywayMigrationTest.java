@@ -45,7 +45,7 @@ class FlywayMigrationTest {
     @DisplayName("Verify all Flyway migrations are successfully executed and applied")
     void verifyFlywayMigrationsApplied() {
         MigrationInfo[] appliedMigrations = flyway.info().applied();
-        assertThat(appliedMigrations).hasSize(5);
+        assertThat(appliedMigrations).hasSize(6);
 
         assertThat(appliedMigrations[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(appliedMigrations[0].getDescription()).isEqualTo("initial schema");
@@ -55,6 +55,9 @@ class FlywayMigrationTest {
 
         assertThat(appliedMigrations[2].getVersion().getVersion()).isEqualTo("3");
         assertThat(appliedMigrations[2].getDescription()).isEqualTo("seed data");
+
+        assertThat(appliedMigrations[5].getVersion().getVersion()).isEqualTo("6");
+        assertThat(appliedMigrations[5].getDescription()).isEqualTo("stock receipt idempotency");
     }
 
     @Test
