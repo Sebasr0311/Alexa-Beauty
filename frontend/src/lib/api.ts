@@ -403,6 +403,13 @@ class ApiClient {
     return this.request<SalesListResponseDto>(`/admin/sales${query ? `?${query}` : ''}`);
   }
 
+  async createPhysicalSale(data: CreatePhysicalSaleRequestDto): Promise<SaleOrderDto> {
+    return this.request<SaleOrderDto>('/admin/sales', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async downloadAdminSalesExcel(params: { from?: string; to?: string; method?: string }): Promise<void> {
     const searchParams = new URLSearchParams();
     if (params.from) searchParams.set('from', params.from);
@@ -753,6 +760,19 @@ export interface SalesAnalyticsResponseDto {
   paymentMethods: PaymentMethodBreakdownDto[];
 }
 
+export interface CreatePhysicalSaleRequestDto {
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod: 'EFECTIVO' | 'NEQUI' | 'DAVIPLATA' | 'BANCOLOMBIA' | 'OTRO';
+  transferReference?: string;
+  discount?: number;
+  notes?: string;
+  items: Array<{
+    variantId: string;
+    quantity: number;
+  }>;
+}
+
 export interface InventorySummaryDto {
   variantId: string;
   productId: string;
@@ -761,6 +781,7 @@ export interface InventorySummaryDto {
   brandName?: string;
   categoryName?: string;
   shadeName?: string;
+  salePrice?: number;
   stockOnHand: number;
   stockReserved: number;
   availableStock: number;

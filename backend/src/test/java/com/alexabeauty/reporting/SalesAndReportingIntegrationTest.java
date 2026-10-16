@@ -45,6 +45,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -472,5 +473,84 @@ class SalesAndReportingIntegrationTest {
                 .path("data").path("orders").findValuesAsText("reference");
         assertThat(banRefs).contains(orderBancolombia.getReference());
         assertThat(banRefs).doesNotContain(orderNequi.getReference());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/sales registers physical store sale, deducts stockOnHand, preserves stockReserved, and appears in sales")
+    void testCreatePhysicalSale_deductsStockAndAppearsInSales() throws Exception {
+        String testSuffix = UUID.randomUUID().toString().substring(0, 6);
+        ProductVariant variant = createTestVariant("SKU-POS-" + testSuffix, "Sérum Punto Físico",
+                new BigDecimal("45000.00"), new BigDecimal("20000.00"));
+        variant.setStockOnHand(5);
+        variant.setStockReserved(1);
+        productVariantRepository.save(variant);
+
+        String payload = """
+                {
+                  "customerName": "Camila Mostrador",
+                  "customerPhone": "3159998877",
+                  "paymentMethod": "NEQUI",
+                  "transferReference": "NEQ-POS-001",
+                  "discount": 5000.00,
+                  "notes": "Venta presencial en mostrador",
+                  "items": [
+                    {
+                      "variantId": "%s",
+                      "quantity": 2
+                    }
+                  ]
+                }
+                """.formatted(variant.getId());
+
+        MvcResult createRes = mockMvc.perform(post("/api/v1/admin/sales")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.channel").value("PUNTO_FISICO"))
+                .andExpect(jsonPath("$.data.status").value("ENTREGADO"))
+                .andExpect(jsonPath("$.data.paymentMethod").value("NEQUI"))
+                .andExpect(jsonPath("$.data.subtotal").value(90000.00))
+                .andExpect(jsonPath("$.data.discount").value(5000.00))
+                .andExpect(jsonPath("$.data.total").value(85000.00))
+                .andExpect(jsonPath("$.data.items[0].costSnapshot").value(20000.00))
+                .andReturn();
+
+        String createdRef = objectMapper.readTree(createRes.getResponse().getContentAsString())
+                .path("data").path("reference").asText();
+
+        ProductVariant updatedVariant = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(updatedVariant.getStockOnHand()).isEqualTo(3);
+        assertThat(updatedVariant.getStockReserved()).isEqualTo(1);
+
+        // Now attempt to sell 3 units when only 2 are available (stockOnHand=3, stockReserved=1) -> 409 Conflict
+        String conflictPayload = """
+                {
+                  "paymentMethod": "EFECTIVO",
+                  "items": [
+                    {
+                      "variantId": "%s",
+                      "quantity": 3
+                    }
+                  ]
+                }
+                """.formatted(variant.getId());
+
+        mockMvc.perform(post("/api/v1/admin/sales")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(conflictPayload))
+                .andExpect(status().isConflict());
+
+        // Verify the created physical sale appears in GET /api/v1/admin/sales
+        MvcResult listRes = mockMvc.perform(get("/api/v1/admin/sales")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<String> refs = objectMapper.readTree(listRes.getResponse().getContentAsString())
+                .path("data").path("orders").findValuesAsText("reference");
+        assertThat(refs).contains(createdRef);
     }
 }

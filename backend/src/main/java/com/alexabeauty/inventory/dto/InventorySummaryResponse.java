@@ -2,6 +2,7 @@ package com.alexabeauty.inventory.dto;
 
 import com.alexabeauty.catalog.domain.ProductVariant;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public record InventorySummaryResponse(
@@ -12,6 +13,7 @@ public record InventorySummaryResponse(
         String brandName,
         String categoryName,
         String shadeName,
+        BigDecimal salePrice,
         int stockOnHand,
         int stockReserved,
         int availableStock,
@@ -42,6 +44,7 @@ public record InventorySummaryResponse(
                 brandName,
                 categoryName,
                 variant.getShadeName(),
+                variant.getSalePrice(),
                 stockOnHand,
                 stockReserved,
                 availableStock,

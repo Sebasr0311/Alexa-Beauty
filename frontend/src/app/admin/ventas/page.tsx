@@ -30,12 +30,17 @@ import {
   Upload,
   AlertCircle,
   Sparkles,
+  Plus,
+  Trash2,
+  Store,
 } from 'lucide-react';
 import {
   api,
   SalesListResponseDto,
   SaleOrderDto,
   SalesSummaryDto,
+  InventorySummaryDto,
+  CreatePhysicalSaleRequestDto,
 } from '@/lib/api';
 import {
   formatCOP,
@@ -49,6 +54,11 @@ import {
 const EMPTY_SALES_SUMMARY: SalesSummaryDto = { totalSales: 0, paidOrdersCount: 0, totalUnitsSold: 0, averageTicket: 0, startDate: '', endDate: '' };
 
 const EMPTY_SALES_ORDERS: SaleOrderDto[] = [];
+
+interface PosLineItem {
+  variantId: string;
+  quantity: number;
+}
 
 export default function AdminVentasPage() {
   // Date and filter states
@@ -79,10 +89,23 @@ export default function AdminVentasPage() {
   // Modal detail state
   const [selectedOrder, setSelectedOrder] = useState<SaleOrderDto | null>(null);
 
+  // Physical Store Sale (POS) Modal states
+  const [isPosModalOpen, setIsPosModalOpen] = useState<boolean>(false);
+  const [loadingVariants, setLoadingVariants] = useState<boolean>(false);
+  const [availableVariants, setAvailableVariants] = useState<InventorySummaryDto[]>([]);
+  const [posItems, setPosItems] = useState<PosLineItem[]>([{ variantId: '', quantity: 1 }]);
+  const [posPaymentMethod, setPosPaymentMethod] = useState<CreatePhysicalSaleRequestDto['paymentMethod']>('EFECTIVO');
+  const [posTransferReference, setPosTransferReference] = useState<string>('');
+  const [posDiscount, setPosDiscount] = useState<string>('');
+  const [posCustomerName, setPosCustomerName] = useState<string>('');
+  const [posCustomerPhone, setPosCustomerPhone] = useState<string>('');
+  const [posNotes, setPosNotes] = useState<string>('');
+  const [submittingPos, setSubmittingPos] = useState<boolean>(false);
+  const [posError, setPosError] = useState<string | null>(null);
+
   // Fetch sales from API
   const fetchSales = useCallback(async () => {
     setLoading(true);
-    setFeedbackMessage(null);
     try {
       const res = await api.getAdminSales({
         from: fromDate,
@@ -95,7 +118,10 @@ export default function AdminVentasPage() {
       if (res && res.orders) {
         setSalesResponse(res);
       }
-    } catch { setFeedbackMessage({ type: "error", text: "No pudimos consultar las ventas. No se mostrarán ventas de demostración." }); setSalesResponse({ summary: EMPTY_SALES_SUMMARY, orders: [], page: 0, size: pageSize, totalElements: 0, totalPages: 0 }); } finally {
+    } catch {
+      setFeedbackMessage({ type: 'error', text: 'No pudimos consultar las ventas. No se mostrarán ventas de demostración.' });
+      setSalesResponse({ summary: EMPTY_SALES_SUMMARY, orders: [], page: 0, size: pageSize, totalElements: 0, totalPages: 0 });
+    } finally {
       setLoading(false);
     }
   }, [fromDate, toDate, paymentMethodFilter, page, pageSize]);
@@ -103,6 +129,150 @@ export default function AdminVentasPage() {
   useEffect(() => {
     fetchSales();
   }, [fetchSales]);
+
+  const openPosModal = async () => {
+    setPosError(null);
+    setPosPaymentMethod('EFECTIVO');
+    setPosTransferReference('');
+    setPosDiscount('');
+    setPosCustomerName('');
+    setPosCustomerPhone('');
+    setPosNotes('');
+    setIsPosModalOpen(true);
+    setLoadingVariants(true);
+    try {
+      const pageRes = await api.getInventorySummary({ size: 200 });
+      const activeWithStock = (pageRes.content || []).filter((v) => v.active && v.availableStock > 0);
+      setAvailableVariants(activeWithStock);
+      if (activeWithStock.length > 0) {
+        setPosItems([{ variantId: activeWithStock[0].variantId, quantity: 1 }]);
+      } else {
+        setPosItems([{ variantId: '', quantity: 1 }]);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al cargar inventario disponible.';
+      setPosError(msg);
+    } finally {
+      setLoadingVariants(false);
+    }
+  };
+
+  const posSubtotal = useMemo(() => {
+    return posItems.reduce((acc, item) => {
+      const variant = availableVariants.find((v) => v.variantId === item.variantId);
+      const unitPrice = variant?.salePrice || 0;
+      const qty = Math.max(0, Number(item.quantity) || 0);
+      return acc + unitPrice * qty;
+    }, 0);
+  }, [posItems, availableVariants]);
+
+  const posDiscountAmount = useMemo(() => {
+    const parsed = Number(posDiscount);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }, [posDiscount]);
+
+  const posTotal = useMemo(() => {
+    return Math.max(0, posSubtotal - posDiscountAmount);
+  }, [posSubtotal, posDiscountAmount]);
+
+  const handleAddPosLine = () => {
+    const usedIds = new Set(posItems.map((i) => i.variantId));
+    const nextAvailable = availableVariants.find((v) => !usedIds.has(v.variantId)) || availableVariants[0];
+    setPosItems((prev) => [...prev, { variantId: nextAvailable ? nextAvailable.variantId : '', quantity: 1 }]);
+  };
+
+  const handleRemovePosLine = (index: number) => {
+    setPosItems((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== index) : prev));
+  };
+
+  const handlePosLineChange = (index: number, field: 'variantId' | 'quantity', value: string | number) => {
+    setPosItems((prev) =>
+      prev.map((line, idx) => {
+        if (idx !== index) return line;
+        if (field === 'variantId') {
+          const newVar = availableVariants.find((v) => v.variantId === String(value));
+          const maxAvail = newVar ? newVar.availableStock : 1;
+          return {
+            variantId: String(value),
+            quantity: Math.min(Math.max(1, line.quantity), maxAvail),
+          };
+        }
+        const currentVar = availableVariants.find((v) => v.variantId === line.variantId);
+        const maxAvail = currentVar ? currentVar.availableStock : 999;
+        const parsedQty = Math.max(1, Math.min(Number(value) || 1, maxAvail));
+        return { ...line, quantity: parsedQty };
+      })
+    );
+  };
+
+  const handleSubmitPosSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPosError(null);
+
+    const validItems = posItems.filter((item) => item.variantId && item.quantity >= 1);
+    if (validItems.length === 0) {
+      setPosError('Selecciona al menos un producto disponible con cantidad válida.');
+      return;
+    }
+
+    // Aggregate quantities by variantId to validate against availableStock before submitting
+    const requestedByVariant = new Map<string, number>();
+    for (const item of validItems) {
+      requestedByVariant.set(item.variantId, (requestedByVariant.get(item.variantId) || 0) + item.quantity);
+    }
+
+    for (const [variantId, totalQty] of requestedByVariant.entries()) {
+      const variant = availableVariants.find((v) => v.variantId === variantId);
+      if (!variant) {
+        setPosError('Uno de los productos seleccionados ya no está disponible.');
+        return;
+      }
+      if (totalQty > variant.availableStock) {
+        setPosError(
+          `La cantidad solicitada (${totalQty}) para "${variant.productName}" supera las unidades disponibles (${variant.availableStock}).`
+        );
+        return;
+      }
+    }
+
+    if (posDiscountAmount > posSubtotal) {
+      setPosError('El descuento no puede superar el subtotal de la venta.');
+      return;
+    }
+
+    setSubmittingPos(true);
+    try {
+      const created = await api.createPhysicalSale({
+        customerName: posCustomerName.trim() || undefined,
+        customerPhone: posCustomerPhone.trim() || undefined,
+        paymentMethod: posPaymentMethod,
+        transferReference: posTransferReference.trim() || undefined,
+        discount: posDiscountAmount > 0 ? posDiscountAmount : undefined,
+        notes: posNotes.trim() || undefined,
+        items: validItems.map((i) => ({
+          variantId: i.variantId,
+          quantity: Number(i.quantity),
+        })),
+      });
+
+      setIsPosModalOpen(false);
+      // Ensure 'toDate' includes today so the newly registered sale is immediately visible
+      const today = getColombiaToday();
+      if (toDate < today) {
+        setToDate(today);
+      }
+      await fetchSales();
+      setFeedbackMessage({
+        type: 'success',
+        text: `Venta en punto físico ${created.reference} registrada exitosamente (${created.paymentMethod}) por ${formatCOP(created.total)}. Stock descontado automáticamente.`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo registrar la venta en punto físico.';
+      setPosError(msg);
+    } finally {
+      setSubmittingPos(false);
+    }
+  };
 
   // Client search filter over current results
   const displayedOrders = useMemo(() => {
@@ -201,19 +371,29 @@ export default function AdminVentasPage() {
       badge="Reportes Comerciales"
       subtitle="Reporte oficial de pedidos pagados y verificados con impacto contable e inventario descontado."
       actions={
-        <button
-          type="button"
-          onClick={handleExportExcel}
-          disabled={exporting}
-          className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark disabled:opacity-50 text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-glow transition active:scale-95"
-        >
-          {exporting ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <FileSpreadsheet className="w-4 h-4 stroke-[2.5]" />
-          )}
-          <span>{exporting ? 'Generando Excel...' : 'Descargar Reporte Excel (.xlsx)'}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={openPosModal}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-sm transition active:scale-95"
+          >
+            <Store className="w-4 h-4 stroke-[2.5]" />
+            <span>Registrar Venta Física</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark disabled:opacity-50 text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-glow transition active:scale-95"
+          >
+            {exporting ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 stroke-[2.5]" />
+            )}
+            <span>{exporting ? 'Generando Excel...' : 'Descargar Reporte Excel (.xlsx)'}</span>
+          </button>
+        </div>
       }
     >
       <div className="space-y-6">
@@ -529,8 +709,14 @@ export default function AdminVentasPage() {
 
                       {/* Canal */}
                       <td className="py-3.5 px-3.5 hidden sm:table-cell">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-cream border border-border text-muted">
-                          {order.channel}
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                            order.channel === 'PUNTO_FISICO'
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                              : 'bg-cream border-border text-muted'
+                          }`}
+                        >
+                          {order.channel === 'PUNTO_FISICO' ? 'Punto Físico' : order.channel}
                         </span>
                       </td>
 
@@ -582,11 +768,312 @@ export default function AdminVentasPage() {
         </section>
       </div>
 
+      {/* Registrar Venta en Punto Físico (POS) Modal */}
+      {isPosModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pos-modal-title"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+        >
+          <form
+            onSubmit={handleSubmitPosSale}
+            className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-border p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-border pb-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                  <Store className="w-3.5 h-3.5" /> Punto Físico · Mostrador
+                </span>
+                <h3 id="pos-modal-title" className="font-serif text-xl sm:text-2xl text-wine font-medium mt-1">
+                  Registrar Venta en Punto Físico
+                </h3>
+                <p className="text-muted text-xs">
+                  Selecciona los productos entregados al cliente y el método de pago recibido. El stock se descontará al instante.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPosModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-cream hover:bg-blush flex items-center justify-center text-muted hover:text-wine transition"
+                aria-label="Cerrar modal de venta física"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {posError && (
+              <div role="alert" className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>{posError}</span>
+              </div>
+            )}
+
+            {/* Step 1: Products Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-wine">
+                  1. Productos Vendidos ({posItems.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddPosLine}
+                  disabled={loadingVariants || availableVariants.length === 0}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blush/70 hover:bg-wine hover:text-white text-wine text-xs font-bold transition disabled:opacity-40"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Agregar otro producto</span>
+                </button>
+              </div>
+
+              {loadingVariants ? (
+                <div className="p-6 rounded-2xl bg-cream/50 border border-border text-center text-xs text-muted flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-wine" />
+                  <span>Cargando productos con stock disponible...</span>
+                </div>
+              ) : availableVariants.length === 0 ? (
+                <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-center">
+                  No hay productos activos con unidades disponibles en inventario para vender en este momento.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {posItems.map((line, idx) => {
+                    const selectedVar = availableVariants.find((v) => v.variantId === line.variantId);
+                    const unitPrice = selectedVar?.salePrice || 0;
+                    const maxStock = selectedVar?.availableStock || 1;
+                    const lineSub = unitPrice * (Number(line.quantity) || 0);
+
+                    return (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-cream/50 border border-border rounded-2xl p-3"
+                      >
+                        <div className="sm:col-span-7">
+                          <label htmlFor={`pos-product-${idx}`} className="block text-[10px] font-bold uppercase text-muted mb-1">
+                            Producto disponible
+                          </label>
+                          <select
+                            id={`pos-product-${idx}`}
+                            aria-label={`Producto ${idx + 1}`}
+                            value={line.variantId}
+                            onChange={(e) => handlePosLineChange(idx, 'variantId', e.target.value)}
+                            className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs font-semibold text-ink focus:outline-hidden focus:border-wine"
+                            required
+                          >
+                            {availableVariants.map((v) => (
+                              <option key={v.variantId} value={v.variantId}>
+                                {v.sku} — {v.productName}
+                                {v.shadeName ? ` (${v.shadeName})` : ''} · {formatCOP(v.salePrice || 0)} ({v.availableStock} disp.)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label htmlFor={`pos-qty-${idx}`} className="block text-[10px] font-bold uppercase text-muted mb-1">
+                            Cantidad (máx {maxStock})
+                          </label>
+                          <input
+                            id={`pos-qty-${idx}`}
+                            aria-label={`Cantidad producto ${idx + 1}`}
+                            type="number"
+                            min={1}
+                            max={maxStock}
+                            value={line.quantity}
+                            onChange={(e) => handlePosLineChange(idx, 'quantity', e.target.value)}
+                            className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs font-bold text-wine text-center focus:outline-hidden focus:border-wine"
+                            required
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2 text-right">
+                          <span className="block text-[10px] font-bold uppercase text-muted mb-1">Subtotal</span>
+                          <span className="text-xs font-bold text-ink">{formatCOP(lineSub)}</span>
+                        </div>
+
+                        <div className="sm:col-span-1 flex justify-end">
+                          {posItems.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePosLine(idx)}
+                              className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 transition"
+                              aria-label={`Quitar producto ${idx + 1}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Step 2: Payment Method & Discount */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-wine block">
+                2. Método de Pago y Condiciones
+              </label>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {(['EFECTIVO', 'NEQUI', 'DAVIPLATA', 'BANCOLOMBIA', 'OTRO'] as const).map((method) => {
+                  const isSelected = posPaymentMethod === method;
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setPosPaymentMethod(method)}
+                      aria-pressed={isSelected}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-wine text-white border-wine shadow-xs'
+                          : 'bg-cream/60 text-ink border-border hover:border-wine/50'
+                      }`}
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>{method === 'EFECTIVO' ? 'Efectivo' : method === 'NEQUI' ? 'Nequi' : method === 'DAVIPLATA' ? 'Daviplata' : method === 'BANCOLOMBIA' ? 'Bancolombia' : 'Otro'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label htmlFor="pos-transfer-ref" className="block text-xs font-semibold text-muted mb-1">
+                    Referencia de pago / comprobante (opcional)
+                  </label>
+                  <input
+                    id="pos-transfer-ref"
+                    type="text"
+                    placeholder="Ej. Comprobante Nequi o Recibo mostrador"
+                    value={posTransferReference}
+                    onChange={(e) => setPosTransferReference(e.target.value)}
+                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="pos-discount" className="block text-xs font-semibold text-muted mb-1">
+                    Descuento en COP (opcional)
+                  </label>
+                  <input
+                    id="pos-discount"
+                    type="number"
+                    min={0}
+                    step="100"
+                    placeholder="0"
+                    value={posDiscount}
+                    onChange={(e) => setPosDiscount(e.target.value)}
+                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Optional Customer Details */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-wine block">
+                3. Datos del Cliente (Opcional)
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="pos-customer-name" className="block text-xs font-semibold text-muted mb-1">
+                    Nombre del cliente (opcional)
+                  </label>
+                  <input
+                    id="pos-customer-name"
+                    type="text"
+                    placeholder="Cliente Punto Físico"
+                    value={posCustomerName}
+                    onChange={(e) => setPosCustomerName(e.target.value)}
+                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="pos-customer-phone" className="block text-xs font-semibold text-muted mb-1">
+                    Teléfono / WhatsApp (opcional)
+                  </label>
+                  <input
+                    id="pos-customer-phone"
+                    type="text"
+                    placeholder="Mostrador"
+                    value={posCustomerPhone}
+                    onChange={(e) => setPosCustomerPhone(e.target.value)}
+                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="pos-notes" className="block text-xs font-semibold text-muted mb-1">
+                  Observaciones de la venta (opcional)
+                </label>
+                <input
+                  id="pos-notes"
+                  type="text"
+                  placeholder="Ej. Venta entregada directamente en local..."
+                  value={posNotes}
+                  onChange={(e) => setPosNotes(e.target.value)}
+                  className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                />
+              </div>
+            </div>
+
+            {/* Financial Summary */}
+            <div className="bg-blush/40 border border-border rounded-2xl p-4 space-y-2">
+              <div className="flex justify-between text-xs text-muted">
+                <span>Subtotal artículos:</span>
+                <span className="font-semibold text-ink">{formatCOP(posSubtotal)}</span>
+              </div>
+              {posDiscountAmount > 0 && (
+                <div className="flex justify-between text-xs text-[#24734E]">
+                  <span>Descuento aplicado:</span>
+                  <span className="font-semibold">- {formatCOP(posDiscountAmount)}</span>
+                </div>
+              )}
+              <div className="border-t border-border pt-2 flex justify-between items-center text-sm font-bold text-wine">
+                <span>Total cobrado ({posPaymentMethod}):</span>
+                <span className="font-serif text-lg">{formatCOP(posTotal)}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsPosModalOpen(false)}
+                className="px-5 py-2.5 rounded-full border border-border hover:bg-cream text-xs font-bold text-ink transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={submittingPos || loadingVariants || availableVariants.length === 0}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-sm transition"
+              >
+                {submittingPos ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                <span>{submittingPos ? 'Registrando venta...' : 'Confirmar Venta Física'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Sale Order Details Modal */}
       {selectedOrder && (
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="sale-detail-modal-title"
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
         >
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-border p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
@@ -601,7 +1088,7 @@ export default function AdminVentasPage() {
                     <CheckCircle2 className="w-3 h-3" /> Pago Confirmado
                   </span>
                 </div>
-                <h3 className="font-serif text-xl sm:text-2xl text-wine font-medium mt-1">
+                <h3 id="sale-detail-modal-title" className="font-serif text-xl sm:text-2xl text-wine font-medium mt-1">
                   Detalle de Venta Confirmada
                 </h3>
                 <p className="text-muted text-xs">
@@ -634,7 +1121,7 @@ export default function AdminVentasPage() {
                   {selectedOrder.customerPhone}
                 </p>
                 <p className="text-[11px] text-muted">
-                  Canal de origen: <span className="font-semibold text-ink">{selectedOrder.channel}</span>
+                  Canal de origen: <span className="font-semibold text-ink">{selectedOrder.channel === 'PUNTO_FISICO' ? 'Punto Físico' : selectedOrder.channel}</span>
                 </p>
               </div>
 

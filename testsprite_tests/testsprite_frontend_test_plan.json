@@ -936,5 +936,34 @@
       }
     ],
     "priority": "Low"
+  },
+  {
+    "id": "TC031",
+    "title": "Register a physical point-of-sale transaction and deduct stock automatically",
+    "description": "Verifies that an admin can register an in-store physical sale from /admin/ventas by selecting available products, quantity, and payment method, confirming immediate stock deduction and Kardex VENTA entry.",
+    "category": "Admin Ventas Confirmadas y Reportes",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin and log in with admin@alexabeauty.com / Admin123*Alexa"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /admin/ventas and click 'Registrar Venta Física'"
+      },
+      {
+        "type": "action",
+        "description": "Select an available product variant, enter quantity, choose payment method, and click 'Confirmar Venta Física'"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify confirmation banner and new row with 'Punto Físico' badge appear in the sales table"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify physical stock is deducted and a VENTA movement is recorded in /admin/inventario Kardex"
+      }
+    ],
+    "priority": "High"
   }
 ]

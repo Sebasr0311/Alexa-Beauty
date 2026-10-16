@@ -1,15 +1,33 @@
 package com.alexabeauty.reporting.service;
 
+import com.alexabeauty.auth.domain.User;
+import com.alexabeauty.auth.repository.UserRepository;
 import com.alexabeauty.catalog.domain.ProductVariant;
+import com.alexabeauty.catalog.repository.ProductVariantRepository;
+import com.alexabeauty.common.audit.AuditLog;
+import com.alexabeauty.common.audit.AuditLogRepository;
+import com.alexabeauty.common.error.ConflictException;
+import com.alexabeauty.common.error.ResourceNotFoundException;
+import com.alexabeauty.common.error.ValidationException;
+import com.alexabeauty.config.repository.AppSettingRepository;
+import com.alexabeauty.inventory.domain.InventoryMovement;
+import com.alexabeauty.inventory.domain.MovementType;
+import com.alexabeauty.inventory.repository.InventoryMovementRepository;
 import com.alexabeauty.order.domain.Order;
 import com.alexabeauty.order.domain.OrderItem;
 import com.alexabeauty.order.domain.OrderStatus;
+import com.alexabeauty.order.domain.OrderStatusHistory;
 import com.alexabeauty.order.repository.OrderRepository;
+import com.alexabeauty.order.repository.OrderStatusHistoryRepository;
+import com.alexabeauty.order.service.OrderReferenceGenerator;
 import com.alexabeauty.payment.domain.Payment;
 import com.alexabeauty.payment.domain.PaymentMethod;
 import com.alexabeauty.payment.domain.PaymentStatus;
+import com.alexabeauty.payment.repository.PaymentRepository;
+import com.alexabeauty.reporting.dto.CreatePhysicalSaleRequest;
 import com.alexabeauty.reporting.dto.DailySalesDto;
 import com.alexabeauty.reporting.dto.PaymentMethodBreakdownDto;
+import com.alexabeauty.reporting.dto.PhysicalSaleItemRequest;
 import com.alexabeauty.reporting.dto.SaleOrderItemResponse;
 import com.alexabeauty.reporting.dto.SaleOrderResponse;
 import com.alexabeauty.reporting.dto.SalesAnalyticsResponse;
@@ -18,8 +36,8 @@ import com.alexabeauty.reporting.dto.SalesSummaryDto;
 import com.alexabeauty.reporting.dto.TopProductDto;
 import com.alexabeauty.reporting.excel.ExcelSalesReportGenerator;
 import com.alexabeauty.security.UserPrincipal;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,6 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -38,10 +59,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SalesServiceImpl implements SalesService {
 
     public static final ZoneId BOGOTA_ZONE = ZoneId.of("America/Bogota");
@@ -49,6 +71,46 @@ public class SalesServiceImpl implements SalesService {
 
     private final OrderRepository orderRepository;
     private final ExcelSalesReportGenerator excelSalesReportGenerator;
+    private final ProductVariantRepository productVariantRepository;
+    private final InventoryMovementRepository inventoryMovementRepository;
+    private final PaymentRepository paymentRepository;
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final UserRepository userRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final AppSettingRepository appSettingRepository;
+    private final OrderReferenceGenerator orderReferenceGenerator;
+
+    @Autowired
+    public SalesServiceImpl(
+            OrderRepository orderRepository,
+            ExcelSalesReportGenerator excelSalesReportGenerator,
+            ProductVariantRepository productVariantRepository,
+            InventoryMovementRepository inventoryMovementRepository,
+            PaymentRepository paymentRepository,
+            OrderStatusHistoryRepository orderStatusHistoryRepository,
+            UserRepository userRepository,
+            AuditLogRepository auditLogRepository,
+            AppSettingRepository appSettingRepository,
+            OrderReferenceGenerator orderReferenceGenerator
+    ) {
+        this.orderRepository = orderRepository;
+        this.excelSalesReportGenerator = excelSalesReportGenerator;
+        this.productVariantRepository = productVariantRepository;
+        this.inventoryMovementRepository = inventoryMovementRepository;
+        this.paymentRepository = paymentRepository;
+        this.orderStatusHistoryRepository = orderStatusHistoryRepository;
+        this.userRepository = userRepository;
+        this.auditLogRepository = auditLogRepository;
+        this.appSettingRepository = appSettingRepository;
+        this.orderReferenceGenerator = orderReferenceGenerator;
+    }
+
+    public SalesServiceImpl(
+            OrderRepository orderRepository,
+            ExcelSalesReportGenerator excelSalesReportGenerator
+    ) {
+        this(orderRepository, excelSalesReportGenerator, null, null, null, null, null, null, null, null);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -76,6 +138,231 @@ public class SalesServiceImpl implements SalesService {
                 orderPage.getTotalElements(),
                 orderPage.getTotalPages()
         );
+    }
+
+    @Override
+    @Transactional
+    public SaleOrderResponse createPhysicalSale(CreatePhysicalSaleRequest request, UserPrincipal actor) {
+        if (request == null || request.items() == null || request.items().isEmpty()) {
+            throw new ValidationException("Debe incluir al menos un producto para registrar la venta en punto físico.");
+        }
+        if (request.paymentMethod() == null) {
+            throw new ValidationException("El método de pago es obligatorio.");
+        }
+
+        if (appSettingRepository != null) {
+            appSettingRepository.lockBootstrapSetting();
+        }
+
+        // 1. Deterministically lock requested variants in ascending UUID order
+        List<UUID> variantIds = request.items().stream()
+                .map(PhysicalSaleItemRequest::variantId)
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<ProductVariant> lockedVariants = productVariantRepository.findByIdInOrderByIdForUpdate(variantIds);
+        Map<UUID, ProductVariant> variantMap = lockedVariants.stream()
+                .collect(Collectors.toMap(ProductVariant::getId, v -> v));
+
+        for (PhysicalSaleItemRequest itemReq : request.items()) {
+            if (itemReq.variantId() == null || !variantMap.containsKey(itemReq.variantId())) {
+                throw new ResourceNotFoundException("Variante no encontrada: " + itemReq.variantId());
+            }
+            if (itemReq.quantity() == null || itemReq.quantity() < 1) {
+                throw new ValidationException("La cantidad de cada artículo debe ser al menos 1.");
+            }
+        }
+
+        // Aggregate requested quantities per variant preserving insertion order
+        Map<UUID, Integer> requestedByVariant = new LinkedHashMap<>();
+        for (PhysicalSaleItemRequest itemReq : request.items()) {
+            requestedByVariant.merge(itemReq.variantId(), itemReq.quantity(), Integer::sum);
+        }
+
+        // 2. Validate active status & available stock (stockOnHand - stockReserved)
+        for (Map.Entry<UUID, Integer> entry : requestedByVariant.entrySet()) {
+            ProductVariant variant = variantMap.get(entry.getKey());
+            if (!variant.isActive() || !variant.getProduct().isActive() || variant.getProduct().isDeleted()) {
+                throw new ConflictException("El producto o variante no está activo para la venta: "
+                        + variant.getProduct().getName() + " (" + variant.getSku() + ")");
+            }
+            int available = variant.getStockOnHand() - variant.getStockReserved();
+            int requestedQty = entry.getValue();
+            if (available < requestedQty) {
+                throw new ConflictException("Stock disponible insuficiente para el producto: "
+                        + variant.getProduct().getName() + " (" + variant.getSku() + "). Disponibles: " + available);
+            }
+        }
+
+        // 3. Build OrderItems with frozen unitPrice and costSnapshot
+        BigDecimal subtotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        List<OrderItem> orderItems = new ArrayList<>();
+
+        for (Map.Entry<UUID, Integer> entry : requestedByVariant.entrySet()) {
+            ProductVariant variant = variantMap.get(entry.getKey());
+            int qty = entry.getValue();
+            BigDecimal unitPrice = variant.getSalePrice().setScale(2, RoundingMode.HALF_UP);
+            BigDecimal lineSubtotal = unitPrice.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+            subtotal = subtotal.add(lineSubtotal);
+
+            OrderItem item = OrderItem.builder()
+                    .variant(variant)
+                    .sku(variant.getSku())
+                    .productName(variant.getProduct().getName())
+                    .variantName(variant.displayName())
+                    .unitPrice(unitPrice)
+                    .quantity(qty)
+                    .subtotal(lineSubtotal)
+                    .costSnapshot(variant.getReferenceCost())
+                    .build();
+            orderItems.add(item);
+        }
+
+        BigDecimal discount = request.discount() != null
+                ? request.discount().setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        if (discount.signum() < 0) {
+            throw new ValidationException("El descuento no puede ser negativo.");
+        }
+        if (discount.compareTo(subtotal) > 0) {
+            throw new ValidationException("El descuento no puede superar el subtotal de la venta.");
+        }
+
+        BigDecimal shippingFee = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = subtotal.subtract(discount).add(shippingFee).setScale(2, RoundingMode.HALF_UP);
+
+        String reference = orderReferenceGenerator.generateReference();
+        Instant now = Instant.now();
+        String trackingToken = UUID.randomUUID().toString();
+        String trackingTokenHash = hashToken(trackingToken);
+
+        String customerName = (request.customerName() != null && !request.customerName().isBlank())
+                ? request.customerName().trim()
+                : "Cliente Punto Físico";
+        String customerPhone = (request.customerPhone() != null && !request.customerPhone().isBlank())
+                ? request.customerPhone().trim()
+                : "Mostrador";
+        String notes = (request.notes() != null && !request.notes().isBlank())
+                ? request.notes().trim()
+                : "Venta presencial registrada en punto físico";
+        String transferRef = (request.transferReference() != null && !request.transferReference().isBlank())
+                ? request.transferReference().trim()
+                : ("POS-" + reference);
+
+        User actorEntity = null;
+        if (actor != null && actor.getId() != null && userRepository != null) {
+            actorEntity = userRepository.findById(actor.getId()).orElse(null);
+        }
+        String actorEmail = actor != null ? actor.getUsername() : "sistema";
+
+        // 4. Create Order in ENTREGADO status and PUNTO_FISICO channel
+        Order order = Order.builder()
+                .reference(reference)
+                .customerName(customerName)
+                .customerPhone(customerPhone)
+                .deliveryType("TIENDA")
+                .customerNotes(notes)
+                .subtotal(subtotal)
+                .discount(discount)
+                .shippingFee(shippingFee)
+                .total(total)
+                .status(OrderStatus.ENTREGADO)
+                .channel("PUNTO_FISICO")
+                .expiresAt(now)
+                .paidAt(now)
+                .trackingToken(trackingToken)
+                .trackingTokenHash(trackingTokenHash)
+                .build();
+
+        for (OrderItem item : orderItems) {
+            item.setOrder(order);
+            order.getItems().add(item);
+        }
+
+        Order savedOrder = orderRepository.save(order);
+
+        // 5. Deduct physical stock immediately and record VENTA movements in Kardex
+        for (OrderItem item : savedOrder.getItems()) {
+            ProductVariant variant = variantMap.get(item.getVariant().getId());
+            int qty = item.getQuantity();
+            int qtyBefore = variant.getStockOnHand();
+            int qtyAfter = qtyBefore - qty;
+
+            variant.setStockOnHand(qtyAfter);
+            productVariantRepository.save(variant);
+
+            InventoryMovement movement = InventoryMovement.builder()
+                    .variant(variant)
+                    .movementType(MovementType.VENTA)
+                    .quantityDelta(-qty)
+                    .qtyBefore(qtyBefore)
+                    .qtyAfter(qtyAfter)
+                    .reference(reference)
+                    .reason("Venta en punto físico (" + request.paymentMethod().name() + ") ref: " + transferRef)
+                    .user(actorEntity)
+                    .build();
+            inventoryMovementRepository.save(movement);
+        }
+
+        // 6. Create VERIFICADO Payment
+        Payment payment = Payment.builder()
+                .order(savedOrder)
+                .paymentMethod(request.paymentMethod())
+                .transferReference(transferRef)
+                .amount(total)
+                .status(PaymentStatus.VERIFICADO)
+                .verifiedBy(actorEntity)
+                .verifiedAt(now)
+                .notes(notes)
+                .build();
+        Payment savedPayment = paymentRepository.save(payment);
+        savedOrder.getPayments().add(savedPayment);
+
+        // 7. Record OrderStatusHistory and AuditLog
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(savedOrder)
+                .previousStatus(null)
+                .newStatus(OrderStatus.ENTREGADO)
+                .user(actorEntity)
+                .notes("Venta en punto físico registrada y pagada (" + request.paymentMethod().name() + ") por " + actorEmail)
+                .build();
+        savedOrder.getStatusHistory().add(history);
+        orderStatusHistoryRepository.save(history);
+
+        AuditLog auditLog = AuditLog.builder()
+                .actorEmail(actorEmail)
+                .action("PHYSICAL_SALE_CREATED")
+                .entityType("ORDER")
+                .entityId(savedOrder.getId().toString())
+                .beforeSnapshot(null)
+                .afterSnapshot("ENTREGADO | PUNTO_FISICO | Método: " + request.paymentMethod().name() + " | Total: " + total)
+                .build();
+        auditLogRepository.save(auditLog);
+
+        log.info("Physical sale registered: reference='{}', method={}, total={}, actor='{}'",
+                reference, request.paymentMethod(), total, actorEmail);
+
+        return toSaleOrderResponse(savedOrder);
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
     }
 
     @Override
