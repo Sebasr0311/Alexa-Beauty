@@ -915,22 +915,22 @@ export default function AdminVentasPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="pos-modal-title"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-6"
         >
           <form
             onSubmit={handleSubmitPosSale}
-            className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-border p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full max-h-[94vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl border border-border p-3.5 sm:p-8 space-y-4 sm:space-y-6 animate-in fade-in zoom-in-95 duration-200"
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-border pb-4">
+            <div className="flex items-start justify-between border-b border-border pb-3 sm:pb-4 gap-2">
               <div>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                  <Store className="w-3.5 h-3.5" /> Punto Físico · Mostrador
+                <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 sm:px-2.5 py-0.5 rounded-full">
+                  <Store className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Punto Físico · Mostrador
                 </span>
-                <h3 id="pos-modal-title" className="font-serif text-xl sm:text-2xl text-wine font-medium mt-1">
+                <h3 id="pos-modal-title" className="font-serif text-lg sm:text-2xl text-wine font-medium mt-1 leading-snug">
                   Registrar Venta en Punto Físico
                 </h3>
-                <p className="text-muted text-xs">
+                <p className="text-muted text-[11px] sm:text-xs">
                   Selecciona los productos disponibles con su foto, tono y precio predeterminado. El stock y las ganancias se actualizan al instante.
                 </p>
               </div>
@@ -1006,7 +1006,7 @@ export default function AdminVentasPage() {
                           if (posQuickSearch.trim()) setIsPosQuickSearchOpen(true);
                         }}
                         placeholder="Buscar por nombre, tono, marca o SKU para agregar al instante..."
-                        className="w-full pl-10 pr-9 py-2 rounded-xl bg-white border border-wine/30 hover:border-wine text-xs text-ink placeholder:text-muted/70 focus:outline-hidden focus:ring-2 focus:ring-wine/20 shadow-2xs transition"
+                        className="w-full pl-10 pr-9 py-2.5 sm:py-2 rounded-xl bg-white border border-wine/30 hover:border-wine text-[16px] sm:text-xs text-ink placeholder:text-muted/70 focus:outline-hidden focus:ring-2 focus:ring-wine/20 shadow-2xs transition"
                       />
                       {posQuickSearch && (
                         <button
@@ -1223,7 +1223,7 @@ export default function AdminVentasPage() {
                                     placeholder="Buscar por nombre, tono, marca o SKU..."
                                     value={pickerSearch}
                                     onChange={(e) => setPickerSearch(e.target.value)}
-                                    className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-cream/60 border border-border text-xs text-ink focus:outline-hidden focus:border-wine"
+                                    className="w-full pl-8 pr-7 py-2 sm:py-1.5 rounded-xl bg-cream/60 border border-border text-[16px] sm:text-xs text-ink focus:outline-hidden focus:border-wine"
                                   />
                                   {pickerSearch && (
                                     <button
@@ -1315,49 +1315,49 @@ export default function AdminVentasPage() {
                             )}
                           </div>
 
-                          {/* Quantity Input */}
-                          <div className="sm:col-span-2">
-                            <label htmlFor={`pos-qty-${idx}`} className="block text-[10px] font-bold uppercase text-muted mb-1">
-                              Cantidad (máx {maxStock})
-                            </label>
-                            <input
-                              id={`pos-qty-${idx}`}
-                              aria-label={`Cantidad producto ${idx + 1}`}
-                              type="number"
-                              min={1}
-                              max={maxStock}
-                              value={line.quantity}
-                              onChange={(e) => handlePosLineChange(idx, 'quantity', e.target.value)}
-                              className="w-full rounded-xl bg-white border border-border px-3 py-2.5 text-xs font-bold text-wine text-center focus:outline-hidden focus:border-wine"
-                              required
-                            />
-                          </div>
+                          {/* Mobile Controls Row: Quantity, Subtotal, Remove */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40 sm:border-0 sm:pt-0 sm:contents">
+                            {/* Quantity Input */}
+                            <div className="sm:col-span-2 flex items-center gap-1.5 sm:block">
+                              <label htmlFor={`pos-qty-${idx}`} className="text-[10px] font-bold uppercase text-muted sm:mb-1 whitespace-nowrap">
+                                Cant:
+                              </label>
+                              <input
+                                id={`pos-qty-${idx}`}
+                                aria-label={`Cantidad producto ${idx + 1}`}
+                                type="number"
+                                min={1}
+                                max={maxStock}
+                                value={line.quantity}
+                                onChange={(e) => handlePosLineChange(idx, 'quantity', e.target.value)}
+                                className="w-16 sm:w-full rounded-xl bg-white border border-border px-2 py-1.5 sm:px-3 sm:py-2.5 text-xs font-bold text-wine text-center focus:outline-hidden focus:border-wine"
+                                required
+                              />
+                            </div>
 
-                          {/* Line Subtotal */}
-                          <div className="sm:col-span-2 text-right">
-                            <span className="block text-[10px] font-bold uppercase text-muted mb-1">
-                              Subtotal línea
-                            </span>
-                            <span className="text-xs sm:text-sm font-bold text-ink">
-                              {formatCOP(lineSub)}
-                            </span>
-                            <span className="block text-[10px] text-muted">
-                              {formatCOP(unitPrice)} c/u
-                            </span>
-                          </div>
+                            {/* Line Subtotal */}
+                            <div className="sm:col-span-2 text-right">
+                              <span className="text-xs sm:text-sm font-bold text-ink">
+                                {formatCOP(lineSub)}
+                              </span>
+                              <span className="block text-[10px] text-muted">
+                                {formatCOP(unitPrice)} c/u
+                              </span>
+                            </div>
 
-                          {/* Remove Line Button */}
-                          <div className="sm:col-span-1 flex justify-end">
-                            {posItems.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemovePosLine(idx)}
-                                className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 transition"
-                                aria-label={`Quitar producto ${idx + 1}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
+                            {/* Remove Line Button */}
+                            <div className="sm:col-span-1 flex justify-end">
+                              {posItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePosLine(idx)}
+                                  className="p-2 sm:p-2.5 rounded-xl text-rose-600 hover:bg-rose-50 transition"
+                                  aria-label={`Quitar producto ${idx + 1}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1373,7 +1373,7 @@ export default function AdminVentasPage() {
                 2. Método de Pago y Descuento
               </label>
 
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 sm:gap-2">
                 {(['EFECTIVO', 'NEQUI', 'DAVIPLATA', 'BANCOLOMBIA', 'OTRO'] as const).map((method) => {
                   const isSelected = posPaymentMethod === method;
                   return (
@@ -1382,14 +1382,14 @@ export default function AdminVentasPage() {
                       type="button"
                       onClick={() => setPosPaymentMethod(method)}
                       aria-pressed={isSelected}
-                      className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      className={`py-2 px-2.5 sm:py-2.5 sm:px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                         isSelected
                           ? 'bg-wine text-white border-wine shadow-xs'
                           : 'bg-cream/60 text-ink border-border hover:border-wine/50'
                       }`}
                     >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>
+                      <CreditCard className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">
                         {method === 'EFECTIVO'
                           ? 'Efectivo'
                           : method === 'NEQUI'
@@ -1454,7 +1454,7 @@ export default function AdminVentasPage() {
                       placeholder={posDiscountMode === 'PERCENT' ? 'Ej. 10 (%)' : '0'}
                       value={posDiscount}
                       onChange={(e) => setPosDiscount(e.target.value)}
-                      className="w-full rounded-xl bg-white border border-border px-3.5 py-2 text-xs font-bold text-ink focus:outline-hidden focus:border-wine"
+                      className="w-full rounded-xl bg-white border border-border px-3.5 py-2 text-[16px] sm:text-xs font-bold text-ink focus:outline-hidden focus:border-wine"
                     />
                     {posDiscountAmount > 0 && (
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#196B3E]">
@@ -1516,7 +1516,7 @@ export default function AdminVentasPage() {
                       placeholder="Ej. Comprobante Nequi o Recibo mostrador"
                       value={posTransferReference}
                       onChange={(e) => setPosTransferReference(e.target.value)}
-                      className="w-full rounded-xl bg-white border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                      className="w-full rounded-xl bg-white border border-border px-3.5 py-2 text-[16px] sm:text-xs text-ink focus:outline-hidden focus:border-wine"
                     />
                   </div>
                   <p className="text-[11px] text-muted">
@@ -1543,7 +1543,7 @@ export default function AdminVentasPage() {
                     placeholder="Cliente Punto Físico"
                     value={posCustomerName}
                     onChange={(e) => setPosCustomerName(e.target.value)}
-                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-[16px] sm:text-xs text-ink focus:outline-hidden focus:border-wine"
                   />
                 </div>
 
@@ -1557,7 +1557,7 @@ export default function AdminVentasPage() {
                     placeholder="Mostrador"
                     value={posCustomerPhone}
                     onChange={(e) => setPosCustomerPhone(e.target.value)}
-                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-[16px] sm:text-xs text-ink focus:outline-hidden focus:border-wine"
                   />
                 </div>
               </div>
@@ -1572,7 +1572,7 @@ export default function AdminVentasPage() {
                   placeholder="Ej. Venta entregada directamente en local..."
                   value={posNotes}
                   onChange={(e) => setPosNotes(e.target.value)}
-                  className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                  className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-[16px] sm:text-xs text-ink focus:outline-hidden focus:border-wine"
                 />
               </div>
             </div>
@@ -1616,18 +1616,18 @@ export default function AdminVentasPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setIsPosModalOpen(false)}
-                className="px-5 py-2.5 rounded-full border border-border hover:bg-cream text-xs font-bold text-ink transition"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl sm:rounded-full border border-border hover:bg-cream text-xs font-bold text-ink transition text-center"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={submittingPos || loadingVariants || availableVariants.length === 0}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-sm transition"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 sm:py-2.5 rounded-xl sm:rounded-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-sm font-bold shadow-sm transition"
               >
                 {submittingPos ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
