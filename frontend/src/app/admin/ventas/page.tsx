@@ -122,6 +122,8 @@ export default function AdminVentasPage() {
   const [posItems, setPosItems] = useState<PosLineItem[]>([{ variantId: '', quantity: 1 }]);
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
   const [pickerSearch, setPickerSearch] = useState<string>('');
+  const [posQuickSearch, setPosQuickSearch] = useState<string>('');
+  const [isPosQuickSearchOpen, setIsPosQuickSearchOpen] = useState<boolean>(false);
   const [posPaymentMethod, setPosPaymentMethod] = useState<CreatePhysicalSaleRequestDto['paymentMethod']>('EFECTIVO');
   const [posTransferReference, setPosTransferReference] = useState<string>('');
   const [posDiscountMode, setPosDiscountMode] = useState<'COP' | 'PERCENT'>('COP');
@@ -172,10 +174,12 @@ export default function AdminVentasPage() {
     setPosNotes('');
     setOpenPickerIndex(null);
     setPickerSearch('');
+    setPosQuickSearch('');
+    setIsPosQuickSearchOpen(false);
     setIsPosModalOpen(true);
     setLoadingVariants(true);
     try {
-      const pageRes = await api.getInventorySummary({ size: 200 });
+      const pageRes = await api.getInventorySummary({ size: 1000 });
       const activeWithStock = (pageRes.content || []).filter((v) => v.active && v.availableStock > 0);
       setAvailableVariants(activeWithStock);
       if (activeWithStock.length > 0) {
@@ -244,6 +248,38 @@ export default function AdminVentasPage() {
       missingCostUnits,
     };
   }, [posItems, availableVariants, posSubtotal, posDiscountAmount]);
+
+  const filteredVariantsForQuickSearch = useMemo(() => {
+    if (!posQuickSearch.trim()) return [];
+    const q = posQuickSearch.toLowerCase().trim();
+    return availableVariants.filter((v) => {
+      const pName = (v.productName || '').toLowerCase();
+      const bName = (v.brandName || '').toLowerCase();
+      const sName = (v.shadeName || '').toLowerCase();
+      const pres = (v.presentation || '').toLowerCase();
+      const sku = (v.sku || '').toLowerCase();
+      return pName.includes(q) || bName.includes(q) || sName.includes(q) || pres.includes(q) || sku.includes(q);
+    });
+  }, [posQuickSearch, availableVariants]);
+
+  const handleQuickAddProduct = (variant: InventorySummaryDto) => {
+    setPosItems((prev) => {
+      if (prev.length === 1 && !prev[0].variantId) {
+        return [{ variantId: variant.variantId, quantity: 1 }];
+      }
+      const existingIndex = prev.findIndex((item) => item.variantId === variant.variantId);
+      if (existingIndex >= 0) {
+        return prev.map((item, idx) => {
+          if (idx !== existingIndex) return item;
+          const nextQty = Math.min(item.quantity + 1, variant.availableStock);
+          return { ...item, quantity: nextQty };
+        });
+      }
+      return [...prev, { variantId: variant.variantId, quantity: 1 }];
+    });
+    setPosQuickSearch('');
+    setIsPosQuickSearchOpen(false);
+  };
 
   const handleAddPosLine = () => {
     const usedIds = new Set(posItems.map((i) => i.variantId));
@@ -944,6 +980,139 @@ export default function AdminVentasPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {/* Quick Search & Add Bar for 200-400 articles */}
+                  <div className="p-3 rounded-2xl bg-gradient-to-r from-blush/40 via-cream/50 to-blush/30 border border-wine/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="pos-quick-search-input" className="text-xs font-bold text-wine flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5" />
+                        <span>Buscador rápido de artículos</span>
+                      </label>
+                      <span className="text-[10px] font-semibold text-muted bg-white/80 px-2 py-0.5 rounded-full border border-border">
+                        {availableVariants.length} disponibles
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-wine/70 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        id="pos-quick-search-input"
+                        type="text"
+                        value={posQuickSearch}
+                        onChange={(e) => {
+                          setPosQuickSearch(e.target.value);
+                          setIsPosQuickSearchOpen(true);
+                        }}
+                        onFocus={() => {
+                          if (posQuickSearch.trim()) setIsPosQuickSearchOpen(true);
+                        }}
+                        placeholder="Buscar por nombre, tono, marca o SKU para agregar al instante..."
+                        className="w-full pl-10 pr-9 py-2 rounded-xl bg-white border border-wine/30 hover:border-wine text-xs text-ink placeholder:text-muted/70 focus:outline-hidden focus:ring-2 focus:ring-wine/20 shadow-2xs transition"
+                      />
+                      {posQuickSearch && (
+                        <button
+                          type="button"
+                          aria-label="Limpiar búsqueda rápida"
+                          onClick={() => {
+                            setPosQuickSearch('');
+                            setIsPosQuickSearchOpen(false);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-cream hover:bg-blush flex items-center justify-center text-muted hover:text-wine text-xs"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick Search Dropdown Results */}
+                    {isPosQuickSearchOpen && posQuickSearch.trim().length > 0 && (
+                      <div className="mt-1 bg-white rounded-2xl border border-wine/40 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                        <div className="px-3 py-1.5 border-b border-border/60 bg-cream/40 flex items-center justify-between text-[11px] text-muted">
+                          <span>
+                            Resultados ({filteredVariantsForQuickSearch.length}) para &ldquo;{posQuickSearch}&rdquo;
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsPosQuickSearchOpen(false)}
+                            className="text-[10px] font-bold text-wine hover:underline"
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto divide-y divide-border/50 p-1">
+                          {filteredVariantsForQuickSearch.length === 0 ? (
+                            <div className="p-4 text-center text-xs text-muted">
+                              No se encontró ningún artículo disponible con &ldquo;{posQuickSearch}&rdquo;.
+                            </div>
+                          ) : (
+                            filteredVariantsForQuickSearch.slice(0, 40).map((v) => {
+                              const shadeLabel = formatCleanShade(v.shadeName, v.presentation);
+                              const alreadyInCart = posItems.some((item) => item.variantId === v.variantId);
+                              return (
+                                <button
+                                  key={v.variantId}
+                                  type="button"
+                                  onClick={() => handleQuickAddProduct(v)}
+                                  className="w-full p-2 rounded-xl hover:bg-cream/80 flex items-center justify-between gap-2.5 text-left transition group"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-blush/40 border border-border flex-shrink-0 flex items-center justify-center">
+                                      {v.imageUrl ? (
+                                        <img src={v.imageUrl} alt={v.productName} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <Package className="w-4 h-4 text-wine/70" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <p className="text-xs font-bold text-ink truncate group-hover:text-wine transition">
+                                          {v.productName}
+                                        </p>
+                                        {alreadyInCart && (
+                                          <span className="text-[9px] font-bold text-wine bg-blush px-1.5 py-0.2 rounded-full">
+                                            En venta
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                        {v.shadeHex && (
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full border border-black/15 flex-shrink-0"
+                                            style={{ backgroundColor: v.shadeHex }}
+                                          />
+                                        )}
+                                        <span className="text-[11px] font-medium text-wine truncate">
+                                          {shadeLabel}
+                                        </span>
+                                        {v.brandName && (
+                                          <span className="text-[10px] text-muted">
+                                            · {v.brandName}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right flex-shrink-0 flex items-center gap-2">
+                                    <div>
+                                      <span className="block text-xs font-bold text-wine">
+                                        {formatCOP(v.salePrice || 0)}
+                                      </span>
+                                      <span className="inline-block text-[10px] font-semibold px-1.5 py-0.2 rounded-md bg-[#E2F5EA] text-[#196B3E]">
+                                        {v.availableStock} disp.
+                                      </span>
+                                    </div>
+                                    <div className="w-6 h-6 rounded-lg bg-blush/60 text-wine flex items-center justify-center group-hover:bg-wine group-hover:text-white transition">
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {posItems.map((line, idx) => {
                     const selectedVar = availableVariants.find((v) => v.variantId === line.variantId);
                     const unitPrice = selectedVar?.salePrice || 0;
@@ -956,10 +1125,11 @@ export default function AdminVentasPage() {
                       if (!pickerSearch.trim()) return true;
                       const q = pickerSearch.toLowerCase().trim();
                       return (
-                        v.productName.toLowerCase().includes(q) ||
+                        (v.productName && v.productName.toLowerCase().includes(q)) ||
                         (v.brandName && v.brandName.toLowerCase().includes(q)) ||
                         (v.shadeName && v.shadeName.toLowerCase().includes(q)) ||
-                        (v.presentation && v.presentation.toLowerCase().includes(q))
+                        (v.presentation && v.presentation.toLowerCase().includes(q)) ||
+                        (v.sku && v.sku.toLowerCase().includes(q))
                       );
                     });
 
@@ -1045,14 +1215,26 @@ export default function AdminVentasPage() {
                                 className="mt-2 rounded-2xl bg-white border border-wine/40 shadow-xl p-2.5 space-y-2 z-30"
                               >
                                 <div className="relative">
-                                  <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                                  <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                   <input
+                                    id={`pos-picker-search-${idx}`}
                                     type="text"
-                                    placeholder="Buscar por nombre o tono..."
+                                    autoFocus
+                                    placeholder="Buscar por nombre, tono, marca o SKU..."
                                     value={pickerSearch}
                                     onChange={(e) => setPickerSearch(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-cream/60 border border-border text-xs text-ink focus:outline-hidden focus:border-wine"
+                                    className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-cream/60 border border-border text-xs text-ink focus:outline-hidden focus:border-wine"
                                   />
+                                  {pickerSearch && (
+                                    <button
+                                      type="button"
+                                      aria-label="Limpiar filtro"
+                                      onClick={() => setPickerSearch('')}
+                                      className="w-4 h-4 rounded-full bg-border/60 hover:bg-border text-muted hover:text-ink absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-xs"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  )}
                                 </div>
 
                                 <div className="max-h-56 overflow-y-auto divide-y divide-border/50">

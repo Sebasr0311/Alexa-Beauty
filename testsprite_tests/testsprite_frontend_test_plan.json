@@ -965,5 +965,46 @@
       }
     ],
     "priority": "High"
+  },
+  {
+    "id": "TC032",
+    "title": "Search and quick-add products in physical store sale registration modal",
+    "description": "Verifies that an admin in /admin/ventas can use the quick search bar and line picker search to quickly find and filter through 200-400 products by name, brand, tone, or SKU, add them to the sale, adjust quantities, and clear filters.",
+    "category": "Admin Registro de Ventas Físicas y POS",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/ventas and click 'Registrar Venta Física'"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the quick search input and available count are visible"
+      },
+      {
+        "type": "action",
+        "description": "Type a query (name, brand, or tone) into the quick search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify filtered results dropdown appears with photos, shade swatches, prices, and stock"
+      },
+      {
+        "type": "action",
+        "description": "Click a search result to add it to the sale"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the item is added to the sale list, subtotal is updated, and search input is cleared"
+      },
+      {
+        "type": "action",
+        "description": "Open a line picker and verify line picker search input has autofocus and filters by SKU/tone/name"
+      },
+      {
+        "type": "action",
+        "description": "Click the clear button (×) to reset the filter"
+      }
+    ],
+    "priority": "High"
   }
 ]

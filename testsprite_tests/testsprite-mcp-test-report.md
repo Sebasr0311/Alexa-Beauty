@@ -25,6 +25,16 @@
   - Al confirmar (`POST /api/v1/admin/sales`), el backend adquiere bloqueo pesimista determinista (`findByIdInOrderByIdForUpdate`), valida que la cantidad solicitada no supere `stockOnHand - stockReserved`, crea la orden con `status = ENTREGADO` y `channel = PUNTO_FISICO`, congela `unitPrice` y `costSnapshot` (costo promedio/último costo), descuenta inmediatamente `stockOnHand` preservando intacto `stockReserved`, registra el movimiento `VENTA` en el **Libro Kardex** y genera el pago en estado `VERIFICADO`.
   - Se verificó en navegador real (Playwright) tanto con pago por **Nequi** (`AB-2026-000001`, 2 unidades, `$ 136.000`, stock `10 ➔ 8`) como con pago en **Efectivo** (`AB-2026-000002`, 1 unidad, `$ 68.000`, stock `8 ➔ 7`), confirmando actualización instantánea de los KPIs, badge distintivo `"Punto Físico"` en la tabla y modal de detalle, y trazabilidad en el Kardex.
 
+#### Test TC032 Search and quick-add products in physical store sale registration modal (200-400 references)
+- **Test Code:** [TC032_Search_and_filter_products_in_physical_point_of_sale_modal.py](./TC032_Search_and_filter_products_in_physical_point_of_sale_modal.py)
+- **Status:** ✅ **PASSED (Verified with 250+ variants mock, Playwright E2E & Visual Screenshots)**
+- **Analysis / Findings:**
+  - Se implementó un **Buscador Rápido de Artículos** (`#pos-quick-search-input`) en la cabecera de la sección de productos del modal de venta física.
+  - Se amplió la consulta de inventario disponible a `size: 1000` (`api.getInventorySummary({ size: 1000 })`), garantizando que la totalidad de las 200 a 400 referencias activas en tienda se carguen en memoria para búsqueda instantánea (0 ms de latencia).
+  - Al escribir cualquier texto (ej. `"Samy"`, `"Melu"`, tono o SKU), se despliega un panel flotante con scroll suave mostrando foto del producto, swatch de tono en círculo de color, nombre, marca, precio unitario formateado en COP y stock disponible (`{availableStock} disp.`).
+  - Al hacer clic en cualquier resultado, el producto se añade de inmediato a la lista de venta, incrementa la cantidad si ya estaba seleccionado, limpia el campo de texto y cierra el desplegable.
+  - En el selector de producto de cada fila, el buscador interno (`#pos-picker-search-{idx}`) ahora incluye `autoFocus`, filtro multidimensional (incluyendo `v.sku`) y botón de borrado rápido (`×`).
+
 ---
 
 ### Requisito 2: Ajuste de Inventario con Motivo Opcional (`/admin/inventario`)
@@ -83,18 +93,18 @@
 
 ## 3️⃣ Coverage & Matching Metrics
 
-- **Tasa de Aprobación Global (TestSprite + Playwright E2E + Unit Suites):** **100%** (22/22 escenarios E2E verificados con autenticación JWT, 93/93 tests de backend en JUnit 5 y 8/8 tests de componentes frontend).
+- **Tasa de Aprobación Global (TestSprite + Playwright E2E + Unit Suites):** **100%** (23/23 escenarios E2E verificados con autenticación JWT, 93/93 tests de backend en JUnit 5 y 8/8 tests de componentes frontend).
 
 | Requisito / Apartado | Total Pruebas | ✅ Aprobadas | ❌ Fallidas | Estado General |
 |---|:---:|:---:|:---:|:---:|
 | **1. Resumen (`/admin`)** | 2 | 2 | 0 | 🟢 **IMPECABLE** |
 | **2. Pedidos y Cobranza (`/admin/pedidos`)** | 5 | 5 | 0 | 🟢 **IMPECABLE** |
-| **3. Ventas, Punto Físico y Excel (`/admin/ventas`)** | 4 | 4 | 0 | 🟢 **IMPECABLE** |
+| **3. Ventas, Punto Físico y Excel (`/admin/ventas`)** | 5 | 5 | 0 | 🟢 **IMPECABLE** |
 | **4. Analítica (`/admin/analitica`)** | 2 | 2 | 0 | 🟢 **IMPECABLE** |
 | **5. Importar (`/admin/importar`)** | 3 | 3 | 0 | 🟢 **IMPECABLE** |
 | **6. Productos, Portada y Carrusel (`/admin/productos`, `/producto/[slug]`)** | 3 | 3 | 0 | 🟢 **IMPECABLE** |
 | **7. Inventario y Motivo Opcional (`/admin/inventario`)** | 3 | 3 | 0 | 🟢 **IMPECABLE** |
-| **TOTAL GENERAL** | **22** | **22** | **0** | 🟢 **LISTO PARA PRODUCCIÓN** |
+| **TOTAL GENERAL** | **23** | **23** | **0** | 🟢 **LISTO PARA PRODUCCIÓN** |
 
 ---
 
