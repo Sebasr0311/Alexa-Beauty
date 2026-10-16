@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-const defaultProdBackend = 'https://alexa-beauty-api.onrender.com/api/v1';
+const defaultProdBackend = 'https://alexa-beauty.onrender.com/api/v1';
 const backend = process.env.API_BACKEND_URL || (process.env.NODE_ENV === 'production' ? defaultProdBackend : 'http://localhost:8080/api/v1');
 if (process.env.NODE_ENV === 'production' && !backend.startsWith('https://')) {
   throw new Error('Production requires an HTTPS API_BACKEND_URL');
