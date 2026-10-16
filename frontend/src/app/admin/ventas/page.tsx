@@ -33,6 +33,8 @@ import {
   Plus,
   Trash2,
   Store,
+  ChevronDown,
+  Percent,
 } from 'lucide-react';
 import {
   api,
@@ -51,13 +53,37 @@ import {
 } from '@/lib/utils';
 
 // Fallback mock data in case backend is offline or empty during preview
-const EMPTY_SALES_SUMMARY: SalesSummaryDto = { totalSales: 0, paidOrdersCount: 0, totalUnitsSold: 0, averageTicket: 0, startDate: '', endDate: '' };
+const EMPTY_SALES_SUMMARY: SalesSummaryDto = {
+  totalSales: 0,
+  paidOrdersCount: 0,
+  totalUnitsSold: 0,
+  averageTicket: 0,
+  startDate: '',
+  endDate: '',
+  merchandiseRevenue: 0,
+  coveredMerchandiseRevenue: 0,
+  knownCostTotal: 0,
+  grossProfit: 0,
+  grossMarginPercentage: null,
+  unitsWithoutCost: 0,
+};
 
 const EMPTY_SALES_ORDERS: SaleOrderDto[] = [];
 
 interface PosLineItem {
   variantId: string;
   quantity: number;
+}
+
+function formatCleanShade(shadeName?: string, presentation?: string): string {
+  const cleanShade =
+    shadeName && shadeName.trim().toLowerCase() !== 'default' ? shadeName.trim() : '';
+  const cleanPres =
+    presentation && presentation.trim().toLowerCase() !== 'default' ? presentation.trim() : '';
+  if (cleanShade && cleanPres) return `${cleanShade} · ${cleanPres}`;
+  if (cleanShade) return cleanShade;
+  if (cleanPres) return cleanPres;
+  return 'Tono único';
 }
 
 export default function AdminVentasPage() {
@@ -94,8 +120,11 @@ export default function AdminVentasPage() {
   const [loadingVariants, setLoadingVariants] = useState<boolean>(false);
   const [availableVariants, setAvailableVariants] = useState<InventorySummaryDto[]>([]);
   const [posItems, setPosItems] = useState<PosLineItem[]>([{ variantId: '', quantity: 1 }]);
+  const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
+  const [pickerSearch, setPickerSearch] = useState<string>('');
   const [posPaymentMethod, setPosPaymentMethod] = useState<CreatePhysicalSaleRequestDto['paymentMethod']>('EFECTIVO');
   const [posTransferReference, setPosTransferReference] = useState<string>('');
+  const [posDiscountMode, setPosDiscountMode] = useState<'COP' | 'PERCENT'>('COP');
   const [posDiscount, setPosDiscount] = useState<string>('');
   const [posCustomerName, setPosCustomerName] = useState<string>('');
   const [posCustomerPhone, setPosCustomerPhone] = useState<string>('');
@@ -104,12 +133,14 @@ export default function AdminVentasPage() {
   const [posError, setPosError] = useState<string | null>(null);
 
   // Fetch sales from API
-  const fetchSales = useCallback(async () => {
+  const fetchSales = useCallback(async (overrideDates?: { from?: string; to?: string }) => {
     setLoading(true);
     try {
+      const effectiveFrom = overrideDates?.from ?? fromDate;
+      const effectiveTo = overrideDates?.to ?? toDate;
       const res = await api.getAdminSales({
-        from: fromDate,
-        to: toDate,
+        from: effectiveFrom,
+        to: effectiveTo,
         method: paymentMethodFilter === 'TODOS' ? undefined : paymentMethodFilter,
         page,
         size: pageSize,
@@ -134,10 +165,13 @@ export default function AdminVentasPage() {
     setPosError(null);
     setPosPaymentMethod('EFECTIVO');
     setPosTransferReference('');
+    setPosDiscountMode('COP');
     setPosDiscount('');
     setPosCustomerName('');
     setPosCustomerPhone('');
     setPosNotes('');
+    setOpenPickerIndex(null);
+    setPickerSearch('');
     setIsPosModalOpen(true);
     setLoadingVariants(true);
     try {
@@ -168,21 +202,62 @@ export default function AdminVentasPage() {
 
   const posDiscountAmount = useMemo(() => {
     const parsed = Number(posDiscount);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-  }, [posDiscount]);
+    if (!Number.isFinite(parsed) || parsed <= 0 || posSubtotal <= 0) return 0;
+    if (posDiscountMode === 'PERCENT') {
+      const pct = Math.min(100, Math.max(0, parsed));
+      return Math.round((posSubtotal * pct) / 100);
+    }
+    return Math.round(parsed);
+  }, [posDiscount, posDiscountMode, posSubtotal]);
 
   const posTotal = useMemo(() => {
     return Math.max(0, posSubtotal - posDiscountAmount);
   }, [posSubtotal, posDiscountAmount]);
 
+  const posCostAndProfit = useMemo(() => {
+    let totalCost = 0;
+    let coveredSub = 0;
+    let missingCostUnits = 0;
+    for (const item of posItems) {
+      const variant = availableVariants.find((v) => v.variantId === item.variantId);
+      if (!variant) continue;
+      const qty = Math.max(0, Number(item.quantity) || 0);
+      const unitPrice = variant.salePrice || 0;
+      if (variant.referenceCost != null && variant.referenceCost >= 0) {
+        totalCost += variant.referenceCost * qty;
+        coveredSub += unitPrice * qty;
+      } else {
+        missingCostUnits += qty;
+      }
+    }
+    const discountShare =
+      posSubtotal > 0 && coveredSub > 0
+        ? Math.round((posDiscountAmount * coveredSub) / posSubtotal)
+        : 0;
+    const netCoveredRevenue = Math.max(0, coveredSub - discountShare);
+    const estimatedProfit = netCoveredRevenue - totalCost;
+    return {
+      totalCost,
+      coveredSub,
+      netCoveredRevenue,
+      estimatedProfit,
+      missingCostUnits,
+    };
+  }, [posItems, availableVariants, posSubtotal, posDiscountAmount]);
+
   const handleAddPosLine = () => {
     const usedIds = new Set(posItems.map((i) => i.variantId));
     const nextAvailable = availableVariants.find((v) => !usedIds.has(v.variantId)) || availableVariants[0];
     setPosItems((prev) => [...prev, { variantId: nextAvailable ? nextAvailable.variantId : '', quantity: 1 }]);
+    setOpenPickerIndex(null);
+    setPickerSearch('');
   };
 
   const handleRemovePosLine = (index: number) => {
     setPosItems((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== index) : prev));
+    if (openPickerIndex === index) {
+      setOpenPickerIndex(null);
+    }
   };
 
   const handlePosLineChange = (index: number, field: 'variantId' | 'quantity', value: string | number) => {
@@ -203,6 +278,11 @@ export default function AdminVentasPage() {
         return { ...line, quantity: parsedQty };
       })
     );
+  };
+
+  const applyQuickDiscount = (mode: 'COP' | 'PERCENT', value: string) => {
+    setPosDiscountMode(mode);
+    setPosDiscount(value);
   };
 
   const handleSubmitPosSale = async (e: React.FormEvent) => {
@@ -256,15 +336,17 @@ export default function AdminVentasPage() {
       });
 
       setIsPosModalOpen(false);
-      // Ensure 'toDate' includes today so the newly registered sale is immediately visible
+      // Ensure date filter includes today so the newly registered sale is immediately visible & exported
       const today = getColombiaToday();
-      if (toDate < today) {
-        setToDate(today);
-      }
-      await fetchSales();
+      const nextFrom = fromDate > today ? today : fromDate;
+      const nextTo = toDate < today ? today : toDate;
+      if (nextFrom !== fromDate) setFromDate(nextFrom);
+      if (nextTo !== toDate) setToDate(nextTo);
+
+      await fetchSales({ from: nextFrom, to: nextTo });
       setFeedbackMessage({
         type: 'success',
-        text: `Venta en punto físico ${created.reference} registrada exitosamente (${created.paymentMethod}) por ${formatCOP(created.total)}. Stock descontado automáticamente.`,
+        text: `Venta en punto físico ${created.reference} registrada exitosamente (${created.paymentMethod}) por ${formatCOP(created.total)}. Stock descontado e incluida en ganancias y reporte Excel.`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'No se pudo registrar la venta en punto físico.';
@@ -425,8 +507,8 @@ export default function AdminVentasPage() {
           </div>
         )}
 
-        {/* 4 Brand Palette KPI Cards */}
-        <section aria-label="Métricas de ventas" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 5 Brand Palette KPI Cards (Including Ganancia Bruta) */}
+        <section aria-label="Métricas de ventas" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total Ventas Pagadas */}
           <div className="bg-white border border-[#EADDE0] rounded-2xl p-5 shadow-sm relative overflow-hidden group hover:border-wine transition">
             <div className="flex items-center justify-between">
@@ -440,7 +522,25 @@ export default function AdminVentasPage() {
             </p>
             <span className="text-[11px] text-muted flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-mauve" />
-              Ingresos brutos confirmados
+              Ingresos netos confirmados
+            </span>
+          </div>
+
+          {/* Ganancia Bruta / Utilidad */}
+          <div className="bg-white border border-[#EADDE0] rounded-2xl p-5 shadow-sm relative overflow-hidden group hover:border-emerald-700 transition">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted font-medium">Ganancia Bruta</span>
+              <div className="w-9 h-9 rounded-xl bg-[#E2F5EA] text-[#24734E] flex items-center justify-center">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+            </div>
+            <p className="font-serif text-2xl sm:text-3xl font-bold text-[#196B3E] my-2 tracking-tight">
+              {formatCOP(salesResponse.summary.grossProfit || 0)}
+            </p>
+            <span className="text-[11px] text-[#24734E] font-semibold flex items-center gap-1">
+              {salesResponse.summary.grossMarginPercentage != null
+                ? `Margen: ${salesResponse.summary.grossMarginPercentage}% (incluye dcto.)`
+                : 'Ventas menos costos registrados'}
             </span>
           </div>
 
@@ -456,7 +556,7 @@ export default function AdminVentasPage() {
               {salesResponse.summary.paidOrdersCount || 0}
             </p>
             <span className="text-[11px] text-[#24734E] font-semibold flex items-center gap-1">
-              ✓ Órdenes con pago verificado
+              ✓ Online y Punto Físico
             </span>
           </div>
 
@@ -488,7 +588,7 @@ export default function AdminVentasPage() {
               {formatCOP(salesResponse.summary.averageTicket || 0)}
             </p>
             <span className="text-[11px] text-muted flex items-center gap-1">
-              Promedio por orden pagada
+              Promedio por venta confirmada
             </span>
           </div>
         </section>
@@ -696,7 +796,12 @@ export default function AdminVentasPage() {
 
                       {/* Total */}
                       <td className="py-3.5 px-3.5 font-bold text-ink text-right whitespace-nowrap">
-                        {formatCOP(order.total)}
+                        <div>{formatCOP(order.total)}</div>
+                        {order.discount > 0 && (
+                          <div className="text-[10px] font-semibold text-[#24734E]">
+                            Dcto: -{formatCOP(order.discount)}
+                          </div>
+                        )}
                       </td>
 
                       {/* Verificado Por */}
@@ -790,7 +895,7 @@ export default function AdminVentasPage() {
                   Registrar Venta en Punto Físico
                 </h3>
                 <p className="text-muted text-xs">
-                  Selecciona los productos entregados al cliente y el método de pago recibido. El stock se descontará al instante.
+                  Selecciona los productos disponibles con su foto, tono y precio predeterminado. El stock y las ganancias se actualizan al instante.
                 </p>
               </div>
 
@@ -811,11 +916,11 @@ export default function AdminVentasPage() {
               </div>
             )}
 
-            {/* Step 1: Products Selection */}
+            {/* Step 1: Visual Products Selection (Photo + Name + Tone + Default Price, NO long SKU) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold uppercase tracking-wider text-wine">
-                  1. Productos Vendidos ({posItems.length})
+                  1. Productos Disponibles a Vender ({posItems.length})
                 </label>
                 <button
                   type="button"
@@ -831,79 +936,247 @@ export default function AdminVentasPage() {
               {loadingVariants ? (
                 <div className="p-6 rounded-2xl bg-cream/50 border border-border text-center text-xs text-muted flex items-center justify-center gap-2">
                   <RefreshCw className="w-4 h-4 animate-spin text-wine" />
-                  <span>Cargando productos con stock disponible...</span>
+                  <span>Cargando catálogo disponible con fotos y precios...</span>
                 </div>
               ) : availableVariants.length === 0 ? (
                 <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-center">
                   No hay productos activos con unidades disponibles en inventario para vender en este momento.
                 </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {posItems.map((line, idx) => {
                     const selectedVar = availableVariants.find((v) => v.variantId === line.variantId);
                     const unitPrice = selectedVar?.salePrice || 0;
                     const maxStock = selectedVar?.availableStock || 1;
                     const lineSub = unitPrice * (Number(line.quantity) || 0);
+                    const isPickerOpen = openPickerIndex === idx;
+                    const shadeLabel = formatCleanShade(selectedVar?.shadeName, selectedVar?.presentation);
+
+                    const filteredVariantsForPicker = availableVariants.filter((v) => {
+                      if (!pickerSearch.trim()) return true;
+                      const q = pickerSearch.toLowerCase().trim();
+                      return (
+                        v.productName.toLowerCase().includes(q) ||
+                        (v.brandName && v.brandName.toLowerCase().includes(q)) ||
+                        (v.shadeName && v.shadeName.toLowerCase().includes(q)) ||
+                        (v.presentation && v.presentation.toLowerCase().includes(q))
+                      );
+                    });
 
                     return (
                       <div
                         key={idx}
-                        className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-cream/50 border border-border rounded-2xl p-3"
+                        className="bg-cream/50 border border-border rounded-2xl p-3.5 space-y-2.5"
                       >
-                        <div className="sm:col-span-7">
-                          <label htmlFor={`pos-product-${idx}`} className="block text-[10px] font-bold uppercase text-muted mb-1">
-                            Producto disponible
-                          </label>
-                          <select
-                            id={`pos-product-${idx}`}
-                            aria-label={`Producto ${idx + 1}`}
-                            value={line.variantId}
-                            onChange={(e) => handlePosLineChange(idx, 'variantId', e.target.value)}
-                            className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs font-semibold text-ink focus:outline-hidden focus:border-wine"
-                            required
-                          >
-                            {availableVariants.map((v) => (
-                              <option key={v.variantId} value={v.variantId}>
-                                {v.sku} — {v.productName}
-                                {v.shadeName ? ` (${v.shadeName})` : ''} · {formatCOP(v.salePrice || 0)} ({v.availableStock} disp.)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label htmlFor={`pos-qty-${idx}`} className="block text-[10px] font-bold uppercase text-muted mb-1">
-                            Cantidad (máx {maxStock})
-                          </label>
-                          <input
-                            id={`pos-qty-${idx}`}
-                            aria-label={`Cantidad producto ${idx + 1}`}
-                            type="number"
-                            min={1}
-                            max={maxStock}
-                            value={line.quantity}
-                            onChange={(e) => handlePosLineChange(idx, 'quantity', e.target.value)}
-                            className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs font-bold text-wine text-center focus:outline-hidden focus:border-wine"
-                            required
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2 text-right">
-                          <span className="block text-[10px] font-bold uppercase text-muted mb-1">Subtotal</span>
-                          <span className="text-xs font-bold text-ink">{formatCOP(lineSub)}</span>
-                        </div>
-
-                        <div className="sm:col-span-1 flex justify-end">
-                          {posItems.length > 1 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                          {/* Visual Product Selector Button */}
+                          <div className="sm:col-span-7 relative">
+                            <span className="block text-[10px] font-bold uppercase text-muted mb-1">
+                              Producto disponible (Foto · Nombre · Tono)
+                            </span>
                             <button
                               type="button"
-                              onClick={() => handleRemovePosLine(idx)}
-                              className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 transition"
-                              aria-label={`Quitar producto ${idx + 1}`}
+                              id={`pos-product-${idx}`}
+                              aria-label={`Seleccionar producto ${idx + 1}`}
+                              aria-expanded={isPickerOpen}
+                              onClick={() => {
+                                if (isPickerOpen) {
+                                  setOpenPickerIndex(null);
+                                } else {
+                                  setOpenPickerIndex(idx);
+                                  setPickerSearch('');
+                                }
+                              }}
+                              className="w-full rounded-2xl bg-white border border-border hover:border-wine px-3 py-2.5 text-left transition flex items-center justify-between gap-3 shadow-2xs"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              {selectedVar ? (
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {/* Product Thumbnail */}
+                                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-blush/50 border border-border flex-shrink-0 flex items-center justify-center">
+                                    {selectedVar.imageUrl ? (
+                                      <img
+                                        src={selectedVar.imageUrl}
+                                        alt={selectedVar.productName}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <Package className="w-5 h-5 text-wine/70" />
+                                    )}
+                                  </div>
+                                  {/* Name, Tone & Default Price */}
+                                  <div className="min-w-0">
+                                    <p className="text-xs sm:text-sm font-bold text-ink truncate">
+                                      {selectedVar.productName}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-wine bg-blush/70 px-2 py-0.5 rounded-full">
+                                        {selectedVar.shadeHex && (
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full border border-black/15 flex-shrink-0"
+                                            style={{ backgroundColor: selectedVar.shadeHex }}
+                                          />
+                                        )}
+                                        <span>{shadeLabel}</span>
+                                      </span>
+                                      <span className="text-[11px] font-bold text-[#196B3E] bg-[#E2F5EA] px-2 py-0.5 rounded-full">
+                                        {formatCOP(unitPrice)} c/u
+                                      </span>
+                                      <span className="text-[10px] font-semibold text-muted">
+                                        ({selectedVar.availableStock} disp.)
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted">Haz clic para elegir un producto...</span>
+                              )}
+                              <ChevronDown
+                                className={`w-4 h-4 text-wine flex-shrink-0 transition-transform ${
+                                  isPickerOpen ? 'rotate-180' : ''
+                                }`}
+                              />
                             </button>
-                          )}
+
+                            {/* Visual Dropdown Panel */}
+                            {isPickerOpen && (
+                              <div
+                                role="listbox"
+                                aria-label={`Opciones para producto ${idx + 1}`}
+                                className="mt-2 rounded-2xl bg-white border border-wine/40 shadow-xl p-2.5 space-y-2 z-30"
+                              >
+                                <div className="relative">
+                                  <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                                  <input
+                                    type="text"
+                                    placeholder="Buscar por nombre o tono..."
+                                    value={pickerSearch}
+                                    onChange={(e) => setPickerSearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-cream/60 border border-border text-xs text-ink focus:outline-hidden focus:border-wine"
+                                  />
+                                </div>
+
+                                <div className="max-h-56 overflow-y-auto divide-y divide-border/50">
+                                  {filteredVariantsForPicker.length === 0 ? (
+                                    <p className="text-xs text-muted text-center py-4">
+                                      No se encontraron productos disponibles con ese nombre o tono.
+                                    </p>
+                                  ) : (
+                                    filteredVariantsForPicker.map((v) => {
+                                      const isCurrent = v.variantId === line.variantId;
+                                      const vShade = formatCleanShade(v.shadeName, v.presentation);
+                                      return (
+                                        <button
+                                          key={v.variantId}
+                                          type="button"
+                                          role="option"
+                                          aria-selected={isCurrent}
+                                          onClick={() => {
+                                            handlePosLineChange(idx, 'variantId', v.variantId);
+                                            setOpenPickerIndex(null);
+                                            setPickerSearch('');
+                                          }}
+                                          className={`w-full p-2 rounded-xl flex items-center justify-between gap-2.5 text-left transition ${
+                                            isCurrent
+                                              ? 'bg-blush/80 border border-wine/30'
+                                              : 'hover:bg-cream/70'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-blush/40 border border-border flex-shrink-0 flex items-center justify-center">
+                                              {v.imageUrl ? (
+                                                <img
+                                                  src={v.imageUrl}
+                                                  alt={v.productName}
+                                                  className="w-full h-full object-cover"
+                                                />
+                                              ) : (
+                                                <Package className="w-4 h-4 text-wine/70" />
+                                              )}
+                                            </div>
+                                            <div className="min-w-0">
+                                              <p className="text-xs font-bold text-ink truncate">
+                                                {v.productName}
+                                              </p>
+                                              <div className="flex items-center gap-1.5 mt-0.5">
+                                                {v.shadeHex && (
+                                                  <span
+                                                    className="w-2.5 h-2.5 rounded-full border border-black/15 flex-shrink-0"
+                                                    style={{ backgroundColor: v.shadeHex }}
+                                                  />
+                                                )}
+                                                <span className="text-[11px] font-medium text-wine truncate">
+                                                  {vShade}
+                                                </span>
+                                                {v.brandName && (
+                                                  <span className="text-[10px] text-muted">
+                                                    · {v.brandName}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="text-right flex-shrink-0">
+                                            <span className="block text-xs font-bold text-wine">
+                                              {formatCOP(v.salePrice || 0)}
+                                            </span>
+                                            <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#E2F5EA] text-[#196B3E]">
+                                              {v.availableStock} disp.
+                                            </span>
+                                          </div>
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quantity Input */}
+                          <div className="sm:col-span-2">
+                            <label htmlFor={`pos-qty-${idx}`} className="block text-[10px] font-bold uppercase text-muted mb-1">
+                              Cantidad (máx {maxStock})
+                            </label>
+                            <input
+                              id={`pos-qty-${idx}`}
+                              aria-label={`Cantidad producto ${idx + 1}`}
+                              type="number"
+                              min={1}
+                              max={maxStock}
+                              value={line.quantity}
+                              onChange={(e) => handlePosLineChange(idx, 'quantity', e.target.value)}
+                              className="w-full rounded-xl bg-white border border-border px-3 py-2.5 text-xs font-bold text-wine text-center focus:outline-hidden focus:border-wine"
+                              required
+                            />
+                          </div>
+
+                          {/* Line Subtotal */}
+                          <div className="sm:col-span-2 text-right">
+                            <span className="block text-[10px] font-bold uppercase text-muted mb-1">
+                              Subtotal línea
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-ink">
+                              {formatCOP(lineSub)}
+                            </span>
+                            <span className="block text-[10px] text-muted">
+                              {formatCOP(unitPrice)} c/u
+                            </span>
+                          </div>
+
+                          {/* Remove Line Button */}
+                          <div className="sm:col-span-1 flex justify-end">
+                            {posItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePosLine(idx)}
+                                className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 transition"
+                                aria-label={`Quitar producto ${idx + 1}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -912,10 +1185,10 @@ export default function AdminVentasPage() {
               )}
             </div>
 
-            {/* Step 2: Payment Method & Discount */}
-            <div className="space-y-3 border-t border-border pt-4">
+            {/* Step 2: Payment Method & Enhanced Discount Controls */}
+            <div className="space-y-4 border-t border-border pt-4">
               <label className="text-xs font-bold uppercase tracking-wider text-wine block">
-                2. Método de Pago y Condiciones
+                2. Método de Pago y Descuento
               </label>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -934,41 +1207,139 @@ export default function AdminVentasPage() {
                       }`}
                     >
                       <CreditCard className="w-3.5 h-3.5" />
-                      <span>{method === 'EFECTIVO' ? 'Efectivo' : method === 'NEQUI' ? 'Nequi' : method === 'DAVIPLATA' ? 'Daviplata' : method === 'BANCOLOMBIA' ? 'Bancolombia' : 'Otro'}</span>
+                      <span>
+                        {method === 'EFECTIVO'
+                          ? 'Efectivo'
+                          : method === 'NEQUI'
+                          ? 'Nequi'
+                          : method === 'DAVIPLATA'
+                          ? 'Daviplata'
+                          : method === 'BANCOLOMBIA'
+                          ? 'Bancolombia'
+                          : 'Otro'}
+                      </span>
                     </button>
                   );
                 })}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label htmlFor="pos-transfer-ref" className="block text-xs font-semibold text-muted mb-1">
-                    Referencia de pago / comprobante (opcional)
-                  </label>
-                  <input
-                    id="pos-transfer-ref"
-                    type="text"
-                    placeholder="Ej. Comprobante Nequi o Recibo mostrador"
-                    value={posTransferReference}
-                    onChange={(e) => setPosTransferReference(e.target.value)}
-                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
-                  />
+                {/* Discount Block ($ COP or %) */}
+                <div className="bg-cream/50 border border-border rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="pos-discount" className="text-xs font-bold text-ink">
+                      Descuento sobre el precio (opcional)
+                    </label>
+                    <div className="inline-flex rounded-xl bg-white border border-border p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosDiscountMode('COP');
+                          setPosDiscount('');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                          posDiscountMode === 'COP'
+                            ? 'bg-wine text-white'
+                            : 'text-muted hover:text-ink'
+                        }`}
+                      >
+                        $ COP
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosDiscountMode('PERCENT');
+                          setPosDiscount('');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-0.5 ${
+                          posDiscountMode === 'PERCENT'
+                            ? 'bg-wine text-white'
+                            : 'text-muted hover:text-ink'
+                        }`}
+                      >
+                        <Percent className="w-3 h-3" /> Porcentaje
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      id="pos-discount"
+                      type="number"
+                      min={0}
+                      max={posDiscountMode === 'PERCENT' ? 100 : posSubtotal}
+                      step={posDiscountMode === 'PERCENT' ? '1' : '100'}
+                      placeholder={posDiscountMode === 'PERCENT' ? 'Ej. 10 (%)' : '0'}
+                      value={posDiscount}
+                      onChange={(e) => setPosDiscount(e.target.value)}
+                      className="w-full rounded-xl bg-white border border-border px-3.5 py-2 text-xs font-bold text-ink focus:outline-hidden focus:border-wine"
+                    />
+                    {posDiscountAmount > 0 && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#196B3E]">
+                        - {formatCOP(posDiscountAmount)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quick Discount Presets */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-semibold text-muted">Rápido:</span>
+                    <button
+                      type="button"
+                      onClick={() => applyQuickDiscount('COP', '')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white border border-border hover:border-wine text-muted hover:text-wine transition"
+                    >
+                      Sin dcto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyQuickDiscount('PERCENT', '5')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blush/60 hover:bg-blush text-wine transition"
+                    >
+                      5%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyQuickDiscount('PERCENT', '10')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blush/60 hover:bg-blush text-wine transition"
+                    >
+                      10%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyQuickDiscount('PERCENT', '15')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blush/60 hover:bg-blush text-wine transition"
+                    >
+                      15%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyQuickDiscount('COP', '5000')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blush/60 hover:bg-blush text-wine transition"
+                    >
+                      -$5.000
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label htmlFor="pos-discount" className="block text-xs font-semibold text-muted mb-1">
-                    Descuento en COP (opcional)
-                  </label>
-                  <input
-                    id="pos-discount"
-                    type="number"
-                    min={0}
-                    step="100"
-                    placeholder="0"
-                    value={posDiscount}
-                    onChange={(e) => setPosDiscount(e.target.value)}
-                    className="w-full rounded-xl bg-cream/50 border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
-                  />
+                {/* Payment Reference Block */}
+                <div className="bg-cream/50 border border-border rounded-2xl p-3.5 space-y-2.5 flex flex-col justify-between">
+                  <div>
+                    <label htmlFor="pos-transfer-ref" className="block text-xs font-bold text-ink mb-1.5">
+                      Referencia de pago / comprobante (opcional)
+                    </label>
+                    <input
+                      id="pos-transfer-ref"
+                      type="text"
+                      placeholder="Ej. Comprobante Nequi o Recibo mostrador"
+                      value={posTransferReference}
+                      onChange={(e) => setPosTransferReference(e.target.value)}
+                      className="w-full rounded-xl bg-white border border-border px-3.5 py-2 text-xs text-ink focus:outline-hidden focus:border-wine"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted">
+                    Si dejas este campo vacío, se asignará automáticamente la referencia de caja física.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1024,21 +1395,41 @@ export default function AdminVentasPage() {
               </div>
             </div>
 
-            {/* Financial Summary */}
+            {/* Financial & Profit Summary */}
             <div className="bg-blush/40 border border-border rounded-2xl p-4 space-y-2">
               <div className="flex justify-between text-xs text-muted">
-                <span>Subtotal artículos:</span>
+                <span>Subtotal artículos (precio predeterminado):</span>
                 <span className="font-semibold text-ink">{formatCOP(posSubtotal)}</span>
               </div>
               {posDiscountAmount > 0 && (
                 <div className="flex justify-between text-xs text-[#24734E]">
-                  <span>Descuento aplicado:</span>
-                  <span className="font-semibold">- {formatCOP(posDiscountAmount)}</span>
+                  <span>
+                    Descuento aplicado
+                    {posSubtotal > 0
+                      ? ` (${Math.round((posDiscountAmount / posSubtotal) * 100)}%)`
+                      : ''}
+                    :
+                  </span>
+                  <span className="font-bold">- {formatCOP(posDiscountAmount)}</span>
                 </div>
               )}
               <div className="border-t border-border pt-2 flex justify-between items-center text-sm font-bold text-wine">
                 <span>Total cobrado ({posPaymentMethod}):</span>
                 <span className="font-serif text-lg">{formatCOP(posTotal)}</span>
+              </div>
+
+              {/* Real-time Profit Impact */}
+              <div className="border-t border-border/60 pt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-muted flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-[#196B3E]" />
+                  <span>Impacto en Ganancia Bruta (neto - costo base):</span>
+                </span>
+                <span className="font-bold text-[#196B3E]">
+                  + {formatCOP(posCostAndProfit.estimatedProfit)}
+                  {posCostAndProfit.totalCost > 0
+                    ? ` (Costo: ${formatCOP(posCostAndProfit.totalCost)})`
+                    : ''}
+                </span>
               </div>
             </div>
 
@@ -1152,9 +1543,8 @@ export default function AdminVentasPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-blush text-wine font-bold border-b border-border">
                     <tr>
-                      <th className="py-2.5 px-3">SKU</th>
                       <th className="py-2.5 px-3">Producto</th>
-                      <th className="py-2.5 px-3">Tono / Var.</th>
+                      <th className="py-2.5 px-3">Tono / Presentación</th>
                       <th className="py-2.5 px-2 text-center">Cant.</th>
                       <th className="py-2.5 px-3 text-right">Precio Unit.</th>
                       <th className="py-2.5 px-3 text-right">Subtotal</th>
@@ -1163,9 +1553,6 @@ export default function AdminVentasPage() {
                   <tbody className="divide-y divide-border/60">
                     {selectedOrder.items?.map((item) => (
                       <tr key={item.id} className="hover:bg-cream/40">
-                        <td className="py-2.5 px-3 font-mono font-semibold text-muted text-[11px]">
-                          {item.sku}
-                        </td>
                         <td className="py-2.5 px-3 font-semibold text-ink">
                           {item.productName}
                           {item.brandName && (
@@ -1175,7 +1562,7 @@ export default function AdminVentasPage() {
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-muted text-[11px]">
-                          {item.shadeName || '—'}
+                          {formatCleanShade(item.shadeName)}
                         </td>
                         <td className="py-2.5 px-2 text-center font-bold text-wine">
                           {item.quantity}

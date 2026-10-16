@@ -781,7 +781,11 @@ export interface InventorySummaryDto {
   brandName?: string;
   categoryName?: string;
   shadeName?: string;
+  presentation?: string;
+  shadeHex?: string;
   salePrice?: number;
+  referenceCost?: number;
+  imageUrl?: string;
   stockOnHand: number;
   stockReserved: number;
   availableStock: number;

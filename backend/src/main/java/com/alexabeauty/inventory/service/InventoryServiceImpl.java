@@ -64,6 +64,28 @@ public class InventoryServiceImpl implements InventoryService {
     private final UserRepository userRepository;
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final com.alexabeauty.media.MediaService mediaService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public InventoryServiceImpl(
+            ProductVariantRepository productVariantRepository,
+            InventoryMovementRepository inventoryMovementRepository,
+            StockReceiptRepository stockReceiptRepository,
+            StockReceiptItemRepository stockReceiptItemRepository,
+            UserRepository userRepository,
+            AuditLogRepository auditLogRepository,
+            ObjectMapper objectMapper,
+            com.alexabeauty.media.MediaService mediaService
+    ) {
+        this.productVariantRepository = productVariantRepository;
+        this.inventoryMovementRepository = inventoryMovementRepository;
+        this.stockReceiptRepository = stockReceiptRepository;
+        this.stockReceiptItemRepository = stockReceiptItemRepository;
+        this.userRepository = userRepository;
+        this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper;
+        this.mediaService = mediaService;
+    }
 
     public InventoryServiceImpl(
             ProductVariantRepository productVariantRepository,
@@ -74,13 +96,8 @@ public class InventoryServiceImpl implements InventoryService {
             AuditLogRepository auditLogRepository,
             ObjectMapper objectMapper
     ) {
-        this.productVariantRepository = productVariantRepository;
-        this.inventoryMovementRepository = inventoryMovementRepository;
-        this.stockReceiptRepository = stockReceiptRepository;
-        this.stockReceiptItemRepository = stockReceiptItemRepository;
-        this.userRepository = userRepository;
-        this.auditLogRepository = auditLogRepository;
-        this.objectMapper = objectMapper;
+        this(productVariantRepository, inventoryMovementRepository, stockReceiptRepository,
+                stockReceiptItemRepository, userRepository, auditLogRepository, objectMapper, null);
     }
 
     private String hashFingerprint(String input) {
@@ -205,6 +222,9 @@ public class InventoryServiceImpl implements InventoryService {
 
             // NEVER touch stock_reserved on receipt!
             variant.setStockOnHand(qtyAfter);
+            if (itemReq.unitCost() != null) {
+                variant.setReferenceCost(itemReq.unitCost());
+            }
             productVariantRepository.save(variant);
 
             // Create ENTRADA movement
@@ -385,7 +405,8 @@ public class InventoryServiceImpl implements InventoryService {
                 pageable
         );
 
-        return variantsPage.map(InventorySummaryResponse::from);
+        Function<String, String> urlResolver = mediaService != null ? mediaService::getPublicUrl : Function.identity();
+        return variantsPage.map(v -> InventorySummaryResponse.from(v, urlResolver));
     }
 
     @Override

@@ -56,7 +56,7 @@ public class ProductVariant {
 
     public String displayName() {
         return java.util.stream.Stream.of(shadeCode, shadeName, presentation)
-                .filter(value -> value != null && !value.isBlank())
+                .filter(value -> value != null && !value.isBlank() && !value.trim().equalsIgnoreCase("Default"))
                 .map(String::trim).collect(java.util.stream.Collectors.joining(" · "));
     }
 

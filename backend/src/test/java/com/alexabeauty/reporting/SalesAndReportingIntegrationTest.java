@@ -552,5 +552,34 @@ class SalesAndReportingIntegrationTest {
         List<String> refs = objectMapper.readTree(listRes.getResponse().getContentAsString())
                 .path("data").path("orders").findValuesAsText("reference");
         assertThat(refs).contains(createdRef);
+
+        // Verify the created physical sale is exported in /api/v1/admin/sales/export.xlsx for today's date filter
+        String todayStr = java.time.LocalDate.now(BOGOTA_ZONE).toString();
+        MvcResult excelRes = mockMvc.perform(get("/api/v1/admin/sales/export.xlsx")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("from", todayStr)
+                        .param("to", todayStr))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excelRes.getResponse().getContentAsByteArray()))) {
+            XSSFSheet ventas = wb.getSheet("VENTAS");
+            boolean foundPosOrder = false;
+            for (int r = 5; r <= ventas.getLastRowNum(); r++) {
+                var row = ventas.getRow(r);
+                if (row != null && row.getCell(1) != null && createdRef.equals(row.getCell(1).getStringCellValue())) {
+                    foundPosOrder = true;
+                    assertThat(row.getCell(4).getNumericCellValue()).isEqualTo(90000.0);
+                    assertThat(row.getCell(5).getNumericCellValue()).isEqualTo(5000.0);
+                    assertThat(row.getCell(7).getNumericCellValue()).isEqualTo(85000.0);
+                    assertThat(row.getCell(10).getStringCellValue()).isEqualTo("Punto Físico (Mostrador)");
+                }
+            }
+            assertThat(foundPosOrder).isTrue();
+
+            XSSFSheet resumen = wb.getSheet("RESUMEN");
+            assertThat(resumen.getRow(24).getCell(0).getStringCellValue()).isEqualTo("DESGLOSE POR CANAL Y DESCUENTOS");
+            assertThat(resumen.getRow(25).getCell(1).getNumericCellValue()).isGreaterThanOrEqualTo(1.0);
+        }
     }
 }
