@@ -20,6 +20,12 @@ spring:
       max-request-size: 6MB
 server:
   forward-headers-strategy: framework
+  tomcat:
+    threads:
+      max: ${TOMCAT_MAX_THREADS:16}
+      min-spare: ${TOMCAT_MIN_SPARE_THREADS:4}
+    max-connections: 100
+    accept-count: 20
 app:
   jwt:
     secret: ${JWT_SECRET}

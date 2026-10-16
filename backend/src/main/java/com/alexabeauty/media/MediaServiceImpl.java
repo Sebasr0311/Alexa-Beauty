@@ -180,29 +180,33 @@ public class MediaServiceImpl implements MediaService {
             }
         }
 
-        try (var input = javax.imageio.ImageIO.createImageInputStream(new java.io.ByteArrayInputStream(file.getBytes()))) {
-            var readers = javax.imageio.ImageIO.getImageReaders(input);
-            if (!readers.hasNext()) throw new ValidationException("El contenido no es una imagen JPEG o PNG válida.");
-            var reader = readers.next();
-            try {
-                reader.setInput(input, true, true);
-                String format = reader.getFormatName().toLowerCase(Locale.ROOT);
-                if (!(format.equals("jpeg") || format.equals("png"))
-                        || !contentType.equals(format.equals("jpeg") ? "image/jpeg" : "image/png")) {
-                    throw new ValidationException("El formato real de la imagen no coincide con el tipo declarado.");
+        try {
+            byte[] bytes = file.getBytes();
+            try (var input = javax.imageio.ImageIO.createImageInputStream(new java.io.ByteArrayInputStream(bytes))) {
+                var readers = javax.imageio.ImageIO.getImageReaders(input);
+                if (!readers.hasNext()) {
+                    throw new ValidationException("El contenido no es una imagen JPEG o PNG válida.");
                 }
-                int width = reader.getWidth(0), height = reader.getHeight(0);
-                if (width < 1 || height < 1 || (long) width * height > 16000000L) {
-                    throw new ValidationException("La imagen excede 16 megapíxeles.");
+                var reader = readers.next();
+                try {
+                    reader.setInput(input, true, true);
+                    String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+                    if (!(format.equals("jpeg") || format.equals("png"))
+                            || !contentType.equals(format.equals("jpeg") ? "image/jpeg" : "image/png")) {
+                        throw new ValidationException("El formato real de la imagen no coincide con el tipo declarado.");
+                    }
+                    int width = reader.getWidth(0);
+                    int height = reader.getHeight(0);
+                    if (width < 1 || height < 1 || (long) width * height > 16000000L) {
+                        throw new ValidationException("La imagen excede 16 megapíxeles.");
+                    }
+                    return bytes;
+                } finally {
+                    reader.dispose();
                 }
-                var image = reader.read(0);
-                var output = new java.io.ByteArrayOutputStream();
-                if (image == null || !javax.imageio.ImageIO.write(image, format, output)) {
-                    throw new ValidationException("No se pudo decodificar la imagen.");
-                }
-                if (output.size() > MAX_FILE_SIZE) throw new ValidationException("La imagen procesada excede 5MB.");
-                return output.toByteArray();
-            } finally { reader.dispose(); }
+            }
+        } catch (ValidationException ve) {
+            throw ve;
         } catch (IOException | IllegalArgumentException exception) {
             throw new ValidationException("El contenido de la imagen es inválido.");
         }
