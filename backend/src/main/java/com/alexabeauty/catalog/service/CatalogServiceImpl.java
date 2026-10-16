@@ -640,7 +640,9 @@ public class CatalogServiceImpl implements CatalogService {
         ProductImage coverImg = product.getImages().stream()
                 .filter(img -> img.getVariant() == null && img.isCover())
                 .findFirst()
-                .orElse(product.getImages().stream().filter(img -> img.getVariant() == null).findFirst().orElse(null));
+                .orElse(product.getImages().stream().filter(img -> img.getVariant() == null).findFirst()
+                        .orElse(product.getImages().stream().filter(ProductImage::isCover).findFirst()
+                                .orElse(product.getImages().stream().findFirst().orElse(null))));
 
         String coverUrl = coverImg != null ? mediaService.getPublicUrl(coverImg.getStoragePath()) : null;
 

@@ -22,8 +22,13 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
   const [selectedVariant, setSelectedVariant] = useState<ProductVariantDto | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [selectedImageIndex, selectedVariant?.id]);
 
   useEffect(() => {
     async function loadProduct() {
@@ -113,15 +118,24 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
         {/* Visual Gallery 1:1 Aspect Ratio */}
         <div className="space-y-4">
           <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#f8e4ea] to-[#ebd0d9] border border-border shadow-[0_12px_36px_rgba(92,26,49,0.06)] grid place-items-center">
-            <span className="text-8xl select-none filter drop-shadow-lg -rotate-6">
-              {images[selectedImageIndex]?.url ? <img src={images[selectedImageIndex].url} alt={images[selectedImageIndex].altText || product.name} className="absolute inset-0 h-full w-full object-contain" /> : '💄'}
-            </span>
+            {images[selectedImageIndex]?.url && !imageError ? (
+              <img
+                src={images[selectedImageIndex].url}
+                alt={images[selectedImageIndex].altText || product.name}
+                onError={() => setImageError(true)}
+                className="w-full h-full object-contain p-4 transition-transform duration-300"
+              />
+            ) : (
+              <span className="text-8xl select-none filter drop-shadow-lg -rotate-6" aria-hidden="true">
+                💄
+              </span>
+            )}
             {isOutOfStock && (
-              <span className="absolute top-4 left-4 bg-red-600/95 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
+              <span className="absolute top-4 left-4 z-10 bg-red-600/95 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
                 Agotado
               </span>
             )}
-            <span className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm text-wine text-[11px] font-extrabold tracking-wider uppercase px-3 py-1 rounded-full border border-border/50">
+            <span className="absolute top-4 right-4 z-10 bg-white/80 backdrop-blur-sm text-wine text-[11px] font-extrabold tracking-wider uppercase px-3 py-1 rounded-full border border-border/50">
               {product.brand.name}
             </span>
           </div>

@@ -21,6 +21,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [productDetail, setProductDetail] = useState<ProductDetailDto | null>(null);
   const [isShadeModalOpen, setIsShadeModalOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const isOutOfStock = product.stock <= 0;
 
   const handleAdd = async (e: React.MouseEvent) => {
@@ -104,17 +105,27 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="absolute -top-4 -right-6 w-36 h-36 bg-white/40 rounded-full pointer-events-none blur-[1px]" />
 
             {/* Badge chip */}
-            <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-wine text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
+            <span className="absolute top-3 left-3 z-10 bg-white/95 backdrop-blur-sm text-wine text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
               {product.badge}
             </span>
 
-            {/* Product Emoji / Icon */}
-            <span
-              className="text-6xl sm:text-7xl select-none filter drop-shadow-[0_15px_12px_rgba(94,49,61,0.18)] -rotate-6 group-hover:scale-105 transition-transform duration-300"
-              aria-hidden="true"
-            >
-              {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="absolute inset-0 w-full h-full object-contain" /> : product.icon}
-            </span>
+            {/* Product Image or Fallback Emoji */}
+            {product.imageUrl && !imageError ? (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                onError={() => setImageError(true)}
+                className="w-full h-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+            ) : (
+              <span
+                className="text-6xl sm:text-7xl select-none filter drop-shadow-[0_15px_12px_rgba(94,49,61,0.18)] -rotate-6 group-hover:scale-105 transition-transform duration-300"
+                aria-hidden="true"
+              >
+                {product.icon}
+              </span>
+            )}
           </div>
         </Link>
 
