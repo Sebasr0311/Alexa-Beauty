@@ -40,6 +40,13 @@ async def run_test():
         except Exception:
             pass
         
+        # -> Authenticate as Admin if redirected to /admin/login
+        if "/admin/login" in page.url:
+            await page.get_by_placeholder("admin@alexabeauty.com").fill("admin@alexabeauty.com")
+            await page.get_by_placeholder("••••••••••••••••").fill("Admin123*Alexa")
+            await page.get_by_role("button", name="Ingresar al panel").click(timeout=10000)
+            await page.wait_for_url("**/admin**", timeout=10000)
+
         # -> Navigate to the admin 'Productos' page at /admin/productos (Productos catalog).
         await page.goto("http://localhost:3000/admin/productos")
         try:

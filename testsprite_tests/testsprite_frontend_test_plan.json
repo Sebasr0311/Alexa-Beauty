@@ -93,36 +93,28 @@
   {
     "id": "TC004",
     "title": "Adjust physical stock for a product variant",
-    "description": "Verifies that a manual stock adjustment can be saved for a selected variant and the available stock updates immediately.",
+    "description": "Verifies that a manual stock adjustment can be saved for a selected variant with an optional reason and the available stock updates immediately.",
     "category": "Admin Inventario y Bodega",
     "steps": [
       {
         "type": "action",
-        "description": "Navigate to /admin/inventario"
+        "description": "Navigate to /admin/inventario and sign in using email admin@alexabeauty.com and password Admin123*Alexa if prompted"
       },
       {
         "type": "action",
-        "description": "Open the manual stock adjustment modal"
+        "description": "Click the 'Ajustar' or 'Ajuste manual' button for a product variant to open the manual stock adjustment modal"
       },
       {
         "type": "action",
-        "description": "Select a product variant"
+        "description": "Fill a valid new physical stock value (e.g. 5) into the new stock field while leaving the optional reason field empty"
       },
       {
         "type": "action",
-        "description": "Fill a valid new physical stock value into the stock field"
-      },
-      {
-        "type": "action",
-        "description": "Fill a reason into the adjustment reason field"
-      },
-      {
-        "type": "action",
-        "description": "Save the adjustment"
+        "description": "Save and confirm the adjustment"
       },
       {
         "type": "assertion",
-        "description": "Verify the stock values are updated immediately"
+        "description": "Verify the stock values are updated immediately without requiring a mandatory reason"
       },
       {
         "type": "assertion",
