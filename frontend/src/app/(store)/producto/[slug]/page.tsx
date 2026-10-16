@@ -8,7 +8,7 @@ import { formatCOP } from '@/lib/utils';
 import { ShadeSelector } from '@/components/catalog/ShadeSelector';
 import { initialVariant, variantImages, variantLabel } from '@/lib/shades';
 import { useCart } from '@/context/CartContext';
-import { ArrowLeft, Check, Heart, Minus, Plus, Share2, ShieldCheck, Sparkles, Truck } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Heart, Minus, Plus, Share2, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -22,9 +22,20 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
   const [selectedVariant, setSelectedVariant] = useState<ProductVariantDto | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const images = product ? variantImages(product.images, selectedVariant?.id) : [];
+
+  useEffect(() => {
+    if (!product || images.length <= 1 || isHovered) return;
+    const interval = setInterval(() => {
+      setSelectedImageIndex((prev) => (prev + 1) % images.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [images.length, isHovered, product]);
 
   useEffect(() => {
     setImageError(false);
@@ -103,8 +114,6 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
     }
   };
 
-  const images = variantImages(product.images, selectedVariant?.id);
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 sm:py-10">
       {/* Breadcrumb / Back button */}
@@ -117,19 +126,62 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
         {/* Visual Gallery 1:1 Aspect Ratio */}
         <div className="space-y-4">
-          <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#f8e4ea] to-[#ebd0d9] border border-border shadow-[0_12px_36px_rgba(92,26,49,0.06)] grid place-items-center">
+          <div
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="group/carousel relative aspect-square w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#f8e4ea] to-[#ebd0d9] border border-border shadow-[0_12px_36px_rgba(92,26,49,0.06)] grid place-items-center"
+          >
             {images[selectedImageIndex]?.url && !imageError ? (
               <img
+                key={images[selectedImageIndex].url}
                 src={images[selectedImageIndex].url}
                 alt={images[selectedImageIndex].altText || product.name}
                 onError={() => setImageError(true)}
-                className="w-full h-full object-contain p-4 transition-transform duration-300"
+                className="w-full h-full object-contain p-4 transition-all duration-300"
               />
             ) : (
               <span className="text-8xl select-none filter drop-shadow-lg -rotate-6" aria-hidden="true">
                 💄
               </span>
             )}
+
+            {/* Carousel navigation & indicators if multiple images */}
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length)}
+                  aria-label="Foto anterior"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/85 backdrop-blur-xs text-wine shadow-md flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity hover:bg-white active:scale-95"
+                >
+                  <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedImageIndex((prev) => (prev + 1) % images.length)}
+                  aria-label="Foto siguiente"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/85 backdrop-blur-xs text-wine shadow-md flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity hover:bg-white active:scale-95"
+                >
+                  <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                </button>
+
+                {/* Pagination indicator dots */}
+                <div className="absolute bottom-3 inset-x-0 z-20 flex items-center justify-center gap-1.5">
+                  {images.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedImageIndex(idx)}
+                      aria-label={`Ver foto ${idx + 1}`}
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        selectedImageIndex === idx ? 'w-5 bg-wine' : 'w-2 bg-wine/30 hover:bg-wine/60'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
             {isOutOfStock && (
               <span className="absolute top-4 left-4 z-10 bg-red-600/95 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
                 Agotado
