@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Product } from '@/lib/data';
 import { api, ProductDetailDto, ProductVariantDto } from '@/lib/api';
@@ -8,7 +8,7 @@ import { activeVariants, variantLabel } from '@/lib/shades';
 import { formatCOP } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { ShadeSelectorModal } from '@/components/catalog/ShadeSelectorModal';
-import { Check, Plus, Loader2 } from 'lucide-react';
+import { Check, Plus, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -23,6 +23,23 @@ export function ProductCard({ product }: ProductCardProps) {
   const [isShadeModalOpen, setIsShadeModalOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const isOutOfStock = product.stock <= 0;
+
+  const productImages = useMemo(() => {
+    if (product.images && product.images.length > 0) return product.images;
+    if (product.imageUrl) return [product.imageUrl];
+    return [];
+  }, [product.images, product.imageUrl]);
+
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    if (productImages.length <= 1 || isHovered) return;
+    const interval = setInterval(() => {
+      setActiveImageIndex((prev) => (prev + 1) % productImages.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [productImages.length, isHovered]);
 
   const handleAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -99,6 +116,8 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Visual Header */}
         <Link href={`/producto/${slug}`} className="block">
           <div
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
             className={`h-48 sm:h-56 relative grid place-items-center bg-gradient-to-br ${gradientClass} overflow-hidden`}
           >
             {/* Decorative circular aura */}
@@ -109,10 +128,63 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.badge}
             </span>
 
+            {/* Carousel navigation & indicators if multiple images */}
+            {productImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveImageIndex((prev) => (prev - 1 + productImages.length) % productImages.length);
+                  }}
+                  aria-label="Foto anterior"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/85 backdrop-blur-xs text-wine shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white active:scale-95"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveImageIndex((prev) => (prev + 1) % productImages.length);
+                  }}
+                  aria-label="Foto siguiente"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/85 backdrop-blur-xs text-wine shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white active:scale-95"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                {/* Pagination indicator dots */}
+                <div
+                  className="absolute bottom-2.5 inset-x-0 z-20 flex items-center justify-center gap-1.5"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                >
+                  {productImages.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveImageIndex(idx);
+                      }}
+                      aria-label={`Ver foto ${idx + 1}`}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        activeImageIndex === idx ? 'w-4 bg-wine' : 'w-1.5 bg-wine/30 hover:bg-wine/60'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
             {/* Product Image or Fallback Emoji */}
-            {product.imageUrl && !imageError ? (
+            {productImages.length > 0 && !imageError ? (
               <img
-                src={product.imageUrl}
+                key={productImages[activeImageIndex]}
+                src={productImages[activeImageIndex]}
                 alt={product.name}
                 onError={() => setImageError(true)}
                 className="w-full h-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"

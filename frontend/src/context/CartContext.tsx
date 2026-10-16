@@ -37,7 +37,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: 'Selecciona una variante disponible en la ficha del producto.' };
     }
     const existing = items.find(item => item.variantId === variantId);
-    if ((existing?.quantity || 0) + quantity > product.stock) return { success: false, message: 'No hay suficientes unidades disponibles.' };
+    if ((existing?.quantity || 0) + quantity > product.stock) {
+      if (existing && existing.quantity >= product.stock) {
+        return {
+          success: false,
+          message: product.stock === 1
+            ? 'Ya agregaste la única unidad disponible al carrito. Puedes finalizar tu pedido desde tu bolsa.'
+            : `Ya agregaste todas las unidades disponibles (${product.stock}) a tu carrito.`
+        };
+      }
+      return { success: false, message: 'No hay suficientes unidades disponibles.' };
+    }
     setItems(previous => {
       const current = previous.find(item => item.variantId === variantId);
       if ((current?.quantity || 0) + quantity > product.stock) return previous;

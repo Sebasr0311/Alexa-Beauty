@@ -45,6 +45,7 @@ export interface ProductSummaryDto {
   maxPrice: number;
   totalAvailableStock: number;
   coverImageUrl?: string;
+  imageUrls?: string[];
   featured: boolean;
   active: boolean;
 }
@@ -491,7 +492,7 @@ class ApiClient {
   async adjustStock(data: {
     variantId: string;
     newStockOnHand: number;
-    reason: string;
+    reason?: string;
     notes?: string;
   }): Promise<any> {
     return this.request('/admin/inventory/adjustments', {

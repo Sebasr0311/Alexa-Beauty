@@ -124,14 +124,6 @@ export default function AdminInventarioPage() {
       return;
     }
 
-    if (adjustReason.trim().length < 5) {
-      setFeedback({
-        type: 'error',
-        text: 'El motivo del ajuste debe tener al menos 5 caracteres.',
-      });
-      return;
-    }
-
     setAdjusting(true);
     setFeedback(null);
 
@@ -139,7 +131,7 @@ export default function AdminInventarioPage() {
       await api.adjustStock({
         variantId: selectedVariantForAdjust.variantId,
         newStockOnHand,
-        reason: adjustReason.trim(),
+        reason: adjustReason.trim() || undefined,
       });
       setFeedback({
         type: 'success',
@@ -653,11 +645,9 @@ export default function AdminInventarioPage() {
 
               <div>
                 <label className="font-bold text-ink block mb-1">
-                  Motivo obligatorio del ajuste *
+                  Motivo del ajuste (opcional)
                 </label>
                 <textarea
-                  required
-                  minLength={5}
                   rows={2}
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}

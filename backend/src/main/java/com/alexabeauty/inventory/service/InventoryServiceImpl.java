@@ -268,6 +268,9 @@ public class InventoryServiceImpl implements InventoryService {
         int stockReserved = variant.getStockReserved();
         int availableStock = request.newStockOnHand() - stockReserved;
         String productName = variant.getProduct() != null ? variant.getProduct().getName() : null;
+        String resolvedReason = (request.reason() != null && !request.reason().isBlank())
+                ? request.reason().trim()
+                : "Ajuste manual de inventario";
 
         // If delta == 0, return current summary without creating movement
         if (delta == 0) {
@@ -280,7 +283,7 @@ public class InventoryServiceImpl implements InventoryService {
                     stockReserved,
                     availableStock,
                     0,
-                    request.reason(),
+                    resolvedReason,
                     variant.getUpdatedAt()
             );
         }
@@ -303,7 +306,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .qtyBefore(previousStockOnHand)
                 .qtyAfter(request.newStockOnHand())
                 .reference("AJUSTE_MANUAL")
-                .reason(request.reason())
+                .reason(resolvedReason)
                 .user(actorEntity)
                 .build();
         inventoryMovementRepository.save(movement);
@@ -315,7 +318,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .entityType("ProductVariant")
                 .entityId(savedVariant.getId().toString())
                 .beforeSnapshot("{\"stockOnHand\":" + previousStockOnHand + ",\"stockReserved\":" + stockReserved + "}")
-                .afterSnapshot("{\"stockOnHand\":" + request.newStockOnHand() + ",\"stockReserved\":" + stockReserved + ",\"delta\":" + delta + ",\"reason\":\"" + request.reason() + "\"}")
+                .afterSnapshot("{\"stockOnHand\":" + request.newStockOnHand() + ",\"stockReserved\":" + stockReserved + ",\"delta\":" + delta + ",\"reason\":\"" + resolvedReason + "\"}")
                 .build();
         auditLogRepository.save(auditLog);
 
@@ -331,7 +334,7 @@ public class InventoryServiceImpl implements InventoryService {
                 savedVariant.getStockReserved(),
                 availableStock,
                 delta,
-                request.reason(),
+                resolvedReason,
                 savedVariant.getUpdatedAt()
         );
     }

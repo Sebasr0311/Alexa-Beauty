@@ -45,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -571,6 +572,10 @@ public class CatalogServiceImpl implements CatalogService {
                 .toList();
 
         List<ProductImageResponse> imageResponses = product.getImages().stream()
+                .sorted((a, b) -> {
+                    if (a.isCover() != b.isCover()) return a.isCover() ? -1 : 1;
+                    return Integer.compare(a.getSortOrder(), b.getSortOrder());
+                })
                 .map(img -> ProductImageResponse.from(img, mediaService.getPublicUrl(img.getStoragePath()), publicView))
                 .toList();
 
@@ -638,13 +643,27 @@ public class CatalogServiceImpl implements CatalogService {
                 .sum();
 
         ProductImage coverImg = product.getImages().stream()
-                .filter(img -> img.getVariant() == null && img.isCover())
+                .filter(ProductImage::isCover)
                 .findFirst()
                 .orElse(product.getImages().stream().filter(img -> img.getVariant() == null).findFirst()
-                        .orElse(product.getImages().stream().filter(ProductImage::isCover).findFirst()
-                                .orElse(product.getImages().stream().findFirst().orElse(null))));
+                        .orElse(product.getImages().stream().findFirst().orElse(null)));
 
         String coverUrl = coverImg != null ? mediaService.getPublicUrl(coverImg.getStoragePath()) : null;
+
+        List<String> imageUrls = new ArrayList<>();
+        if (coverUrl != null) {
+            imageUrls.add(coverUrl);
+        }
+        product.getImages().stream()
+                .sorted(Comparator.comparingInt(ProductImage::getSortOrder))
+                .forEach(img -> {
+                    if (coverImg == null || !img.getId().equals(coverImg.getId())) {
+                        String url = mediaService.getPublicUrl(img.getStoragePath());
+                        if (url != null && !imageUrls.contains(url)) {
+                            imageUrls.add(url);
+                        }
+                    }
+                });
 
         return new ProductSummaryResponse(
                 product.getId(),
@@ -661,6 +680,7 @@ public class CatalogServiceImpl implements CatalogService {
                 totalStockOnHand,
                 totalAvailableStock,
                 coverUrl,
+                imageUrls,
                 visibleVariants.stream()
                         .map(v -> publicView ? ProductVariantResponse.publicView(v) : ProductVariantResponse.adminView(v))
                         .toList(),
