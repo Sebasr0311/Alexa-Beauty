@@ -43,6 +43,7 @@ export interface ProductSummaryDto {
   category?: { name: string };
   minPrice: number;
   maxPrice: number;
+  totalStockOnHand?: number | null;
   totalAvailableStock: number;
   coverImageUrl?: string;
   imageUrls?: string[];

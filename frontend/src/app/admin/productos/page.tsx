@@ -88,6 +88,7 @@ export default function AdminProductosPage() {
   // Modal Confirmar Eliminación
   const [productToDelete, setProductToDelete] = useState<ProductSummaryDto | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     setCurrentPage(0);
@@ -116,6 +117,7 @@ export default function AdminProductosPage() {
         setTotalPages(prodsRes.value?.totalPages || 1);
         setTotalElements(prodsRes.value?.totalElements || 0);
       }
+      setLastSyncedAt(new Date());
     } catch {
       setFeedback({ type: 'error', text: 'No se pudieron sincronizar los productos del servidor.' });
     } finally {
@@ -125,6 +127,12 @@ export default function AdminProductosPage() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onFocus = () => void loadData();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [loadData]);
 
   // Suspender / Activar Producto
@@ -487,14 +495,14 @@ export default function AdminProductosPage() {
           <div className="flex items-center bg-cream rounded-xl p-1 border border-border/70 text-xs font-bold">
             <button
               type="button"
-              onClick={() => setStatusFilter('ALL')}
+              onClick={() => setStatusFilter('ALL')} title="Total de referencias o productos en catálogo (no unidades de inventario)"
               className={`px-3 py-1 rounded-lg transition ${
                 statusFilter === 'ALL'
                   ? 'bg-wine text-white shadow-xs'
                   : 'text-muted hover:text-ink'
               }`}
             >
-              Todos ({products.length})
+              Todos ({products.length} refs)
             </button>
             <button
               type="button"
@@ -547,14 +555,21 @@ export default function AdminProductosPage() {
                 {cat}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              title="Recargar catálogo"
-              className="p-1.5 text-muted hover:text-wine rounded-lg bg-cream hover:bg-blush transition ml-1"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-1.5 ml-1">
+              <button
+                type="button"
+                onClick={() => void loadData()}
+                title="Recargar catálogo de productos"
+                className="p-1.5 text-muted hover:text-wine rounded-lg bg-cream hover:bg-blush transition"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              {lastSyncedAt && (
+                <span className="text-[10px] text-muted hidden xl:inline-block whitespace-nowrap">
+                  {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -569,7 +584,7 @@ export default function AdminProductosPage() {
                 <th className="py-3 px-3.5">SKU</th>
                 <th className="py-3 px-3.5 hidden sm:table-cell">Categoría</th>
                 <th className="py-3 px-3.5">Precio COP</th>
-                <th className="py-3 px-3.5">Stock Disp.</th>
+                <th className="py-3 px-3.5" title="Unidades disponibles para venta inmediata / Físico en bodega / Reservado en pedidos WhatsApp">Stock (Disp. / Físico)</th>
                 <th className="py-3 px-3.5">Estado</th>
                 <th className="py-3 px-3.5 rounded-r-xl text-right">Acciones</th>
               </tr>
@@ -616,16 +631,29 @@ export default function AdminProductosPage() {
                       {formatCOP(p.minPrice)}
                     </td>
                     <td className="py-3.5 px-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1 font-bold ${
-                          p.totalAvailableStock <= 5
-                            ? 'text-rose-600'
-                            : 'text-emerald-700'
-                        }`}
-                      >
-                        <Boxes className="w-3.5 h-3.5" />
-                        {p.totalAvailableStock} un.
-                      </span>
+                      <div className="flex flex-col">
+                        <span
+                          className={`inline-flex items-center gap-1 font-bold ${
+                            p.totalAvailableStock <= 5
+                              ? 'text-rose-600'
+                              : 'text-emerald-700'
+                          }`}
+                          title="Unidades disponibles inmediatamente para venta"
+                        >
+                          <Boxes className="w-3.5 h-3.5 flex-shrink-0" />
+                          {p.totalAvailableStock} disp.
+                        </span>
+                        {p.totalStockOnHand != null && (
+                          <span className="text-[11px] text-muted tracking-tight mt-0.5">
+                            {p.totalStockOnHand} físico
+                            {p.totalStockOnHand > p.totalAvailableStock && (
+                              <span className="text-amber-700 font-semibold ml-1" title="Unidades bloqueadas en pedidos de WhatsApp pendientes de confirmación">
+                                ({p.totalStockOnHand - p.totalAvailableStock} reserv.)
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-3.5">
                       <span
