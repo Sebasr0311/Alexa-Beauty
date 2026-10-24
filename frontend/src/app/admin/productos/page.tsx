@@ -116,8 +116,13 @@ export default function AdminProductosPage() {
         setProducts(prodsRes.value?.content || []);
         setTotalPages(prodsRes.value?.totalPages || 1);
         setTotalElements(prodsRes.value?.totalElements || 0);
+        setLastSyncedAt(new Date());
+      } else {
+        setFeedback({
+          type: 'error',
+          text: 'Error al sincronizar el catálogo de productos desde el servidor.',
+        });
       }
-      setLastSyncedAt(new Date());
     } catch {
       setFeedback({ type: 'error', text: 'No se pudieron sincronizar los productos del servidor.' });
     } finally {
@@ -502,7 +507,7 @@ export default function AdminProductosPage() {
                   : 'text-muted hover:text-ink'
               }`}
             >
-              Todos ({products.length} refs)
+              Todos ({selectedCategory === 'TODAS' ? totalElements : filteredProducts.length} refs)
             </button>
             <button
               type="button"
@@ -565,7 +570,7 @@ export default function AdminProductosPage() {
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               </button>
               {lastSyncedAt && (
-                <span className="text-[10px] text-muted hidden xl:inline-block whitespace-nowrap">
+                <span className="text-[10px] text-muted hidden md:inline-block whitespace-nowrap">
                   {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
               )}

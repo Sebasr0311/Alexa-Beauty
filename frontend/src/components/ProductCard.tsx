@@ -29,7 +29,13 @@ export function ProductCard({ product }: ProductCardProps) {
   const handleAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isOutOfStock || loadingVariants) return;
+    if (isOutOfStock || loadingVariants || isShadeModalOpen) return;
+    if (productDetail) {
+      if (productDetail.variants && productDetail.variants.length > 1) {
+        setIsShadeModalOpen(true);
+        return;
+      }
+    }
 
     try {
       setLoadingVariants(true);
@@ -102,7 +108,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const slug = encodeURIComponent(product.slug);
 
   return (
-    <article className="group bg-white border border-[#efdee3] rounded-2xl overflow-hidden shadow-[0_9px_26px_rgba(58,26,39,0.035)] hover:-translate-y-1 transition duration-200 flex flex-col justify-between">
+    <article className={`group bg-white border border-[#efdee3] rounded-2xl overflow-hidden shadow-[0_9px_26px_rgba(58,26,39,0.035)] ${isShadeModalOpen ? '' : 'hover:-translate-y-1'} transition duration-200 flex flex-col justify-between`}>
       <div>
         {/* Visual Header */}
         <Link href={`/producto/${slug}`} className="block">

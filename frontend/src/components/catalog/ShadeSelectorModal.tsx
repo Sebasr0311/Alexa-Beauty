@@ -36,7 +36,14 @@ export function ShadeSelectorModal({product,isOpen,onClose,onSelectVariant,retur
   if(!isOpen || !product || typeof document === 'undefined')return null;
   const image=variantImages(product.images,selected?.id)[0];
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
     <div ref={panel} role="dialog" aria-modal="true" aria-labelledby="shade-selector-title" onClick={event=>event.stopPropagation()}
       className="w-full min-w-0 max-h-[90dvh] overflow-y-auto bg-cream p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl sm:max-w-lg shadow-xl space-y-4">
       <div className="flex gap-3 justify-between items-start">
