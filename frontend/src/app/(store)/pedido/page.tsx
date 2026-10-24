@@ -393,8 +393,21 @@ export default function CheckoutPage() {
             {items.map((item, idx) => (
               <div key={`${item.product.id}-${item.variantId || idx}`} className="py-3.5 flex items-center justify-between gap-3 text-sm">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#f8eadc] to-[#edd0d9] flex items-center justify-center text-lg flex-shrink-0 shadow-inner">
-                    {item.product.icon || '💄'}
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#f8eadc] to-[#edd0d9] flex items-center justify-center text-lg flex-shrink-0 shadow-inner overflow-hidden border border-border/50 relative">
+                    {item.product.imageUrl ? (
+                      <img
+                        src={item.product.imageUrl}
+                        alt={item.product.name}
+                        className="w-full h-full object-contain p-1 relative z-10"
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    <span className="absolute text-lg select-none" aria-hidden="true">
+                      {item.product.icon || '💄'}
+                    </span>
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-xs sm:text-sm text-ink truncate">

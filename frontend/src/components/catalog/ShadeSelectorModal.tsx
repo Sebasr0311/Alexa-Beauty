@@ -4,6 +4,7 @@ import { ProductDetailDto, ProductVariantDto } from '@/lib/api';
 import { formatCOP } from '@/lib/utils';
 import { variantImages, variantLabel } from '@/lib/shades';
 import { ShadeSelector } from './ShadeSelector';
+import { createPortal } from 'react-dom';
 
 export function ShadeSelectorModal({product,isOpen,onClose,onSelectVariant,returnFocusRef}: {
   returnFocusRef?:RefObject<HTMLButtonElement|null>;
@@ -32,9 +33,10 @@ export function ShadeSelectorModal({product,isOpen,onClose,onSelectVariant,retur
     document.addEventListener('keydown',keyboard);
     return ()=>{document.body.style.overflow=oldOverflow;document.removeEventListener('keydown',keyboard);previous?.focus();};
   },[isOpen,returnFocusRef]);
-  if(!isOpen || !product)return null;
+  if(!isOpen || !product || typeof document === 'undefined')return null;
   const image=variantImages(product.images,selected?.id)[0];
-  return <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
     <div ref={panel} role="dialog" aria-modal="true" aria-labelledby="shade-selector-title" onClick={event=>event.stopPropagation()}
       className="w-full min-w-0 max-h-[90dvh] overflow-y-auto bg-cream p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl sm:max-w-lg shadow-xl space-y-4">
       <div className="flex gap-3 justify-between items-start">
@@ -50,5 +52,7 @@ export function ShadeSelectorModal({product,isOpen,onClose,onSelectVariant,retur
       <button type="button" disabled={!selected||!selected.active||selected.availableStock<=0} onClick={()=>selected&&onSelectVariant(selected)}
         className="w-full min-h-12 rounded-full bg-wine text-white font-bold px-4 py-3 disabled:opacity-50 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-wine">Agregar al carrito</button>
     </div>
-  </div>;
+    </div>,
+    document.body
+  );
 }

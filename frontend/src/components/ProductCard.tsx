@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Product } from '@/lib/data';
 import { api, ProductDetailDto, ProductVariantDto } from '@/lib/api';
-import { activeVariants, variantLabel } from '@/lib/shades';
+import { activeVariants, variantLabel, variantImages } from '@/lib/shades';
 import { formatCOP } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { ShadeSelectorModal } from '@/components/catalog/ShadeSelectorModal';
@@ -41,12 +41,15 @@ export function ProductCard({ product }: ProductCardProps) {
         setIsShadeModalOpen(true);
       } else if (detail.variants && detail.variants.length === 1) {
         const single = detail.variants[0];
+        const vImages = variantImages(detail.images, single.id);
+        const chosenImage = vImages[0]?.url || product.imageUrl;
         const result = addItem(
           {
             ...product,
             price: single.salePrice,
             stock: single.availableStock,
             variantId: single.id,
+            imageUrl: chosenImage,
           },
           1,
           single.id,
@@ -68,6 +71,8 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const handleSelectVariant = (variant: ProductVariantDto) => {
     if (!productDetail) return;
+    const vImages = variantImages(productDetail.images, variant.id);
+    const chosenImage = vImages[0]?.url || product.imageUrl;
     const result = addItem(
       {
         ...product,
@@ -75,6 +80,7 @@ export function ProductCard({ product }: ProductCardProps) {
         price: variant.salePrice,
         stock: variant.availableStock,
         variantId: variant.id,
+        imageUrl: chosenImage,
       },
       1,
       variant.id,

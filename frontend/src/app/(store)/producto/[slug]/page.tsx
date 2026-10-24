@@ -86,6 +86,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
 
   const handleAddToCart = () => {
     if (isOutOfStock || !selectedVariant?.active) return;
+    const chosenImage = images[selectedImageIndex]?.url || images[0]?.url || (product.images && product.images[0]?.url);
     // Map to CartContext format
     const res = addItem(
       {
@@ -100,6 +101,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
         visual: 'dark',
         badge: 'Destacado',
         variantId: selectedVariant?.id,
+        imageUrl: chosenImage,
       },
       quantity,
       selectedVariant?.id,
