@@ -24,7 +24,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -65,6 +68,26 @@ public class AdminSalesController {
         SaleOrderResponse response = salesService.createPhysicalSale(request, actor);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Venta en punto físico registrada exitosamente", response));
+    }
+
+    @DeleteMapping("/sales/{id}")
+    @Operation(summary = "Anular una venta física o confirmada y reponer stock", description = "Anula la venta, devuelve el inventario a bodega registrando contra-movimiento en Kardex")
+    public ResponseEntity<ApiResponse<Void>> cancelSale(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal actor
+    ) {
+        salesService.cancelSale(id, actor);
+        return ResponseEntity.ok(ApiResponse.ok("Venta anulada exitosamente y stock restituido a inventario", null));
+    }
+
+    @PostMapping("/sales/{id}/cancel")
+    @Operation(summary = "Anular una venta física o confirmada (vía POST)", description = "Alternativa POST para anulación de venta y reposición de inventario")
+    public ResponseEntity<ApiResponse<Void>> cancelSalePost(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal actor
+    ) {
+        salesService.cancelSale(id, actor);
+        return ResponseEntity.ok(ApiResponse.ok("Venta anulada exitosamente y stock restituido a inventario", null));
     }
 
     @GetMapping("/sales/export.xlsx")

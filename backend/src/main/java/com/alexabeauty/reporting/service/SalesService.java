@@ -11,10 +11,12 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public interface SalesService {
     SalesListResponse getSales(LocalDate from, LocalDate to, PaymentMethod method, Pageable pageable);
     SaleOrderResponse createPhysicalSale(CreatePhysicalSaleRequest request, UserPrincipal actor);
+    void cancelSale(UUID orderId, UserPrincipal actor);
     SalesAnalyticsResponse getAnalytics(LocalDate from, LocalDate to);
     List<TopProductDto> getTopProducts(LocalDate from, LocalDate to);
     byte[] exportSalesReport(LocalDate from, LocalDate to, PaymentMethod method, UserPrincipal actor);

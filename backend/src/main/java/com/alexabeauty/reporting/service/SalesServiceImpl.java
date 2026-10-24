@@ -347,6 +347,120 @@ public class SalesServiceImpl implements SalesService {
         return toSaleOrderResponse(savedOrder);
     }
 
+    @Override
+    @Transactional
+    public void cancelSale(UUID orderId, UserPrincipal actor) {
+        if (orderId == null) {
+            throw new ValidationException("El ID de la orden es obligatorio.");
+        }
+
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        if (order.getStatus() == OrderStatus.CANCELADO) {
+            throw new ConflictException("La venta con referencia '" + order.getReference() + "' ya se encuentra anulada.");
+        }
+
+        User actorEntity = null;
+        if (actor != null && actor.getId() != null && userRepository != null) {
+            actorEntity = userRepository.findById(actor.getId()).orElse(null);
+        }
+        String actorEmail = actor != null ? actor.getUsername() : "sistema";
+
+        List<UUID> variantIds = order.getItems().stream()
+                .map(item -> item.getVariant().getId())
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<ProductVariant> lockedVariants = variantIds.isEmpty()
+                ? List.of()
+                : productVariantRepository.findByIdInOrderByIdForUpdate(variantIds);
+        Map<UUID, ProductVariant> variantMap = lockedVariants.stream()
+                .collect(Collectors.toMap(ProductVariant::getId, java.util.function.Function.identity()));
+
+        boolean wasPaidOrPhysical = order.getPaidAt() != null
+                || OrderRepository.VERIFIED_PAID_STATUSES.contains(order.getStatus())
+                || "PUNTO_FISICO".equalsIgnoreCase(order.getChannel());
+
+        if (wasPaidOrPhysical) {
+            for (OrderItem item : order.getItems()) {
+                ProductVariant variant = variantMap.get(item.getVariant().getId());
+                if (variant != null) {
+                    int qty = item.getQuantity();
+                    int qtyBefore = variant.getStockOnHand();
+                    int qtyAfter = qtyBefore + qty;
+
+                    variant.setStockOnHand(qtyAfter);
+                    productVariantRepository.save(variant);
+
+                    InventoryMovement movement = InventoryMovement.builder()
+                            .variant(variant)
+                            .movementType(MovementType.RETURN)
+                            .quantityDelta(qty)
+                            .qtyBefore(qtyBefore)
+                            .qtyAfter(qtyAfter)
+                            .reference(order.getReference())
+                            .reason("Anulación de venta ref: " + order.getReference())
+                            .user(actorEntity)
+                            .build();
+                    inventoryMovementRepository.save(movement);
+                }
+            }
+        } else {
+            for (OrderItem item : order.getItems()) {
+                ProductVariant variant = variantMap.get(item.getVariant().getId());
+                if (variant != null) {
+                    variant.setStockReserved(Math.max(0, variant.getStockReserved() - item.getQuantity()));
+                }
+            }
+            productVariantRepository.saveAll(lockedVariants);
+
+            if (order.getReservations() != null) {
+                for (var res : order.getReservations()) {
+                    if (res.getStatus() == com.alexabeauty.order.domain.ReservationStatus.ACTIVE) {
+                        res.setStatus(com.alexabeauty.order.domain.ReservationStatus.RELEASED);
+                    }
+                }
+            }
+        }
+
+        if (order.getPayments() != null) {
+            for (Payment p : order.getPayments()) {
+                p.setStatus(PaymentStatus.RECHAZADO);
+                p.setNotes((p.getNotes() != null ? p.getNotes() + " | " : "") + "Venta anulada por administrador");
+                paymentRepository.save(p);
+            }
+        }
+
+        OrderStatus previousStatus = order.getStatus();
+        order.setStatus(OrderStatus.CANCELADO);
+        orderRepository.save(order);
+
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(order)
+                .previousStatus(previousStatus)
+                .newStatus(OrderStatus.CANCELADO)
+                .user(actorEntity)
+                .notes("Venta anulada y stock restituido a bodega por " + actorEmail)
+                .build();
+        order.getStatusHistory().add(history);
+        orderStatusHistoryRepository.save(history);
+
+        AuditLog auditLog = AuditLog.builder()
+                .actorEmail(actorEmail)
+                .action("SALE_CANCELLED")
+                .entityType("ORDER")
+                .entityId(order.getId().toString())
+                .beforeSnapshot(previousStatus.name() + " | Ref: " + order.getReference() + " | Total: " + order.getTotal())
+                .afterSnapshot("CANCELADO | Inventario restituido")
+                .build();
+        auditLogRepository.save(auditLog);
+
+        log.info("Sale reference='{}' cancelled successfully by actor='{}'. Stock restored to warehouse.",
+                order.getReference(), actorEmail);
+    }
+
     private String hashToken(String token) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

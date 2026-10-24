@@ -657,6 +657,36 @@ class CatalogIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @DisplayName("Admin can create category and delete it when no products are associated")
+    void adminCategory_createAndDelete_lifecycle() throws Exception {
+        var createCatReq = new com.alexabeauty.catalog.dto.CreateCategoryRequest(
+                "Cuidado Capilar " + UUID.randomUUID().toString().substring(0, 8),
+                null,
+                10,
+                true
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/v1/admin/categories")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createCatReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        UUID catId = UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asText());
+
+        // Deleting category with 0 products succeeds
+        mockMvc.perform(delete("/api/v1/admin/categories/{id}", catId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        // Trying to delete defaultCategory which has products returns 409 CONFLICT
+        mockMvc.perform(delete("/api/v1/admin/categories/{id}", defaultCategory.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isConflict());
+    }
+
     private byte[] validPng() throws java.io.IOException {
         var bytes = new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", bytes);

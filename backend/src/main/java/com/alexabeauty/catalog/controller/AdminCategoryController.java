@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -63,5 +64,12 @@ public class AdminCategoryController {
     ) {
         CategoryResponse response = catalogService.updateCategory(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Categoría actualizada exitosamente", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar categoría", description = "Elimina una categoría si no tiene productos asociados")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable UUID id) {
+        catalogService.deleteCategory(id);
+        return ResponseEntity.ok(ApiResponse.ok("Categoría eliminada exitosamente", null));
     }
 }

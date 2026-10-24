@@ -59,4 +59,6 @@ public interface CatalogService {
     List<CategoryResponse> listCategories(boolean onlyActive);
 
     CategoryResponse getCategoryById(UUID id);
+
+    void deleteCategory(UUID id);
 }

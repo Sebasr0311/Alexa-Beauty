@@ -23,6 +23,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     Page<Product> findByActiveTrue(Pageable pageable);
     Page<Product> findByCategoryIdAndActiveTrue(UUID categoryId, Pageable pageable);
     Page<Product> findByBrandIdAndActiveTrue(UUID brandId, Pageable pageable);
+    long countByCategoryId(UUID categoryId);
 
     @org.springframework.data.jpa.repository.Query(
         value = "SELECT COUNT(*) > 0 FROM order_items oi JOIN product_variants pv ON oi.variant_id = pv.id WHERE pv.product_id = :productId",

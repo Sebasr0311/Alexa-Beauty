@@ -134,6 +134,10 @@ export default function AdminVentasPage() {
   const [submittingPos, setSubmittingPos] = useState<boolean>(false);
   const [posError, setPosError] = useState<string | null>(null);
 
+  // Cancel/Anular Venta state
+  const [saleToCancel, setSaleToCancel] = useState<SaleOrderDto | null>(null);
+  const [cancellingSale, setCancellingSale] = useState<boolean>(false);
+
   // Fetch sales from API
   const fetchSales = useCallback(async (overrideDates?: { from?: string; to?: string }) => {
     setLoading(true);
@@ -158,6 +162,33 @@ export default function AdminVentasPage() {
       setLoading(false);
     }
   }, [fromDate, toDate, paymentMethodFilter, page, pageSize]);
+
+  // Anulación de venta y reposición de inventario
+  const handleCancelSale = async () => {
+    if (!saleToCancel) return;
+    setCancellingSale(true);
+    try {
+      await api.cancelSale(saleToCancel.id);
+      setFeedbackMessage({
+        type: 'success',
+        text: `Venta "${saleToCancel.reference}" anulada exitosamente. El inventario fue restituido a bodega.`,
+      });
+      setSaleToCancel(null);
+      if (selectedOrder?.id === saleToCancel.id) {
+        setSelectedOrder(null);
+      }
+      await fetchSales();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al anular la venta';
+      setFeedbackMessage({
+        type: 'error',
+        text: msg,
+      });
+      setSaleToCancel(null);
+    } finally {
+      setCancellingSale(false);
+    }
+  };
 
   useEffect(() => {
     fetchSales();
@@ -863,14 +894,25 @@ export default function AdminVentasPage() {
 
                       {/* Acciones */}
                       <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blush/60 hover:bg-wine hover:text-white text-wine text-xs font-bold transition shadow-xs"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Ver detalle</span>
-                        </button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrder(order)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blush/60 hover:bg-wine hover:text-white text-wine text-xs font-bold transition shadow-xs"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Ver detalle</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSaleToCancel(order)}
+                            title="Anular venta y reponer inventario a bodega"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-rose-200 text-rose-700 hover:bg-rose-600 hover:text-white hover:border-rose-600 text-xs font-bold transition shadow-xs"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden md:inline">Anular</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1785,13 +1827,98 @@ export default function AdminVentasPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSaleToCancel(selectedOrder)}
+                className="px-4 py-2 rounded-full border border-rose-200 hover:bg-rose-50 text-xs font-bold text-rose-700 transition inline-flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Anular Venta</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
                 className="px-5 py-2.5 rounded-full border border-border hover:bg-cream text-xs font-bold text-ink transition"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Anulación de Venta */}
+      {saleToCancel && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-ink">
+                  ¿Anular Venta Realizada?
+                </h3>
+                <p className="text-xs text-muted">Esta acción restituirá las unidades vendidas al stock en bodega.</p>
+              </div>
+            </div>
+
+            <div className="bg-cream/50 rounded-2xl p-4 border border-border space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted">Referencia:</span>
+                <span className="font-mono font-bold text-wine">{saleToCancel.reference}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Cliente:</span>
+                <span className="font-bold text-ink">{saleToCancel.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Monto total:</span>
+                <span className="font-bold text-ink">{formatCOP(saleToCancel.total)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Artículos vendidos:</span>
+                <span className="font-semibold text-ink">
+                  {saleToCancel.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} unidades
+                </span>
+              </div>
+              <p className="pt-2 text-[11px] text-muted border-t border-border leading-relaxed">
+                Al confirmar, el sistema registrará un contra-movimiento en el Kardex devolviendo cada producto al stock físico disponible y marcará la orden como <strong>CANCELADA</strong>.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={cancellingSale}
+                onClick={() => setSaleToCancel(null)}
+                className="px-4 py-2 rounded-full border border-border text-muted font-bold text-xs hover:bg-cream transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={cancellingSale}
+                onClick={handleCancelSale}
+                className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {cancellingSale ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Anulando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirmar Anulación</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

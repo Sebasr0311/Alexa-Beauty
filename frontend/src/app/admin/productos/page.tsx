@@ -13,6 +13,7 @@ import {
   XCircle,
   RefreshCw,
   AlertTriangle,
+  AlertCircle,
   X,
   Tag,
   Boxes,
@@ -89,6 +90,14 @@ export default function AdminProductosPage() {
   const [productToDelete, setProductToDelete] = useState<ProductSummaryDto | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
+  // Modal Categorías (Creación y Eliminación)
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [categoryModalError, setCategoryModalError] = useState<string | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<CategoryDto | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState(false);
 
   useEffect(() => {
     setCurrentPage(0);
@@ -176,6 +185,56 @@ export default function AdminProductosPage() {
       });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Gestión de Categorías
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) {
+      setCategoryModalError('El nombre de la categoría es obligatorio.');
+      return;
+    }
+    setCreatingCategory(true);
+    setCategoryModalError(null);
+    try {
+      const created = await api.createCategory({ name: newCategoryName.trim() });
+      setCategories((prev) => [...prev, created]);
+      setSelectedCategory(created.name);
+      setIsAddCategoryModalOpen(false);
+      setNewCategoryName('');
+      setFeedback({ type: 'success', text: `Categoría "${created.name}" creada exitosamente.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al crear la categoría';
+      setCategoryModalError(msg);
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setDeletingCategory(true);
+    try {
+      await api.deleteCategory(categoryToDelete.id);
+      setCategories((prev) => prev.filter((c) => c.id !== categoryToDelete.id));
+      if (selectedCategory.toLowerCase() === categoryToDelete.name.toLowerCase()) {
+        setSelectedCategory('TODAS');
+      }
+      setFeedback({
+        type: 'success',
+        text: `Categoría "${categoryToDelete.name}" eliminada exitosamente.`,
+      });
+      setCategoryToDelete(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo eliminar la categoría';
+      setFeedback({
+        type: 'error',
+        text: msg,
+      });
+      setCategoryToDelete(null);
+    } finally {
+      setDeletingCategory(false);
     }
   };
 
@@ -546,20 +605,50 @@ export default function AdminProductosPage() {
             >
               Todas
             </button>
-            {['Rostro', 'Labios', 'Ojos', 'Accesorios'].map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                  selectedCategory === cat
+            {categories.map((cat) => (
+              <div
+                key={cat.id}
+                className={`inline-flex items-center rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                  selectedCategory.toLowerCase() === cat.name.toLowerCase()
                     ? 'bg-wine/10 text-wine font-extrabold border border-wine/30'
                     : 'bg-cream text-muted hover:text-ink'
                 }`}
               >
-                {cat}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.name)}
+                  className="px-2.5 py-1"
+                >
+                  {cat.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCategoryToDelete(cat);
+                  }}
+                  title={`Eliminar categoría ${cat.name}`}
+                  className="pr-1.5 pl-0.5 py-1 hover:text-rose-600 transition opacity-60 hover:opacity-100"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setCategoryModalError(null);
+                setNewCategoryName('');
+                setIsAddCategoryModalOpen(true);
+              }}
+              title="Agregar nueva categoría"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-cream hover:bg-blush text-wine transition whitespace-nowrap border border-dashed border-wine/30"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Categoría</span>
+            </button>
+
+
             <div className="flex items-center gap-1.5 ml-1">
               <button
                 type="button"
@@ -1221,6 +1310,147 @@ export default function AdminProductosPage() {
           </div>
         </div>
       )}
+      {/* MODAL: AGREGAR CATEGORÍA */}
+      {isAddCategoryModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-blush flex items-center justify-center text-wine">
+                  <Tag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-ink">Nueva Categoría</h3>
+                  <p className="text-[11px] text-muted">Añade una categoría para clasificar productos en la tienda</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddCategoryModalOpen(false)}
+                className="p-1 rounded-xl text-muted hover:text-ink hover:bg-cream transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              {categoryModalError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{categoryModalError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-ink block mb-1">
+                  Nombre de la Categoría *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Cuidado Facial, Brochas, Skincare..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-cream/40 text-xs text-ink focus:ring-2 focus:ring-wine/20 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCategoryModalOpen(false)}
+                  disabled={creatingCategory}
+                  className="px-4 py-2 rounded-full border border-border text-muted font-bold text-xs hover:bg-cream transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingCategory || !newCategoryName.trim()}
+                  className="px-5 py-2 rounded-full bg-wine hover:bg-wineDark text-white text-xs font-bold transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {creatingCategory ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Crear Categoría</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRMAR ELIMINACIÓN DE CATEGORÍA */}
+      {categoryToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-ink">
+                  ¿Eliminar Categoría?
+                </h3>
+                <p className="text-xs text-muted">Esta acción eliminará la categoría del catálogo.</p>
+              </div>
+            </div>
+
+            <div className="bg-cream/50 rounded-2xl p-4 border border-border space-y-2 text-xs">
+              <p className="font-bold text-ink text-sm">{categoryToDelete.name}</p>
+              <p className="text-muted leading-relaxed">
+                Si esta categoría tiene productos asociados en el catálogo, la base de datos bloqueará la eliminación para proteger la integridad de los productos.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deletingCategory}
+                onClick={() => setCategoryToDelete(null)}
+                className="px-4 py-2 rounded-full border border-border text-muted font-bold text-xs hover:bg-cream transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deletingCategory}
+                onClick={handleDeleteCategory}
+                className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {deletingCategory ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Categoría</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     {variantsProductId && <VariantManager productId={variantsProductId} onClose={() => setVariantsProductId(null)} onChanged={() => { void loadData(); }} />}
     </AdminShell>
   );

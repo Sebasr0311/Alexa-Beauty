@@ -10,6 +10,8 @@ import com.alexabeauty.catalog.repository.BrandRepository;
 import com.alexabeauty.catalog.repository.CategoryRepository;
 import com.alexabeauty.catalog.repository.ProductRepository;
 import com.alexabeauty.catalog.repository.ProductVariantRepository;
+import com.alexabeauty.inventory.domain.MovementType;
+import com.alexabeauty.inventory.repository.InventoryMovementRepository;
 import com.alexabeauty.order.domain.Order;
 import com.alexabeauty.order.domain.OrderItem;
 import com.alexabeauty.order.domain.OrderStatus;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -83,6 +86,9 @@ class SalesAndReportingIntegrationTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private InventoryMovementRepository inventoryMovementRepository;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
@@ -581,5 +587,77 @@ class SalesAndReportingIntegrationTest {
             assertThat(resumen.getRow(24).getCell(0).getStringCellValue()).isEqualTo("DESGLOSE POR CANAL Y DESCUENTOS");
             assertThat(resumen.getRow(25).getCell(1).getNumericCellValue()).isGreaterThanOrEqualTo(1.0);
         }
+    }
+
+    @Test
+    @DisplayName("Admin can cancel a sale, restoring stockOnHand, logging RETURN movement, and excluding it from sales list")
+    void testCancelSale_restoresStockAndKardexMovement() throws Exception {
+        String testSuffix = UUID.randomUUID().toString().substring(0, 6);
+        ProductVariant variant = createTestVariant("SKU-CAN-" + testSuffix, "Base Cancelable " + testSuffix,
+                new BigDecimal("60000.00"), new BigDecimal("30000.00"));
+        variant.setStockOnHand(10);
+        variant.setStockReserved(0);
+        productVariantRepository.save(variant);
+
+        // 1. Create physical sale of 2 units
+        String payload = """
+                {
+                  "customerName": "Cliente Cancelación",
+                  "paymentMethod": "EFECTIVO",
+                  "items": [
+                    {
+                      "variantId": "%s",
+                      "quantity": 2
+                    }
+                  ]
+                }
+                """.formatted(variant.getId());
+
+        MvcResult saleRes = mockMvc.perform(post("/api/v1/admin/sales")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(saleRes.getResponse().getContentAsString());
+        UUID orderId = UUID.fromString(json.path("data").path("id").asText());
+        String orderRef = json.path("data").path("reference").asText();
+
+        // Verify stockOnHand was reduced to 8
+        ProductVariant variantAfterSale = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(variantAfterSale.getStockOnHand()).isEqualTo(8);
+
+        // 2. Cancel the sale via DELETE /api/v1/admin/sales/{id}
+        mockMvc.perform(delete("/api/v1/admin/sales/{id}", orderId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // 3. Verify stockOnHand is restored back to 10
+        ProductVariant variantAfterCancel = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(variantAfterCancel.getStockOnHand()).isEqualTo(10);
+
+        // 4. Verify Kardex has a RETURN movement
+        var movements = inventoryMovementRepository.findAll().stream()
+                .filter(m -> orderRef.equals(m.getReference()) && m.getMovementType() == MovementType.RETURN)
+                .toList();
+        assertThat(movements).hasSize(1);
+        assertThat(movements.get(0).getQuantityDelta()).isEqualTo(2);
+
+        // 5. Verify the order is excluded from GET /api/v1/admin/sales
+        MvcResult listRes = mockMvc.perform(get("/api/v1/admin/sales")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<String> refs = objectMapper.readTree(listRes.getResponse().getContentAsString())
+                .path("data").path("orders").findValuesAsText("reference");
+        assertThat(refs).doesNotContain(orderRef);
+
+        // 6. Attempting to cancel again returns 409 Conflict
+        mockMvc.perform(delete("/api/v1/admin/sales/{id}", orderId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isConflict());
     }
 }

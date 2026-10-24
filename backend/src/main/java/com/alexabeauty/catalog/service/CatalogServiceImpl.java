@@ -562,6 +562,20 @@ public class CatalogServiceImpl implements CatalogService {
         return CategoryResponse.from(category);
     }
 
+    @Override
+    public void deleteCategory(UUID id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", id));
+
+        long productCount = productRepository.countByCategoryId(id);
+        if (productCount > 0) {
+            throw new ConflictException("No se puede eliminar la categoría '" + category.getName() + "' porque tiene " + productCount + " producto(s) asociado(s). Reasigna los productos primero.");
+        }
+
+        categoryRepository.delete(category);
+        log.info("Category id={} name='{}' deleted successfully.", id, category.getName());
+    }
+
     // Helpers
     private ProductDetailResponse toProductDetailResponse(Product product) { return toProductDetailResponse(product, false); }
 

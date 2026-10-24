@@ -257,6 +257,23 @@ class ApiClient {
     return this.request('/admin/brands', {method: 'POST', body: JSON.stringify({name: name.trim()})});
   }
   async getAdminBrands(): Promise<BrandDto[]> { return this.request('/admin/brands'); }
+
+  async createCategory(data: { name: string; slug?: string; sortOrder?: number; active?: boolean }): Promise<CategoryDto> {
+    return this.request<CategoryDto>('/admin/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAdminCategories(): Promise<CategoryDto[]> {
+    return this.request<CategoryDto[]>('/admin/categories');
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    return this.request<void>(`/admin/categories/${id}`, {
+      method: 'DELETE',
+    });
+  }
   async updateProduct(id: string, data: {name: string; brandId: string; categoryId: string; description?: string}): Promise<ProductDetailDto> {
     return this.request(`/admin/products/${id}`, {method: 'PUT', body: JSON.stringify(data)});
   }
@@ -408,6 +425,12 @@ class ApiClient {
     return this.request<SaleOrderDto>('/admin/sales', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  async cancelSale(orderId: string): Promise<void> {
+    return this.request<void>(`/admin/sales/${orderId}`, {
+      method: 'DELETE',
     });
   }
 
