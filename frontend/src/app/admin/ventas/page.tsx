@@ -138,6 +138,37 @@ export default function AdminVentasPage() {
   const [saleToCancel, setSaleToCancel] = useState<SaleOrderDto | null>(null);
   const [cancellingSale, setCancellingSale] = useState<boolean>(false);
 
+  // Today live sales & profit summary
+  const [todaySummary, setTodaySummary] = useState<SalesSummaryDto>(EMPTY_SALES_SUMMARY);
+  const [loadingTodaySummary, setLoadingTodaySummary] = useState<boolean>(true);
+
+  const fetchTodaySales = useCallback(async () => {
+    setLoadingTodaySummary(true);
+    try {
+      const res = await api.getAdminSalesToday({ size: 1 });
+      if (res && res.summary) {
+        setTodaySummary(res.summary);
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setLoadingTodaySummary(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTodaySales();
+  }, [fetchTodaySales]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('pos') === '1') {
+        openPosModal();
+      }
+    }
+  }, []);
+
   // Fetch sales from API
   const fetchSales = useCallback(async (overrideDates?: { from?: string; to?: string }) => {
     setLoading(true);
@@ -177,7 +208,7 @@ export default function AdminVentasPage() {
       if (selectedOrder?.id === saleToCancel.id) {
         setSelectedOrder(null);
       }
-      await fetchSales();
+      await Promise.all([fetchSales(), fetchTodaySales()]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al anular la venta';
       setFeedbackMessage({
@@ -410,10 +441,13 @@ export default function AdminVentasPage() {
       if (nextFrom !== fromDate) setFromDate(nextFrom);
       if (nextTo !== toDate) setToDate(nextTo);
 
-      await fetchSales({ from: nextFrom, to: nextTo });
+      await Promise.all([
+        fetchSales({ from: nextFrom, to: nextTo }),
+        fetchTodaySales(),
+      ]);
       setFeedbackMessage({
         type: 'success',
-        text: `Venta en punto físico ${created.reference} registrada exitosamente (${created.paymentMethod}) por ${formatCOP(created.total)}. Stock descontado e incluida en ganancias y reporte Excel.`,
+        text: `Venta en punto físico ${created.reference} registrada exitosamente (${created.paymentMethod}) por ${formatCOP(created.total)}. ¡Las ganancias del día se actualizaron al instante!`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'No se pudo registrar la venta en punto físico.';
@@ -574,7 +608,110 @@ export default function AdminVentasPage() {
           </div>
         )}
 
-        {/* 5 Brand Palette KPI Cards (Including Ganancia Bruta) */}
+        {/* Corte de Ventas y Ganancias de Hoy (En Vivo) */}
+        <section
+          aria-label="Corte de ventas y ganancias de hoy"
+          className="bg-gradient-to-r from-[#FFF8F6] via-white to-blush/30 border-2 border-wine/25 rounded-3xl p-5 sm:p-6 shadow-soft"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/70 pb-4 mb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-serif text-lg sm:text-xl font-bold text-wine">
+                    Ventas y Ganancias de Hoy
+                  </h2>
+                  <span className="bg-emerald-100 text-[#196B3E] text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
+                    En Vivo
+                  </span>
+                </div>
+                <p className="text-xs text-muted mt-0.5">
+                  Métricas de hoy en tiempo real (hora Colombia) · Se actualizan al instante con cada venta registrada.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => applyDatePreset('hoy')}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs ${
+                  fromDate === getColombiaToday() && toDate === getColombiaToday()
+                    ? 'bg-wine text-white shadow-glow'
+                    : 'bg-white border border-wine text-wine hover:bg-wine hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Ver tabla filtrada solo a hoy</span>
+              </button>
+              <button
+                type="button"
+                onClick={openPosModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition shadow-xs active:scale-95"
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>+ Registrar Venta Hoy</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Ventas Hoy */}
+            <div className="bg-white/95 backdrop-blur-xs border border-wine/20 rounded-2xl p-4 shadow-xs">
+              <span className="text-[11px] text-muted font-semibold block">Ventas de Hoy</span>
+              <p className="font-serif text-xl sm:text-2xl font-bold text-wine my-1">
+                {formatCOP(todaySummary.totalSales || 0)}
+              </p>
+              <span className="text-[11px] text-[#24734E] font-medium block">
+                {todaySummary.paidOrdersCount || 0} {todaySummary.paidOrdersCount === 1 ? 'venta confirmada' : 'ventas confirmadas'}
+              </span>
+            </div>
+
+            {/* Ganancias de Hoy */}
+            <div className="bg-white/95 backdrop-blur-xs border border-emerald-600/30 rounded-2xl p-4 shadow-xs">
+              <span className="text-[11px] text-[#196B3E] font-semibold block">Ganancia Neta Hoy</span>
+              <p className="font-serif text-xl sm:text-2xl font-bold text-[#196B3E] my-1">
+                {formatCOP(todaySummary.grossProfit || 0)}
+              </p>
+              <span className="text-[11px] text-[#24734E] font-medium block">
+                {todaySummary.grossMarginPercentage != null
+                  ? `Margen: ${todaySummary.grossMarginPercentage}%`
+                  : 'Ingresos menos costos'}
+              </span>
+            </div>
+
+            {/* Unidades Hoy */}
+            <div className="bg-white/95 backdrop-blur-xs border border-border rounded-2xl p-4 shadow-xs">
+              <span className="text-[11px] text-muted font-semibold block">Unidades Hoy</span>
+              <p className="font-serif text-xl sm:text-2xl font-bold text-ink my-1">
+                {todaySummary.totalUnitsSold || 0}
+              </p>
+              <span className="text-[11px] text-muted font-medium block">
+                Productos vendidos hoy
+              </span>
+            </div>
+
+            {/* Ticket Promedio Hoy */}
+            <div className="bg-white/95 backdrop-blur-xs border border-border rounded-2xl p-4 shadow-xs">
+              <span className="text-[11px] text-muted font-semibold block">Ticket Promedio Hoy</span>
+              <p className="font-serif text-xl sm:text-2xl font-bold text-ink my-1">
+                {formatCOP(todaySummary.averageTicket || 0)}
+              </p>
+              <span className="text-[11px] text-muted font-medium block">
+                Promedio por cliente hoy
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* 5 Brand Palette KPI Cards (Período Seleccionado) */}
+        <div className="pt-2">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-xs text-muted font-semibold">
+              Resumen acumulado del período filtrado ({fromDate} al {toDate}):
+            </span>
+          </div>
+        </div>
         <section aria-label="Métricas de ventas" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total Ventas Pagadas */}
           <div className="bg-white border border-[#EADDE0] rounded-2xl p-5 shadow-sm relative overflow-hidden group hover:border-wine transition">
@@ -700,28 +837,44 @@ export default function AdminVentasPage() {
                 <button
                   type="button"
                   onClick={() => applyDatePreset('hoy')}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-blush/60 hover:bg-blush text-wine transition"
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                    fromDate === getColombiaToday() && toDate === getColombiaToday()
+                      ? 'bg-wine text-white shadow-xs'
+                      : 'bg-blush/60 hover:bg-blush text-wine'
+                  }`}
                 >
                   Hoy
                 </button>
                 <button
                   type="button"
                   onClick={() => applyDatePreset('ultimos7')}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-blush/60 hover:bg-blush text-wine transition"
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                    fromDate === getColombiaDaysAgo(7) && toDate === getColombiaToday()
+                      ? 'bg-wine text-white shadow-xs'
+                      : 'bg-blush/60 hover:bg-blush text-wine'
+                  }`}
                 >
                   7 días
                 </button>
                 <button
                   type="button"
                   onClick={() => applyDatePreset('esteMes')}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-blush/60 hover:bg-blush text-wine transition"
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                    fromDate === getColombiaFirstDayOfMonth() && toDate === getColombiaToday()
+                      ? 'bg-wine text-white shadow-xs'
+                      : 'bg-blush/60 hover:bg-blush text-wine'
+                  }`}
                 >
                   Este Mes
                 </button>
                 <button
                   type="button"
                   onClick={() => applyDatePreset('ultimos30')}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-blush/60 hover:bg-blush text-wine transition"
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                    fromDate === getColombiaDaysAgo(30) && toDate === getColombiaToday()
+                      ? 'bg-wine text-white shadow-xs'
+                      : 'bg-blush/60 hover:bg-blush text-wine'
+                  }`}
                 >
                   30 días
                 </button>

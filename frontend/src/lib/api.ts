@@ -421,6 +421,20 @@ class ApiClient {
     return this.request<SalesListResponseDto>(`/admin/sales${query ? `?${query}` : ''}`);
   }
 
+  async getAdminSalesToday(params?: {
+    method?: string;
+    page?: number;
+    size?: number;
+  }): Promise<SalesListResponseDto> {
+    const searchParams = new URLSearchParams();
+    if (params?.method && params.method !== 'TODOS') searchParams.set('method', params.method);
+    if (params?.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params?.size !== undefined) searchParams.set('size', params.size.toString());
+
+    const query = searchParams.toString();
+    return this.request<SalesListResponseDto>(`/admin/sales/today${query ? `?${query}` : ''}`);
+  }
+
   async createPhysicalSale(data: CreatePhysicalSaleRequestDto): Promise<SaleOrderDto> {
     return this.request<SaleOrderDto>('/admin/sales', {
       method: 'POST',

@@ -59,6 +59,17 @@ public class AdminSalesController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @GetMapping("/sales/today")
+    @Operation(summary = "Consultar ventas y ganancias del día en curso (hora Colombia)")
+    public ResponseEntity<ApiResponse<SalesListResponse>> getTodaySales(
+            @RequestParam(required = false) PaymentMethod method,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        LocalDate today = LocalDate.now(SalesServiceImpl.BOGOTA_ZONE);
+        SalesListResponse response = salesService.getSales(today, today, method, pageable);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
     @PostMapping("/sales")
     @Operation(summary = "Registrar una venta realizada en punto físico con descuento automático de stock y pago verificado")
     public ResponseEntity<ApiResponse<SaleOrderResponse>> createPhysicalSale(

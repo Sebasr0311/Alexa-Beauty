@@ -559,6 +559,17 @@ class SalesAndReportingIntegrationTest {
                 .path("data").path("orders").findValuesAsText("reference");
         assertThat(refs).contains(createdRef);
 
+        // Verify the created physical sale appears in GET /api/v1/admin/sales/today
+        MvcResult todayRes = mockMvc.perform(get("/api/v1/admin/sales/today")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.summary.totalSales").isNumber())
+                .andReturn();
+
+        List<String> todayRefs = objectMapper.readTree(todayRes.getResponse().getContentAsString())
+                .path("data").path("orders").findValuesAsText("reference");
+        assertThat(todayRefs).contains(createdRef);
+
         // Verify the created physical sale is exported in /api/v1/admin/sales/export.xlsx for today's date filter
         String todayStr = java.time.LocalDate.now(BOGOTA_ZONE).toString();
         MvcResult excelRes = mockMvc.perform(get("/api/v1/admin/sales/export.xlsx")
