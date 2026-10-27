@@ -757,12 +757,32 @@ export default function AdminProductosPage() {
                     <td className="py-3.5 px-3.5 hidden sm:table-cell text-muted font-medium">
                       {p.category?.name || p.categoryName || 'General'}
                     </td>
-                    <td className="py-3.5 px-3.5 text-right font-medium text-ink">
-                      {p.referenceCost != null && p.referenceCost > 0 ? (
-                        formatCOP(p.referenceCost)
-                      ) : (
-                        <span className="text-muted text-xs italic">Sin costo</span>
-                      )}
+                    <td className="py-3.5 px-3.5 text-right">
+                      {(() => {
+                        const variantCosts = p.variants?.map((v) => v.referenceCost).filter((c): c is number => c != null && c > 0) || [];
+                        const minCost = variantCosts.length > 0 ? Math.min(...variantCosts) : p.referenceCost;
+                        const maxCost = variantCosts.length > 0 ? Math.max(...variantCosts) : p.referenceCost;
+                        const hasCostVariation = minCost != null && maxCost != null && minCost !== maxCost;
+
+                        if (minCost != null && minCost > 0) {
+                          return (
+                            <div className="flex flex-col items-end">
+                              <span className="font-semibold text-ink text-xs sm:text-sm">
+                                {hasCostVariation ? `Desde ${formatCOP(minCost)}` : formatCOP(minCost)}
+                              </span>
+                              {hasCostVariation && (
+                                <span
+                                  className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/90 px-1.5 py-0.5 rounded font-bold mt-0.5 tracking-tight"
+                                  title={`El costo de inversión varía por tono (hasta ${formatCOP(maxCost)})`}
+                                >
+                                  Varía por tono
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return <span className="text-muted text-xs italic">Sin costo</span>;
+                      })()}
                     </td>
                     <td className="py-3.5 px-3.5 text-right font-bold text-ink">
                       {formatCOP(p.minPrice)}

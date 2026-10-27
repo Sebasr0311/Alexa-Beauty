@@ -36,7 +36,7 @@ export default function AdminInventarioPage() {
   const [summaryList, setSummaryList] = useState<InventorySummaryDto[]>(EMPTY_SUMMARY);
   const [movementsList, setMovementsList] = useState<InventoryMovementDto[]>(EMPTY_MOVEMENTS);
   const [searchQuery, setSearchQuery] = useState('');
-  const [lowStockFilter, setLowStockFilter] = useState(false);
+  const [inventoryFilter, setInventoryFilter] = useState<'ALL' | 'LOW_STOCK' | 'NO_COST' | 'LOW_MARGIN'>('ALL');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -69,7 +69,7 @@ export default function AdminInventarioPage() {
 
   useEffect(() => {
     setSummaryPage(0);
-  }, [searchQuery, lowStockFilter]);
+  }, [searchQuery, inventoryFilter]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -77,7 +77,7 @@ export default function AdminInventarioPage() {
       const [sumRes, movRes] = await Promise.allSettled([
         api.getInventorySummary({
           query: searchQuery || undefined,
-          lowStockOnly: lowStockFilter || undefined,
+          lowStockOnly: inventoryFilter === 'LOW_STOCK' || undefined,
           page: summaryPage,
           size: 20,
         }),
@@ -95,7 +95,7 @@ export default function AdminInventarioPage() {
     } catch { setFeedback({ type: "error", text: "No se pudo confirmar la operación de inventario." }); } finally {
       setLoading(false);
     }
-  }, [searchQuery, lowStockFilter, summaryPage]);
+  }, [searchQuery, inventoryFilter, summaryPage]);
 
   useEffect(() => {
     loadData();
@@ -106,6 +106,12 @@ export default function AdminInventarioPage() {
   const totalReserved = summaryList.reduce((acc, curr) => acc + curr.stockReserved, 0);
   const totalAvailable = summaryList.reduce((acc, curr) => acc + curr.availableStock, 0);
   const lowStockCount = summaryList.filter((s) => s.isLowStock || s.availableStock <= s.minStock).length;
+  const noCostCount = summaryList.filter((s) => s.referenceCost == null || s.referenceCost <= 0).length;
+  const lowMarginCount = summaryList.filter((s) => {
+    if (!s.salePrice || !s.referenceCost || s.salePrice <= 0) return false;
+    return (s.salePrice - s.referenceCost) / s.salePrice < 0.3;
+  }).length;
+
   const totalInvestmentCost = summaryList.reduce(
     (acc, curr) => acc + curr.stockOnHand * (curr.referenceCost || 0),
     0
@@ -245,8 +251,20 @@ export default function AdminInventarioPage() {
       s.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (s.shadeName && s.shadeName.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesLowStock = !lowStockFilter || s.isLowStock || s.availableStock <= s.minStock;
-    return matchesSearch && matchesLowStock;
+
+    let matchesFilter = true;
+    if (inventoryFilter === 'LOW_STOCK') {
+      matchesFilter = s.isLowStock || s.availableStock <= s.minStock;
+    } else if (inventoryFilter === 'NO_COST') {
+      matchesFilter = s.referenceCost == null || s.referenceCost <= 0;
+    } else if (inventoryFilter === 'LOW_MARGIN') {
+      if (!s.salePrice || !s.referenceCost || s.salePrice <= 0) {
+        matchesFilter = false;
+      } else {
+        matchesFilter = (s.salePrice - s.referenceCost) / s.salePrice < 0.3;
+      }
+    }
+    return matchesSearch && matchesFilter;
   });
 
   return (
@@ -403,18 +421,56 @@ export default function AdminInventarioPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2.5 self-start md:self-auto">
+            <div className="flex items-center gap-1.5 flex-wrap self-start md:self-auto">
               <button
                 type="button"
-                onClick={() => setLowStockFilter(!lowStockFilter)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                  lowStockFilter
-                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                onClick={() => setInventoryFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  inventoryFilter === 'ALL'
+                    ? 'bg-wine text-white shadow-xs'
                     : 'bg-cream text-muted hover:text-ink border border-border'
                 }`}
               >
+                Todas ({summaryList.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInventoryFilter('LOW_STOCK')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  inventoryFilter === 'LOW_STOCK'
+                    ? 'bg-rose-700 text-white shadow-xs'
+                    : 'bg-cream text-rose-700 hover:text-rose-900 border border-border'
+                }`}
+              >
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span>Solo Stock Bajo</span>
+                <span>Stock Bajo ({lowStockCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInventoryFilter('NO_COST')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  inventoryFilter === 'NO_COST'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-cream text-amber-800 hover:text-amber-900 border border-border'
+                }`}
+                title="Variantes sin costo de inversión registrado para auditar"
+              >
+                <span>Sin Costo ({noCostCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInventoryFilter('LOW_MARGIN')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  inventoryFilter === 'LOW_MARGIN'
+                    ? 'bg-purple-700 text-white shadow-xs'
+                    : 'bg-cream text-purple-800 hover:text-purple-900 border border-border'
+                }`}
+                title="Variantes con margen comercial inferior al 30%"
+              >
+                <span>Margen &lt; 30% ({lowMarginCount})</span>
               </button>
 
               <button

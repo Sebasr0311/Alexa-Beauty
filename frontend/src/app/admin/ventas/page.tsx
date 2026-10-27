@@ -35,6 +35,8 @@ import {
   Store,
   ChevronDown,
   Percent,
+  FileText,
+  Printer,
 } from 'lucide-react';
 import {
   api,
@@ -141,6 +143,62 @@ export default function AdminVentasPage() {
   // Today live sales & profit summary
   const [todaySummary, setTodaySummary] = useState<SalesSummaryDto>(EMPTY_SALES_SUMMARY);
   const [loadingTodaySummary, setLoadingTodaySummary] = useState<boolean>(true);
+
+  // Daily Cash Closure (Cierre de Caja del Día)
+  const [dailyClosureOpen, setDailyClosureOpen] = useState<boolean>(false);
+  const [dailyClosureLoading, setDailyClosureLoading] = useState<boolean>(false);
+  const [dailyClosureOrders, setDailyClosureOrders] = useState<SaleOrderDto[]>([]);
+
+  const openDailyClosureModal = async () => {
+    setDailyClosureOpen(true);
+    setDailyClosureLoading(true);
+    try {
+      const res = await api.getAdminSalesToday({ size: 200 });
+      if (res && res.orders) {
+        setDailyClosureOrders(res.orders);
+      }
+      if (res && res.summary) {
+        setTodaySummary(res.summary);
+      }
+    } catch {
+      setDailyClosureOrders([]);
+    } finally {
+      setDailyClosureLoading(false);
+    }
+  };
+
+  const closurePaymentMethods = useMemo(() => {
+    const methods = [
+      { code: 'NEQUI', label: 'Nequi', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+      { code: 'DAVIPLATA', label: 'Daviplata', color: 'bg-red-100 text-red-800 border-red-200' },
+      { code: 'BANCOLOMBIA', label: 'Bancolombia', color: 'bg-yellow-100 text-yellow-900 border-yellow-200' },
+      { code: 'EFECTIVO', label: 'Efectivo', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+      { code: 'OTRO', label: 'Otro', color: 'bg-slate-100 text-slate-800 border-slate-200' },
+    ];
+    return methods.map((m) => {
+      const orders = dailyClosureOrders.filter((o) => (o.paymentMethod || '').toUpperCase() === m.code);
+      const total = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const count = orders.length;
+      const percent = (todaySummary.totalSales || 0) > 0 ? (total / todaySummary.totalSales) * 100 : 0;
+      return {
+        ...m,
+        total,
+        count,
+        percent,
+      };
+    });
+  }, [dailyClosureOrders, todaySummary.totalSales]);
+
+  const closureChannels = useMemo(() => {
+    const posOrders = dailyClosureOrders.filter((o) => (o.channel || '').toUpperCase() === 'PUNTO_FISICO');
+    const onlineOrders = dailyClosureOrders.filter((o) => (o.channel || '').toUpperCase() !== 'PUNTO_FISICO');
+    return {
+      posTotal: posOrders.reduce((sum, o) => sum + (o.total || 0), 0),
+      posCount: posOrders.length,
+      onlineTotal: onlineOrders.reduce((sum, o) => sum + (o.total || 0), 0),
+      onlineCount: onlineOrders.length,
+    };
+  }, [dailyClosureOrders]);
 
   const fetchTodaySales = useCallback(async () => {
     setLoadingTodaySummary(true);
@@ -643,6 +701,14 @@ export default function AdminVentasPage() {
               >
                 <Calendar className="w-3.5 h-3.5" />
                 <span>Ver tabla filtrada solo a hoy</span>
+              </button>
+              <button
+                type="button"
+                onClick={openDailyClosureModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-wine/10 hover:bg-wine hover:text-white text-wine transition shadow-xs active:scale-95 border border-wine/20"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Cierre de Caja del Día</span>
               </button>
               <button
                 type="button"
@@ -2155,6 +2221,249 @@ export default function AdminVentasPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Cierre de Caja Diario (Impecable) */}
+      {dailyClosureOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="daily-closure-title"
+        >
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-wine/20 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-wine to-wineDark text-white p-5 sm:p-6 flex items-start justify-between gap-4 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
+                  <FileText className="w-6 h-6 text-blush" />
+                </div>
+                <div>
+                  <span className="text-[10px] tracking-widest uppercase font-extrabold text-blush block">
+                    Alexa Beauty · Control Contable
+                  </span>
+                  <h3 id="daily-closure-title" className="font-serif text-xl sm:text-2xl font-bold tracking-tight">
+                    Cierre de Caja y Arqueo Diario
+                  </h3>
+                  <p className="text-xs text-white/80 mt-0.5">
+                    Corte oficial: {formatColombiaDateTime(new Date().toISOString())} (Hora Colombia)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/15 hover:bg-white text-white hover:text-wine font-bold text-xs transition shadow-xs"
+                  title="Imprimir comprobante o guardar como PDF"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline">Imprimir / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDailyClosureOpen(false)}
+                  className="w-9 h-9 rounded-full bg-white/15 hover:bg-white text-white hover:text-wine flex items-center justify-center transition"
+                  aria-label="Cerrar modal de cierre"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-ink">
+              {dailyClosureLoading ? (
+                <div className="py-16 text-center text-muted">
+                  <RefreshCw className="w-8 h-8 mx-auto mb-2 text-wine animate-spin" />
+                  <p className="font-semibold text-sm">Conciliando ventas y costos del día...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Tarjetas KPI de Cierre */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="bg-[#FFF9F7] border border-wine/20 rounded-2xl p-4 shadow-2xs">
+                      <span className="text-xs text-muted font-medium block">Total Recaudado</span>
+                      <p className="font-serif text-2xl font-bold text-wine my-1">
+                        {formatCOP(todaySummary.totalSales || 0)}
+                      </p>
+                      <span className="text-[11px] text-muted font-medium">Ingresos brutos hoy</span>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-2xs">
+                      <span className="text-xs text-muted font-medium block">Inversión Mercancía</span>
+                      <p className="font-serif text-2xl font-bold text-slate-800 my-1">
+                        {formatCOP(todaySummary.knownCostTotal || 0)}
+                      </p>
+                      <span className="text-[11px] text-muted font-medium">Costo de adquisición</span>
+                    </div>
+
+                    <div className="bg-[#F0FDF4] border border-emerald-200 rounded-2xl p-4 shadow-2xs">
+                      <span className="text-xs text-emerald-800 font-medium block">Ganancia Neta</span>
+                      <p className="font-serif text-2xl font-bold text-emerald-700 my-1">
+                        +{formatCOP(todaySummary.grossProfit || 0)}
+                      </p>
+                      <span className="text-[11px] text-emerald-700 font-bold">
+                        Margen: {todaySummary.grossMarginPercentage?.toFixed(1) || 0}%
+                      </span>
+                    </div>
+
+                    <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 shadow-2xs">
+                      <span className="text-xs text-amber-900 font-medium block">Volumen Despachado</span>
+                      <p className="font-serif text-2xl font-bold text-amber-900 my-1">
+                        {todaySummary.totalUnitsSold || 0} <span className="text-xs font-sans font-normal text-muted">unidades</span>
+                      </p>
+                      <span className="text-[11px] text-amber-800 font-medium">
+                        {todaySummary.paidOrdersCount || 0} pedidos (Ticket: {formatCOP(todaySummary.averageTicket || 0)})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Arqueo por Método de Pago & Canales */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Arqueo Medios de Pago */}
+                    <div className="bg-white border border-border rounded-2xl p-4 sm:p-5 shadow-2xs">
+                      <h4 className="font-bold text-sm text-wine mb-3 flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-wine" />
+                        <span>Arqueo por Medio de Pago</span>
+                      </h4>
+                      <div className="space-y-2.5">
+                        {closurePaymentMethods.map((m) => (
+                          <div key={m.code} className="flex items-center justify-between p-2.5 rounded-xl bg-cream/40 border border-border/70 text-xs sm:text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded font-bold text-xs ${m.color}`}>
+                                {m.label}
+                              </span>
+                              <span className="text-xs text-muted">({m.count} {m.count === 1 ? 'pago' : 'pagos'})</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-ink block">{formatCOP(m.total)}</span>
+                              <span className="text-[10px] text-muted">{m.percent.toFixed(1)}% del total</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Arqueo Canales */}
+                    <div className="bg-white border border-border rounded-2xl p-4 sm:p-5 shadow-2xs">
+                      <h4 className="font-bold text-sm text-wine mb-3 flex items-center gap-2">
+                        <Store className="w-4 h-4 text-wine" />
+                        <span>Distribución por Canal de Venta</span>
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-cream/40 border border-border/70 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-xs sm:text-sm text-ink block">Punto Físico (Mostrador)</span>
+                            <span className="text-xs text-muted">{closureChannels.posCount} pedidos pagados</span>
+                          </div>
+                          <span className="font-bold text-sm text-wine">{formatCOP(closureChannels.posTotal)}</span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-cream/40 border border-border/70 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-xs sm:text-sm text-ink block">Tienda Online / WhatsApp</span>
+                            <span className="text-xs text-muted">{closureChannels.onlineCount} pedidos pagados</span>
+                          </div>
+                          <span className="font-bold text-sm text-wine">{formatCOP(closureChannels.onlineTotal)}</span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 leading-relaxed">
+                          ✓ Todo el inventario asociado fue descontado de bodega e impactado en el Kardex oficial.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detalle de Ventas del Día */}
+                  <div className="border border-border rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="bg-blush px-4 py-2.5 border-b border-border flex items-center justify-between">
+                      <span className="text-xs font-bold text-wine">Transacciones Confirmadas de Hoy ({dailyClosureOrders.length})</span>
+                      <span className="text-[11px] text-muted">Auditoría contable</span>
+                    </div>
+                    <div className="overflow-x-auto max-h-60">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-cream text-muted font-bold border-b border-border sticky top-0">
+                          <tr>
+                            <th className="py-2 px-3">Referencia</th>
+                            <th className="py-2 px-3">Canal</th>
+                            <th className="py-2 px-3">Método</th>
+                            <th className="py-2 px-3 text-right">Inversión</th>
+                            <th className="py-2 px-3 text-right">Total Venta</th>
+                            <th className="py-2 px-3 text-right">Ganancia</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {dailyClosureOrders.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-6 text-center text-muted">
+                                No se registraron transacciones en el corte de hoy.
+                              </td>
+                            </tr>
+                          ) : (
+                            dailyClosureOrders.map((o) => {
+                              const orderCost = o.items?.reduce(
+                                (acc, it) => acc + (it.costSnapshot != null ? it.costSnapshot * it.quantity : 0),
+                                0
+                              ) ?? 0;
+                              const hasCost = o.items?.some((it) => it.costSnapshot != null);
+                              const orderProfit = (o.subtotal - o.discount) - orderCost;
+                              return (
+                                <tr key={o.id} className="hover:bg-cream/30">
+                                  <td className="py-2 px-3 font-mono font-bold text-wine">{o.reference}</td>
+                                  <td className="py-2 px-3">
+                                    <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-semibold">
+                                      {o.channel === 'PUNTO_FISICO' ? 'Punto Físico' : 'Online'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 font-semibold">{o.paymentMethod || 'Efectivo'}</td>
+                                  <td className="py-2 px-3 text-right text-muted">
+                                    {hasCost ? formatCOP(orderCost) : 'Sin costo'}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-bold text-ink">{formatCOP(o.total)}</td>
+                                  <td className="py-2 px-3 text-right font-bold text-emerald-700">
+                                    {hasCost ? `+${formatCOP(orderProfit)}` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Firmas de Auditoría */}
+                  <div className="pt-6 border-t border-border/80 grid grid-cols-2 gap-8 text-center text-xs text-muted">
+                    <div className="space-y-2">
+                      <div className="border-b border-border/80 pb-6 w-3/4 mx-auto" />
+                      <p className="font-bold text-ink">Responsable de Caja / Administrador</p>
+                      <p className="text-[10px]">Alexa Beauty Mostrador</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="border-b border-border/80 pb-6 w-3/4 mx-auto" />
+                      <p className="font-bold text-ink">Fecha de Verificación y Arqueo</p>
+                      <p className="text-[10px]">{formatColombiaDateTime(new Date().toISOString())}</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-cream/60 border-t border-border p-4 sm:p-5 flex items-center justify-between gap-3 flex-shrink-0">
+              <span className="text-[11px] text-muted">
+                Documento de auditoría interna de Alexa Beauty · Valores en pesos colombianos (COP).
+              </span>
+              <button
+                type="button"
+                onClick={() => setDailyClosureOpen(false)}
+                className="px-5 py-2.5 rounded-full border border-border hover:bg-white text-xs font-bold text-ink transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminShell>
   );
 }
