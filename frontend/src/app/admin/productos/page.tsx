@@ -57,6 +57,26 @@ export default function AdminProductosPage() {
   const [exporting, setExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const handleExportExcel = async () => {
+    setExporting(true);
+    setFeedback(null);
+    try {
+      await api.downloadAdminInventoryExcel();
+      setFeedback({
+        type: 'success',
+        text: 'Reporte oficial de inventario y productos descargado correctamente en Excel (.xlsx).',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al exportar catálogo';
+      setFeedback({
+        type: 'error',
+        text: `No se pudo descargar el archivo Excel: ${msg}`,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [imageError, setImageError] = useState('');
   const [newProductCost, setNewProductCost] = useState<number | undefined>(undefined);
@@ -499,6 +519,19 @@ export default function AdminProductosPage() {
         <>
           <button
             type="button"
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-full border border-wine/30 bg-wine/5 hover:bg-wine hover:text-white text-wine font-bold text-xs sm:text-sm px-4 py-2.5 transition active:scale-95 disabled:opacity-50"
+          >
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4" />
+            )}
+            <span>{exporting ? 'Generando...' : 'Exportar a Excel'}</span>
+          </button>
+          <button
+            type="button"
             onClick={handleOpenCreateModal}
             className="inline-flex items-center gap-2 rounded-full bg-wine hover:bg-wineDark text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-glow transition active:scale-95"
           >
@@ -679,7 +712,8 @@ export default function AdminProductosPage() {
                 <th className="py-3 px-3.5 rounded-l-xl">Producto</th>
                 <th className="py-3 px-3.5">SKU</th>
                 <th className="py-3 px-3.5 hidden sm:table-cell">Categoría</th>
-                <th className="py-3 px-3.5">Precio COP</th>
+                <th className="py-3 px-3.5 text-right">Inversión (Costo)</th>
+                <th className="py-3 px-3.5 text-right">Precio Venta</th>
                 <th className="py-3 px-3.5" title="Unidades disponibles para venta inmediata / Físico en bodega / Reservado en pedidos WhatsApp">Stock (Disp. / Físico)</th>
                 <th className="py-3 px-3.5">Estado</th>
                 <th className="py-3 px-3.5 rounded-r-xl text-right">Acciones</th>
@@ -723,7 +757,14 @@ export default function AdminProductosPage() {
                     <td className="py-3.5 px-3.5 hidden sm:table-cell text-muted font-medium">
                       {p.category?.name || p.categoryName || 'General'}
                     </td>
-                    <td className="py-3.5 px-3.5 font-bold text-ink">
+                    <td className="py-3.5 px-3.5 text-right font-medium text-ink">
+                      {p.referenceCost != null && p.referenceCost > 0 ? (
+                        formatCOP(p.referenceCost)
+                      ) : (
+                        <span className="text-muted text-xs italic">Sin costo</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3.5 text-right font-bold text-ink">
                       {formatCOP(p.minPrice)}
                     </td>
                     <td className="py-3.5 px-3.5">

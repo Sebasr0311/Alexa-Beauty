@@ -258,6 +258,19 @@ export default function AdminInventarioPage() {
         <>
           <button
             type="button"
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-full border border-wine/30 bg-wine/5 hover:bg-wine hover:text-white text-wine font-bold text-xs sm:text-sm px-5 py-2.5 transition active:scale-95 disabled:opacity-50"
+          >
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4" />
+            )}
+            <span>{exporting ? 'Generando Excel...' : 'Exportar a Excel (.xlsx)'}</span>
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setReceiptIdempotencyKey(crypto.randomUUID());
               setReceiptModalOpen(true);
@@ -298,38 +311,54 @@ export default function AdminInventarioPage() {
         </div>
       )}
 
-      {/* 4 Tarjetas KPI de Inventario */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-border rounded-2xl p-4 sm:p-5 shadow-xs">
+      {/* 6 Tarjetas KPI de Inventario */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="bg-white border border-border rounded-2xl p-4 shadow-xs">
           <span className="text-xs text-muted font-medium block">Stock Físico (On Hand)</span>
-          <p className="font-serif text-2xl sm:text-3xl font-bold text-wine my-1.5 tracking-tight">
-            {totalOnHand} <span className="text-xs font-sans font-normal text-muted">unidades</span>
+          <p className="font-serif text-xl sm:text-2xl font-bold text-wine my-1.5 tracking-tight">
+            {totalOnHand} <span className="text-xs font-sans font-normal text-muted">un.</span>
           </p>
           <span className="text-[11px] text-muted font-medium">En bodega / anaquel</span>
         </div>
 
-        <div className="bg-white border border-border rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="bg-white border border-border rounded-2xl p-4 shadow-xs">
           <span className="text-xs text-muted font-medium block">Stock Reservado</span>
-          <p className="font-serif text-2xl sm:text-3xl font-bold text-amber-600 my-1.5 tracking-tight">
-            {totalReserved} <span className="text-xs font-sans font-normal text-muted">unidades</span>
+          <p className="font-serif text-xl sm:text-2xl font-bold text-amber-600 my-1.5 tracking-tight">
+            {totalReserved} <span className="text-xs font-sans font-normal text-muted">un.</span>
           </p>
-          <span className="text-[11px] text-amber-700 font-medium">En espera de pago (45 min)</span>
+          <span className="text-[11px] text-amber-700 font-medium">En espera de pago</span>
         </div>
 
-        <div className="bg-white border border-border rounded-2xl p-4 sm:p-5 shadow-xs">
-          <span className="text-xs text-muted font-medium block">Stock Disponible Real</span>
-          <p className="font-serif text-2xl sm:text-3xl font-bold text-emerald-700 my-1.5 tracking-tight">
-            {totalAvailable} <span className="text-xs font-sans font-normal text-muted">unidades</span>
+        <div className="bg-white border border-border rounded-2xl p-4 shadow-xs">
+          <span className="text-xs text-muted font-medium block">Stock Disponible</span>
+          <p className="font-serif text-xl sm:text-2xl font-bold text-emerald-700 my-1.5 tracking-tight">
+            {totalAvailable} <span className="text-xs font-sans font-normal text-muted">un.</span>
           </p>
-          <span className="text-[11px] text-emerald-700 font-medium">Listo para nuevos compradores</span>
+          <span className="text-[11px] text-emerald-700 font-medium">Listo para venta</span>
         </div>
 
-        <div className="bg-white border border-border rounded-2xl p-4 sm:p-5 shadow-xs">
-          <span className="text-xs text-muted font-medium block">Alertas de Stock Bajo</span>
-          <p className="font-serif text-2xl sm:text-3xl font-bold text-rose-600 my-1.5 tracking-tight">
-            {lowStockCount} <span className="text-xs font-sans font-normal text-muted">variantes</span>
+        <div className="bg-white border border-border rounded-2xl p-4 shadow-xs">
+          <span className="text-xs text-muted font-medium block">Alertas Stock Bajo</span>
+          <p className="font-serif text-xl sm:text-2xl font-bold text-rose-600 my-1.5 tracking-tight">
+            {lowStockCount} <span className="text-xs font-sans font-normal text-muted">var.</span>
           </p>
-          <span className="text-[11px] text-rose-600 font-medium">Bajo mínimo o agotándose</span>
+          <span className="text-[11px] text-rose-600 font-medium">Bajo mínimo</span>
+        </div>
+
+        <div className="bg-white border border-border rounded-2xl p-4 shadow-xs">
+          <span className="text-xs text-muted font-medium block">Inversión en Stock</span>
+          <p className="font-serif text-xl sm:text-2xl font-bold text-ink my-1.5 tracking-tight">
+            {formatCOP(totalInvestmentCost)}
+          </p>
+          <span className="text-[11px] text-muted font-medium">Costo de adquisición</span>
+        </div>
+
+        <div className="bg-white border border-border rounded-2xl p-4 shadow-xs">
+          <span className="text-xs text-muted font-medium block">Valor Venta Stock</span>
+          <p className="font-serif text-xl sm:text-2xl font-bold text-wine my-1.5 tracking-tight">
+            {formatCOP(totalRetailValue)}
+          </p>
+          <span className="text-[11px] text-muted font-medium">Estimado comercial</span>
         </div>
       </div>
 
@@ -410,6 +439,9 @@ export default function AdminInventarioPage() {
                     <th className="py-3 px-3.5 text-center">Físico</th>
                     <th className="py-3 px-3.5 text-center">Reservado</th>
                     <th className="py-3 px-3.5 text-center">Disponible</th>
+                    <th className="py-3 px-3.5 text-right">Inversión (Costo)</th>
+                    <th className="py-3 px-3.5 text-right">Precio Venta</th>
+                    <th className="py-3 px-3.5 text-right">Inversión Total</th>
                     <th className="py-3 px-3.5 text-center">Mínimo</th>
                     <th className="py-3 px-3.5 text-right rounded-r-xl">Acciones</th>
                   </tr>
@@ -457,6 +489,27 @@ export default function AdminInventarioPage() {
                           >
                             {s.availableStock} un.
                           </span>
+                        </td>
+                        <td className="py-3.5 px-3.5 text-right font-medium text-ink">
+                          {s.referenceCost != null && s.referenceCost > 0 ? (
+                            formatCOP(s.referenceCost)
+                          ) : (
+                            <span className="text-muted text-xs italic">Sin costo</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3.5 text-right font-medium text-ink">
+                          {s.salePrice != null && s.salePrice > 0 ? (
+                            formatCOP(s.salePrice)
+                          ) : (
+                            <span className="text-muted text-xs italic">N/A</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3.5 text-right font-bold text-wine">
+                          {s.referenceCost != null && s.referenceCost > 0 ? (
+                            formatCOP(s.stockOnHand * s.referenceCost)
+                          ) : (
+                            <span className="text-muted text-xs italic">-</span>
+                          )}
                         </td>
                         <td className="py-3.5 px-3.5 text-center text-muted">
                           {s.minStock} un.
