@@ -25,6 +25,7 @@ import {
   InventorySummaryDto,
   InventoryMovementDto,
 } from '@/lib/api';
+import { formatCOP } from '@/lib/utils';
 
 const EMPTY_SUMMARY: InventorySummaryDto[] = [];
 
@@ -37,6 +38,7 @@ export default function AdminInventarioPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Modal Ajuste de Stock
@@ -104,6 +106,34 @@ export default function AdminInventarioPage() {
   const totalReserved = summaryList.reduce((acc, curr) => acc + curr.stockReserved, 0);
   const totalAvailable = summaryList.reduce((acc, curr) => acc + curr.availableStock, 0);
   const lowStockCount = summaryList.filter((s) => s.isLowStock || s.availableStock <= s.minStock).length;
+  const totalInvestmentCost = summaryList.reduce(
+    (acc, curr) => acc + curr.stockOnHand * (curr.referenceCost || 0),
+    0
+  );
+  const totalRetailValue = summaryList.reduce(
+    (acc, curr) => acc + curr.stockOnHand * (curr.salePrice || 0),
+    0
+  );
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    setFeedback(null);
+    try {
+      await api.downloadAdminInventoryExcel();
+      setFeedback({
+        type: 'success',
+        text: 'Reporte oficial de inventario y productos descargado correctamente en Excel (.xlsx).',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al exportar inventario';
+      setFeedback({
+        type: 'error',
+        text: `No se pudo descargar el archivo Excel: ${msg}`,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleOpenAdjust = (variant: InventorySummaryDto) => {
     setSelectedVariantForAdjust(variant);
@@ -387,7 +417,7 @@ export default function AdminInventarioPage() {
                 <tbody className="divide-y divide-border/60">
                   {filteredSummary.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted">
+                      <td colSpan={9} className="py-12 text-center text-muted">
                         <Boxes className="w-8 h-8 mx-auto mb-2 text-mauve/60" />
                         <p className="font-medium">No se encontraron existencias con este filtro.</p>
                       </td>

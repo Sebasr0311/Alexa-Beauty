@@ -29,4 +29,4 @@ ENV PORT=8080
 ENV SPRING_PROFILES_ACTIVE=prod
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Xms128m", "-Xmx256m", "-XX:MaxRAMPercentage=50.0", "-XX:MaxMetaspaceSize=112m", "-XX:ReservedCodeCacheSize=40m", "-XX:+UseSerialGC", "-Xss384k", "-XX:+ExitOnOutOfMemoryError", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xms128m", "-Xmx384m", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=48m", "-XX:+UseSerialGC", "-Xss384k", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]

@@ -18,7 +18,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +34,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @RestController
@@ -55,6 +59,17 @@ public class AdminInventoryController {
     ) {
         Page<InventorySummaryResponse> page = inventoryService.getInventorySummary(query, lowStockOnly, pageable);
         return ResponseEntity.ok(ApiResponse.ok("Resumen de inventario obtenido exitosamente", PagedResponse.from(page)));
+    }
+
+    @GetMapping("/export.xlsx")
+    @Operation(summary = "Exportar inventario completo a Excel", description = "Genera un archivo Excel oficial con todos los productos, variantes, stock físico, reservado, disponible, costos de inversión y precios de venta")
+    public ResponseEntity<byte[]> exportInventoryReport(@AuthenticationPrincipal UserPrincipal actor) {
+        byte[] bytes = inventoryService.exportInventoryReport(actor);
+        String filename = String.format("AlexaBeauty_Inventario_Productos_%s.xlsx", LocalDate.now(ZoneId.of("America/Bogota")));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(bytes);
     }
 
     @GetMapping("/movements")

@@ -673,11 +673,16 @@ export default function AdminVentasPage() {
               <p className="font-serif text-xl sm:text-2xl font-bold text-[#196B3E] my-1">
                 {formatCOP(todaySummary.grossProfit || 0)}
               </p>
-              <span className="text-[11px] text-[#24734E] font-medium block">
-                {todaySummary.grossMarginPercentage != null
-                  ? `Margen: ${todaySummary.grossMarginPercentage}%`
-                  : 'Ingresos menos costos'}
-              </span>
+              <div className="text-[11px] leading-tight space-y-0.5">
+                <span className="text-muted block text-[10px]">
+                  Inversión: <span className="font-semibold text-ink">{formatCOP(todaySummary.knownCostTotal || 0)}</span>
+                </span>
+                <span className="text-[#24734E] font-medium block">
+                  {todaySummary.grossMarginPercentage != null
+                    ? `Margen: ${todaySummary.grossMarginPercentage}%`
+                    : 'Ingresos menos costos'}
+                </span>
+              </div>
             </div>
 
             {/* Unidades Hoy */}
@@ -741,11 +746,16 @@ export default function AdminVentasPage() {
             <p className="font-serif text-2xl sm:text-3xl font-bold text-[#196B3E] my-2 tracking-tight">
               {formatCOP(salesResponse.summary.grossProfit || 0)}
             </p>
-            <span className="text-[11px] text-[#24734E] font-semibold flex items-center gap-1">
-              {salesResponse.summary.grossMarginPercentage != null
-                ? `Margen: ${salesResponse.summary.grossMarginPercentage}% (incluye dcto.)`
-                : 'Ventas menos costos registrados'}
-            </span>
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-muted block">
+                Inversión histórica: <span className="font-semibold text-ink">{formatCOP(salesResponse.summary.knownCostTotal || 0)}</span>
+              </span>
+              <span className="text-[11px] text-[#24734E] font-semibold flex items-center gap-1">
+                {salesResponse.summary.grossMarginPercentage != null
+                  ? `Margen: ${salesResponse.summary.grossMarginPercentage}% (incluye dcto.)`
+                  : 'Ventas menos costos de inversión'}
+              </span>
+            </div>
           </div>
 
           {/* Pedidos Pagados */}
@@ -984,7 +994,7 @@ export default function AdminVentasPage() {
                     <th className="py-3 px-3.5">Referencia</th>
                     <th className="py-3 px-3.5">Cliente</th>
                     <th className="py-3 px-3.5">Método</th>
-                    <th className="py-3 px-3.5 text-right">Total</th>
+                    <th className="py-3 px-3.5 text-right">Total / Inversión / Ganancia</th>
                     <th className="py-3 px-3.5 hidden md:table-cell">Verificado Por</th>
                     <th className="py-3 px-3.5 hidden sm:table-cell">Canal</th>
                     <th className="py-3 px-3.5 text-center rounded-r-xl">Acciones</th>
@@ -1014,14 +1024,35 @@ export default function AdminVentasPage() {
                         {getPaymentMethodBadge(order.paymentMethod)}
                       </td>
 
-                      {/* Total */}
-                      <td className="py-3.5 px-3.5 font-bold text-ink text-right whitespace-nowrap">
-                        <div>{formatCOP(order.total)}</div>
+                      {/* Total, Inversión y Ganancia */}
+                      <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
+                        <div className="font-bold text-ink">{formatCOP(order.total)}</div>
                         {order.discount > 0 && (
                           <div className="text-[10px] font-semibold text-[#24734E]">
                             Dcto: -{formatCOP(order.discount)}
                           </div>
                         )}
+                        {(() => {
+                          const orderCost = order.items?.reduce(
+                            (acc, it) => acc + (it.costSnapshot != null ? it.costSnapshot * it.quantity : 0),
+                            0
+                          ) ?? 0;
+                          const hasKnownCost = order.items?.some((it) => it.costSnapshot != null);
+                          if (!hasKnownCost) {
+                            return <div className="text-[10px] text-muted font-normal">Sin costo hist.</div>;
+                          }
+                          const orderProfit = (order.subtotal - order.discount) - orderCost;
+                          return (
+                            <div className="text-[11px] leading-tight mt-0.5">
+                              <span className="text-muted block text-[10px]">
+                                Inversión: <span className="font-medium text-ink">{formatCOP(orderCost)}</span>
+                              </span>
+                              <span className="font-bold text-emerald-700 block">
+                                Ganancia: +{formatCOP(orderProfit)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Verificado Por */}
@@ -1923,8 +1954,10 @@ export default function AdminVentasPage() {
                       <th className="py-2.5 px-3">Producto</th>
                       <th className="py-2.5 px-3">Tono / Presentación</th>
                       <th className="py-2.5 px-2 text-center">Cant.</th>
+                      <th className="py-2.5 px-3 text-right">Inversión Unit.</th>
                       <th className="py-2.5 px-3 text-right">Precio Unit.</th>
-                      <th className="py-2.5 px-3 text-right">Subtotal</th>
+                      <th className="py-2.5 px-3 text-right">Subtotal Venta</th>
+                      <th className="py-2.5 px-3 text-right">Ganancia Línea</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -1945,10 +1978,22 @@ export default function AdminVentasPage() {
                           {item.quantity}
                         </td>
                         <td className="py-2.5 px-3 text-right text-muted">
+                          {item.costSnapshot != null ? (
+                            formatCOP(item.costSnapshot)
+                          ) : (
+                            <span className="text-[11px] text-muted">Sin costo</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-medium text-ink">
                           {formatCOP(item.unitPrice)}
                         </td>
                         <td className="py-2.5 px-3 text-right font-bold text-ink">
                           {formatCOP(item.subtotal)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
+                          {item.costSnapshot != null
+                            ? `+${formatCOP((item.unitPrice - item.costSnapshot) * item.quantity)}`
+                            : '-'}
                         </td>
                       </tr>
                     ))}
@@ -1957,27 +2002,60 @@ export default function AdminVentasPage() {
               </div>
             </div>
 
-            {/* Financial Breakdown */}
-            <div className="bg-blush/40 border border-border rounded-2xl p-4 space-y-2">
-              <div className="flex justify-between text-xs text-muted">
-                <span>Subtotal productos:</span>
-                <span className="font-semibold text-ink">{formatCOP(selectedOrder.subtotal)}</span>
-              </div>
-              {selectedOrder.discount > 0 && (
-                <div className="flex justify-between text-xs text-[#24734E]">
-                  <span>Descuento aplicado:</span>
-                  <span className="font-semibold">- {formatCOP(selectedOrder.discount)}</span>
+            {/* Financial Breakdown con Inversión y Ganancia */}
+            {(() => {
+              const orderTotalCost = selectedOrder.items?.reduce(
+                (acc, it) => acc + (it.costSnapshot != null ? it.costSnapshot * it.quantity : 0),
+                0
+              ) ?? 0;
+              const hasCost = selectedOrder.items?.some((it) => it.costSnapshot != null);
+              const estimatedProfit = hasCost ? (selectedOrder.subtotal - selectedOrder.discount) - orderTotalCost : null;
+              const profitMargin = hasCost && (selectedOrder.subtotal - selectedOrder.discount) > 0
+                ? Math.round((estimatedProfit! / (selectedOrder.subtotal - selectedOrder.discount)) * 100)
+                : null;
+
+              return (
+                <div className="bg-blush/40 border border-border rounded-2xl p-4 space-y-2.5">
+                  <div className="flex justify-between text-xs text-muted">
+                    <span>Subtotal productos (Venta):</span>
+                    <span className="font-semibold text-ink">{formatCOP(selectedOrder.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-wineDark font-medium">
+                    <span>Costo Total de Inversión (Mercancía):</span>
+                    <span className="font-semibold">
+                      {hasCost ? formatCOP(orderTotalCost) : 'Sin costo histórico registrado'}
+                    </span>
+                  </div>
+                  {selectedOrder.discount > 0 && (
+                    <div className="flex justify-between text-xs text-[#24734E]">
+                      <span>Descuento aplicado:</span>
+                      <span className="font-semibold">- {formatCOP(selectedOrder.discount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs text-muted">
+                    <span>Tarifa de envío:</span>
+                    <span className="font-semibold text-ink">{formatCOP(selectedOrder.shippingFee)}</span>
+                  </div>
+                  <div className="border-t border-border pt-2 flex justify-between text-sm font-bold text-wine">
+                    <span>Total pagado:</span>
+                    <span className="font-serif text-base">{formatCOP(selectedOrder.total)}</span>
+                  </div>
+                  {hasCost && estimatedProfit != null && (
+                    <div className="border-t border-emerald-200/80 pt-2 flex items-center justify-between text-sm bg-emerald-50/80 -mx-4 -mb-4 px-4 py-3 rounded-b-2xl">
+                      <div>
+                        <span className="font-bold text-emerald-900 block">Ganancia Neta Estimada:</span>
+                        <span className="text-[11px] text-emerald-700">
+                          {profitMargin != null ? `Margen de ganancia: ${profitMargin}% sobre productos` : 'Venta menos costo de inversión'}
+                        </span>
+                      </div>
+                      <span className="font-serif text-base font-extrabold text-emerald-800">
+                        +{formatCOP(estimatedProfit)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-              <div className="flex justify-between text-xs text-muted">
-                <span>Tarifa de envío:</span>
-                <span className="font-semibold text-ink">{formatCOP(selectedOrder.shippingFee)}</span>
-              </div>
-              <div className="border-t border-border pt-2 flex justify-between text-sm font-bold text-wine">
-                <span>Total pagado:</span>
-                <span className="font-serif text-base">{formatCOP(selectedOrder.total)}</span>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between gap-3 pt-2">

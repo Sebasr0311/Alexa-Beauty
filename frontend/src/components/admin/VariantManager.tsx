@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ProductDetailDto, ProductVariantDto, VariantInput } from '@/lib/api';
 import { variantLabel } from '@/lib/shades';
+import { formatCOP } from '@/lib/utils';
 import { emptyVariant, variantPayload, VariantFields } from './VariantFields';
 
 function VariantRow({product,variant,onReload}: {product:ProductDetailDto;variant:ProductVariantDto;onReload:()=>Promise<void>}) {
@@ -13,7 +14,7 @@ function VariantRow({product,variant,onReload}: {product:ProductDetailDto;varian
   }
   return <section className="p-4 border border-border rounded-2xl bg-white space-y-3 min-w-0" aria-label={`Variante ${variantLabel(variant)}`}>
     <h3 className="font-bold text-wine break-words">{variantLabel(variant)} · {variant.active?'Activa':'Inactiva'}</h3>
-    <p className="text-xs text-muted">Existencias: {variant.stockOnHand} · Reservadas: {variant.stockReserved} · Disponibles: {variant.availableStock}. Las existencias se ajustan desde Inventario.</p>
+    <p className="text-xs text-muted font-medium">Existencias: {variant.stockOnHand} · Reservadas: {variant.stockReserved} · Disponibles: {variant.availableStock} · <span className="text-wine font-semibold">Precio: {formatCOP(variant.salePrice)}</span> · <span className="text-ink font-semibold">Inversión (Costo): {variant.referenceCost != null ? formatCOP(variant.referenceCost) : 'Sin costo'}</span></p>
     <form onSubmit={event=>{event.preventDefault();void run(()=>api.updateVariant(product.id,variant.id,variantPayload(value)),'Variante guardada.');}} className="space-y-3">
       <fieldset disabled={busy}><VariantFields value={value} onChange={setValue} editing/></fieldset>
       <div className="flex flex-wrap gap-2"><button disabled={busy} className="min-h-11 rounded-full px-4 bg-wine text-white text-sm font-bold">Guardar variante</button>

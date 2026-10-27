@@ -691,6 +691,7 @@ public class CatalogServiceImpl implements CatalogService {
                 product.isFeatured(),
                 minPrice,
                 maxPrice,
+                publicView ? null : visibleVariants.stream().map(ProductVariant::getReferenceCost).filter(java.util.Objects::nonNull).min(BigDecimal::compareTo).orElse(null),
                 totalStockOnHand,
                 totalAvailableStock,
                 coverUrl,

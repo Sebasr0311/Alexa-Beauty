@@ -17,7 +17,7 @@ import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFDataFormat;
 import org.apache.poi.xssf.usermodel.XSSFFont;
-import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator;
+// POI formula evaluation deferred to Excel viewer
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
@@ -72,7 +72,8 @@ public class ExcelSalesReportGenerator {
             createMetadatosSheet(workbook, orders, startDate, endDate, actor, styles);
 
             try {
-                XSSFFormulaEvaluator.evaluateAllFormulaCells(workbook);
+                // Request Excel/Sheets to recalculate formula cells upon opening without POI heap overhead
+                workbook.setForceFormulaRecalculation(true);
             } catch (Exception ignored) {
                 // If any formula can't be evaluated statically in POI, continue
             }

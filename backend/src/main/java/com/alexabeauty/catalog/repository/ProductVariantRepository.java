@@ -51,4 +51,12 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
             @Param("query") String query,
             @Param("lowStockOnly") boolean lowStockOnly,
             Pageable pageable);
+
+    @Query("SELECT pv FROM ProductVariant pv " +
+           "JOIN FETCH pv.product p " +
+           "LEFT JOIN FETCH p.brand b " +
+           "LEFT JOIN FETCH p.category c " +
+           "WHERE p.deletedAt IS NULL " +
+           "ORDER BY p.name ASC, pv.sku ASC")
+    List<ProductVariant> findAllForInventoryExport();
 }

@@ -24,6 +24,7 @@ import {
   Star,
   UploadCloud,
   Loader2,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { VariantFields, emptyVariant, variantPayload } from '@/components/admin/VariantFields';
 import { BrandPicker } from '@/components/admin/BrandPicker';
@@ -53,6 +54,7 @@ export default function AdminProductosPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('TODAS');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -686,7 +688,7 @@ export default function AdminProductosPage() {
             <tbody className="divide-y divide-border/60">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted">
+                  <td colSpan={8} className="py-12 text-center text-muted">
                     <Package className="w-8 h-8 mx-auto mb-2 text-mauve/60" />
                     <p className="font-medium">No se encontraron productos con los filtros seleccionados.</p>
                   </td>

@@ -27,4 +27,6 @@ public interface InventoryService {
     StockReceiptResponse getReceiptById(UUID id);
 
     Page<StockReceiptResponse> listReceipts(Pageable pageable);
+
+    byte[] exportInventoryReport(UserPrincipal actor);
 }

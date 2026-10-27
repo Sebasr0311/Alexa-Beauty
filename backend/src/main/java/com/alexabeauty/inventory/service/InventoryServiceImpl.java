@@ -65,6 +65,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
     private final com.alexabeauty.media.MediaService mediaService;
+    private final com.alexabeauty.reporting.excel.ExcelInventoryReportGenerator excelInventoryReportGenerator;
 
     @org.springframework.beans.factory.annotation.Autowired
     public InventoryServiceImpl(
@@ -75,7 +76,9 @@ public class InventoryServiceImpl implements InventoryService {
             UserRepository userRepository,
             AuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
-            com.alexabeauty.media.MediaService mediaService
+            com.alexabeauty.media.MediaService mediaService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            com.alexabeauty.reporting.excel.ExcelInventoryReportGenerator excelInventoryReportGenerator
     ) {
         this.productVariantRepository = productVariantRepository;
         this.inventoryMovementRepository = inventoryMovementRepository;
@@ -85,6 +88,9 @@ public class InventoryServiceImpl implements InventoryService {
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper;
         this.mediaService = mediaService;
+        this.excelInventoryReportGenerator = excelInventoryReportGenerator != null
+                ? excelInventoryReportGenerator
+                : new com.alexabeauty.reporting.excel.ExcelInventoryReportGenerator();
     }
 
     public InventoryServiceImpl(
@@ -97,7 +103,7 @@ public class InventoryServiceImpl implements InventoryService {
             ObjectMapper objectMapper
     ) {
         this(productVariantRepository, inventoryMovementRepository, stockReceiptRepository,
-                stockReceiptItemRepository, userRepository, auditLogRepository, objectMapper, null);
+                stockReceiptItemRepository, userRepository, auditLogRepository, objectMapper, null, null);
     }
 
     private String hashFingerprint(String input) {
@@ -422,6 +428,13 @@ public class InventoryServiceImpl implements InventoryService {
     public Page<StockReceiptResponse> listReceipts(Pageable pageable) {
         return stockReceiptRepository.findAllByOrderByCreatedAtDesc(pageable)
                 .map(StockReceiptResponse::from);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportInventoryReport(UserPrincipal actor) {
+        List<ProductVariant> variants = productVariantRepository.findAllForInventoryExport();
+        return excelInventoryReportGenerator.generateInventoryReport(variants, actor);
     }
 
     private String generateReceiptNumber() {

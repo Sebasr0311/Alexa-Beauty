@@ -23,12 +23,15 @@ import com.alexabeauty.inventory.repository.StockReceiptRepository;
 import com.alexabeauty.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -536,5 +539,28 @@ class InventoryIntegrationTest {
 
         ProductVariant afterReplay = productVariantRepository.findById(variant.getId()).orElseThrow();
         assertThat(afterReplay.getStockOnHand()).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/admin/inventory/export.xlsx genera reporte Excel con formato oficial y 2 hojas")
+    void testExportInventoryExcel() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/inventory/export.xlsx")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        byte[] bytes = result.getResponse().getContentAsByteArray();
+        assertThat(bytes).isNotEmpty();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))) {
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(2);
+            XSSFSheet inventarioSheet = workbook.getSheet("INVENTARIO_PRODUCTOS");
+            assertThat(inventarioSheet).isNotNull();
+            assertThat(workbook.getSheet("RESUMEN_EJECUTIVO")).isNotNull();
+
+            assertThat(inventarioSheet.getRow(4).getCell(0).getStringCellValue()).isEqualTo("SKU");
+            assertThat(inventarioSheet.getRow(4).getCell(9).getStringCellValue()).isEqualTo("Costo Inversión COP");
+            assertThat(inventarioSheet.getRow(4).getCell(10).getStringCellValue()).isEqualTo("Precio Venta COP");
+        }
     }
 }

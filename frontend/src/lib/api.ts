@@ -43,6 +43,7 @@ export interface ProductSummaryDto {
   category?: { name: string };
   minPrice: number;
   maxPrice: number;
+  referenceCost?: number;
   totalStockOnHand?: number | null;
   totalAvailableStock: number;
   coverImageUrl?: string;
@@ -477,6 +478,35 @@ class ApiClient {
     const fromStr = params.from || 'inicio';
     const toStr = params.to || 'fin';
     link.download = `AlexaBeauty_Reporte_Ventas_${fromStr}_${toStr}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  }
+
+  async downloadAdminInventoryExcel(): Promise<void> {
+    const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
+
+    const response = await fetch(`${API_BASE_URL}/admin/inventory/export.xlsx`, {
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Error ${response.status} al descargar reporte Excel de inventario`;
+      try {
+        const errorJson = await response.json();
+        errorMsg = errorJson.detail || errorJson.message || errorMsg;
+      } catch {}
+      throw new Error(errorMsg);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    const todayStr = new Date().toISOString().split('T')[0];
+    link.download = `AlexaBeauty_Inventario_Productos_${todayStr}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
