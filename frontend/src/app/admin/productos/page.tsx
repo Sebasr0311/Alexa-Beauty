@@ -734,7 +734,7 @@ export default function AdminProductosPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-blush border border-border flex-shrink-0">
                           <Image unoptimized
-                            src={p.coverImageUrl || '/branding/logo.png'}
+                            src={p.coverImageUrl || '/branding/logo-640.webp'}
                             alt={p.name}
                             fill
                             sizes="44px"

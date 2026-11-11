@@ -121,7 +121,7 @@ export function AdminShell({
             <div className="text-center space-y-2 relative">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blush to-[#F6DFE7] p-2.5 mx-auto shadow-inner border border-[#E8D4DC] flex items-center justify-center">
                 <Image
-                  src="/branding/logo.png"
+                  src="/branding/logo-640.webp"
                   alt="Alexa Beauty"
                   width={44}
                   height={44}
@@ -270,7 +270,7 @@ export function AdminShell({
           <div className="flex items-center gap-3">
             <div className="relative w-9 h-9 rounded-full overflow-hidden border border-border bg-blush shadow-xs">
               <Image
-                src="/branding/logo.png"
+                src="/branding/logo-640.webp"
                 alt="Logo Alexa Beauty"
                 fill
                 sizes="36px"

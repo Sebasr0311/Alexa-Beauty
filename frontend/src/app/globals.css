@@ -29,6 +29,26 @@ body {
   padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* Horizontal chip rails without visible scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Loading placeholder for images and skeletons */
+.shimmer {
+  background: linear-gradient(110deg, #f3e4e8 8%, #fbf2f4 18%, #f3e4e8 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

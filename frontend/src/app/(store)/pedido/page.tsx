@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import { api, CreateOrderRequestDto, OrderItemRequestDto } from '@/lib/api';
 import { formatCOP } from '@/lib/utils';
+import { ProductImage } from '@/components/ProductImage';
 import {
   ArrowLeft,
   Truck,
@@ -180,12 +181,13 @@ export default function CheckoutPage() {
               </label>
               <input
                 id="customerName"
+                autoComplete="name"
                 type="text"
                 required
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Ej. Camila Morales"
-                className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
+                className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-base sm:text-sm text-ink outline-none focus:border-wine transition"
               />
             </div>
 
@@ -196,12 +198,14 @@ export default function CheckoutPage() {
               </label>
               <input
                 id="customerPhone"
+                autoComplete="tel"
+                inputMode="tel"
                 type="tel"
                 required
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="Ej. 300 123 4567"
-                className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
+                className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-base sm:text-sm text-ink outline-none focus:border-wine transition"
               />
               <span className="text-[11px] text-muted block mt-1">
                 Nos comunicaremos a este número vía WhatsApp para coordinar la entrega y el pago.
@@ -279,7 +283,7 @@ export default function CheckoutPage() {
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="Ej. Calle 12 # 15-40 Casa 3"
-                      className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
+                      className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-base sm:text-sm text-ink outline-none focus:border-wine transition"
                     />
                   </div>
 
@@ -294,7 +298,7 @@ export default function CheckoutPage() {
                       value={barrio}
                       onChange={(e) => setBarrio(e.target.value)}
                       placeholder="Ej. Los Cortijos, La Nevada, Novalito..."
-                      className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition"
+                      className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-base sm:text-sm text-ink outline-none focus:border-wine transition"
                     />
                   </div>
                 </div>
@@ -347,7 +351,7 @@ export default function CheckoutPage() {
                 value={customerNotes}
                 onChange={(e) => setCustomerNotes(e.target.value)}
                 placeholder="Ej. Tono preferido, horario de entrega o instrucciones para el repartidor"
-                className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-wine transition resize-none"
+                className="w-full bg-cream border border-border rounded-xl px-4 py-3 text-base sm:text-sm text-ink outline-none focus:border-wine transition resize-none"
               />
             </div>
 
@@ -395,15 +399,7 @@ export default function CheckoutPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#f8eadc] to-[#edd0d9] flex items-center justify-center text-lg flex-shrink-0 shadow-inner overflow-hidden border border-border/50 relative">
                     {item.product.imageUrl ? (
-                      <img
-                        src={item.product.imageUrl}
-                        alt={item.product.name}
-                        className="w-full h-full object-contain p-1 relative z-10"
-                        loading="lazy"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
-                      />
+                      <ProductImage src={item.product.imageUrl} alt={item.product.name} sizes="44px" className="z-10 bg-[#f8eadc]" imgClassName="object-contain p-1" />
                     ) : null}
                     <span className="absolute text-lg select-none" aria-hidden="true">
                       {item.product.icon || '💄'}

@@ -6,9 +6,6 @@ export const metadata: Metadata = {
   title: 'Alexa Beauty — Tu belleza, tu esencia',
   description:
     'Descubre cosméticos y maquillaje seleccionados para resaltar tu brillo natural. Asesoría personalizada y pedidos fáciles vía WhatsApp.',
-  icons: {
-    icon: '/branding/logo.png',
-  },
 };
 
 export const viewport: Viewport = {

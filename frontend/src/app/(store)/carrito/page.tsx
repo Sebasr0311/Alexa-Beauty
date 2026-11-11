@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { formatCOP } from '@/lib/utils';
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Sparkles } from 'lucide-react';
+import { ProductImage } from '@/components/ProductImage';
 
 export default function CartPage() {
   const router = useRouter();
@@ -57,15 +58,7 @@ export default function CartPage() {
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#f8eadc] to-[#edd0d9] flex items-center justify-center text-2xl flex-shrink-0 shadow-inner overflow-hidden border border-border/50 relative">
                         {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-full h-full object-contain p-1 relative z-10"
-                            loading="lazy"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = 'none';
-                            }}
-                          />
+                          <ProductImage src={product.imageUrl} alt={product.name} sizes="56px" className="z-10 bg-[#f8eadc]" imgClassName="object-contain p-1" />
                         ) : null}
                         <span className="absolute text-2xl select-none" aria-hidden="true">
                           {product.icon || '💄'}

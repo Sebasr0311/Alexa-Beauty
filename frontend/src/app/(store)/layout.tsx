@@ -43,12 +43,11 @@ export default function StoreLayout({
           >
             <div className="relative w-11 h-11 rounded-full overflow-hidden border border-border shadow-inner bg-blush flex-shrink-0">
               <Image
-                src="/branding/logo.png"
+                src="/branding/logo-640.webp"
                 alt="Logo Alexa Beauty"
                 fill
                 sizes="44px"
                 className="object-cover group-hover:scale-105 transition-transform duration-200"
-                priority
               />
             </div>
             <div className="font-serif text-2xl tracking-tight text-wine font-bold leading-none">
