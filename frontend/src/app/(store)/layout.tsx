@@ -5,7 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { Home, Sparkles, ShoppingBag, ShieldCheck, Search } from 'lucide-react';
+import { whatsappContact } from '@/lib/contact';
+import { Home, Sparkles, ShoppingBag, MessageCircleHeart, Search } from 'lucide-react';
+
+const WHATSAPP_HREF = whatsappContact('Hola Alexa Beauty, quisiera asesoría sobre sus productos.');
 
 export default function StoreLayout({
   children,
@@ -19,7 +22,6 @@ export default function StoreLayout({
     { href: '/', label: 'Inicio' },
     { href: '/catalogo', label: 'Catálogo' },
     { href: '/carrito', label: 'Carrito' },
-    { href: '/admin', label: 'Vista admin' },
   ];
 
   return (
@@ -82,6 +84,17 @@ export default function StoreLayout({
                 </Link>
               );
             })}
+            {WHATSAPP_HREF && (
+              <a
+                href={WHATSAPP_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink/80 hover:text-wine transition-colors py-1"
+              >
+                <MessageCircleHeart className="w-4 h-4" aria-hidden="true" />
+                WhatsApp
+              </a>
+            )}
           </nav>
 
           {/* Right Header Actions */}
@@ -133,7 +146,7 @@ export default function StoreLayout({
         aria-label="Navegación móvil inferior"
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-border pb-safe shadow-[0_-4px_20px_rgba(76,17,38,0.06)]"
       >
-        <div className="grid grid-cols-4 h-14">
+        <div className={`grid h-14 ${WHATSAPP_HREF ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <Link
             href="/"
             className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition ${
@@ -175,17 +188,17 @@ export default function StoreLayout({
             <span>Carrito</span>
           </Link>
 
-          <Link
-            href="/admin"
-            className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition ${
-              pathname.startsWith('/admin')
-                ? 'text-wine font-bold'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            <ShieldCheck className="w-5 h-5" />
-            <span>Admin</span>
-          </Link>
+          {WHATSAPP_HREF && (
+            <a
+              href={WHATSAPP_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted hover:text-ink transition"
+            >
+              <MessageCircleHeart className="w-5 h-5" aria-hidden="true" />
+              <span>WhatsApp</span>
+            </a>
+          )}
         </div>
       </nav>
     </div>
