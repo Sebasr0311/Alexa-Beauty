@@ -362,7 +362,7 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
             <ul className="space-y-2.5 pt-1 text-sm text-wine font-medium">
               <li className="flex items-center gap-2.5">
                 <Truck className="w-4 h-4 text-mauve shrink-0" aria-hidden="true" />
-                Envíos a todo el país coordinados por WhatsApp
+                Entregas en Valledupar coordinadas por WhatsApp
               </li>
               <li className="flex items-center gap-2.5">
                 <Sparkles className="w-4 h-4 text-mauve shrink-0" aria-hidden="true" />
