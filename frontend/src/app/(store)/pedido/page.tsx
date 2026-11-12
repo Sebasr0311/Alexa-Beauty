@@ -13,7 +13,6 @@ import {
   Store,
   ShieldCheck,
   Clock,
-  Sparkles,
   ShoppingBag,
   AlertCircle,
   Loader2,
@@ -135,15 +134,11 @@ export default function CheckoutPage() {
       {/* Header */}
       <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-wine mb-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Valledupar · Pedido asistido</span>
-          </div>
-          <h1 className="font-serif text-3xl sm:text-4xl text-wine font-normal tracking-tight">
+          <h1 className="font-serif text-[2.1rem] sm:text-5xl text-wine font-normal tracking-[-0.02em] leading-tight">
             Confirmar pedido y reserva
           </h1>
           <p className="text-muted text-sm mt-1">
-            Tus productos quedarán reservados por <strong>45 minutos</strong> mientras coordinas la confirmación vía WhatsApp.
+            Pedido asistido en Valledupar. Tus productos quedarán reservados por <strong>45 minutos</strong> mientras coordinas la confirmación vía WhatsApp.
           </p>
         </div>
 

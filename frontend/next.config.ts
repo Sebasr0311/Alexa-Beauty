@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ['lucide-react', 'motion'],
+    optimizePackageImports: ['lucide-react'],
   },
   async rewrites() { return [{ source: '/api/backend/:path*', destination: `${backend}/:path*` }, { source: '/uploads/:path*', destination: `${backend.replace(/\/api\/v1\/?$/, '')}/uploads/:path*` }]; },
   async headers() { return [{ source: '/:path*', headers: [

@@ -1,6 +1,20 @@
 import type { Metadata, Viewport } from 'next';
+import { Fraunces, Manrope } from 'next/font/google';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
+
+const display = Fraunces({
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
+  variable: '--font-display',
+  display: 'swap',
+});
+
+const body = Manrope({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Alexa Beauty — Tu belleza, tu esencia',
@@ -21,8 +35,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="scroll-smooth">
-      <body className="bg-cream text-ink antialiased selection:bg-blush selection:text-wine font-sans">
+    <html lang="es" className={`scroll-smooth ${display.variable} ${body.variable}`}>
+      <body className="bg-cream text-ink antialiased font-sans">
         <CartProvider>{children}</CartProvider>
       </body>
     </html>

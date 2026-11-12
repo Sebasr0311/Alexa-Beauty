@@ -11,7 +11,7 @@ import { ShadeSelectorModal } from '@/components/catalog/ShadeSelectorModal';
 import { ProductImage } from '@/components/ProductImage';
 import SpotlightCard from '@/components/reactbits/SpotlightCard';
 import ClickSpark from '@/components/reactbits/ClickSpark';
-import { Check, Plus, Loader2 } from 'lucide-react';
+import { Check, Plus, Loader2, Sparkles } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -30,6 +30,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const [isShadeModalOpen, setIsShadeModalOpen] = useState(false);
   const isOutOfStock = product.stock <= 0;
   const activeShades = product.variants?.filter((variant) => variant.active) ?? [];
+  const shadeSwatches = activeShades.filter((variant) => variant.shadeHex).slice(0, 5);
 
   const flashAdded = () => {
     setJustAdded(true);
@@ -130,10 +131,11 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
               {/* Decorative circular aura */}
               <div className="absolute -top-4 -right-6 w-36 h-36 bg-white/40 rounded-full pointer-events-none blur-[1px]" />
 
-              {/* Badge chip */}
-              <span className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-10 bg-white/95 backdrop-blur-sm text-wine text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
-                {product.badge}
-              </span>
+              {isOutOfStock && (
+                <span className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-10 bg-ink/80 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
+                  Agotado
+                </span>
+              )}
 
               <ProductImage
                 src={product.imageUrl}
@@ -141,21 +143,14 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
                 priority={priority}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
                 imgClassName="object-contain p-3 group-hover:scale-105"
-                fallback={
-                  <span
-                    className="text-6xl sm:text-7xl select-none filter drop-shadow-[0_15px_12px_rgba(94,49,61,0.18)] -rotate-6"
-                    aria-hidden="true"
-                  >
-                    {product.icon}
-                  </span>
-                }
+                fallback={<Sparkles className="w-14 h-14 text-wine/25" strokeWidth={1.2} aria-hidden="true" />}
               />
             </div>
           </Link>
 
           {/* Content Body */}
           <div className="p-3 sm:p-4">
-            <span className="text-[#af7b89] text-[10px] font-extrabold tracking-widest uppercase line-clamp-1">
+            <span className="text-[#9b6a7c] text-[10px] font-bold tracking-[0.14em] uppercase line-clamp-1">
               {product.brand}
             </span>
             <Link href={`/producto/${slug}`} className="block">
@@ -164,32 +159,28 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
               </h3>
             </Link>
             {activeShades.length > 1 && (
-              <div className="mt-2 text-xs text-wine">
-                <p>Disponible en {activeShades.length} tonos</p>
-                <div className="flex gap-1 mt-1" aria-hidden="true">
-                  {activeShades.filter((variant) => variant.shadeHex).slice(0, 6).map((variant) => (
-                    <span key={variant.id} className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: variant.shadeHex }} />
-                  ))}
-                </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                {shadeSwatches.length > 0 && (
+                  <div className="flex -space-x-1" aria-hidden="true">
+                    {shadeSwatches.map((variant) => (
+                      <span key={variant.id} className="w-3.5 h-3.5 rounded-full ring-2 ring-white" style={{ backgroundColor: variant.shadeHex }} />
+                    ))}
+                  </div>
+                )}
+                <span className="text-[11px] font-semibold text-[#8a5a6c]">{activeShades.length} tonos</span>
               </div>
             )}
-            <p className="text-muted text-xs mt-1">
-              {isOutOfStock ? (
-                <span className="text-red-600 font-medium">Agotado temporalmente</span>
-              ) : product.stock <= 4 ? (
-                <span className="text-amber-700 font-medium">
-                  {product.stock === 1 ? '¡Última unidad!' : `¡Últimas ${product.stock} unidades!`}
-                </span>
-              ) : (
-                <span>Disponible ({product.stock} unids.)</span>
-              )}
-            </p>
+            {!isOutOfStock && product.stock <= 4 && (
+              <p className="text-[11px] font-semibold text-amber-800 mt-1.5">
+                {product.stock === 1 ? '¡Última unidad!' : `¡Últimas ${product.stock} unidades!`}
+              </p>
+            )}
           </div>
         </div>
 
         {/* Footer Price & Add */}
-        <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex items-center justify-between gap-2 border-t border-border/40 mt-auto">
-          <span className="text-wine font-extrabold text-base sm:text-xl tracking-tight">
+        <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex items-center justify-between gap-2 mt-auto">
+          <span className="text-wine font-extrabold text-base sm:text-lg tracking-tight tabular-nums">
             {formatCOP(product.price)}
           </span>
 

@@ -10,7 +10,7 @@ import { initialVariant, variantImages, variantLabel } from '@/lib/shades';
 import { useCart } from '@/context/CartContext';
 import { ProductImage } from '@/components/ProductImage';
 import ClickSpark from '@/components/reactbits/ClickSpark';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Minus, Plus, ShieldCheck, Sparkles, Truck } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, MessageCircleHeart, Minus, Plus, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 
 interface ProductDetailViewProps {
   slug: string;
@@ -107,6 +107,7 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
   }
 
   const currentPrice = selectedVariant ? selectedVariant.salePrice : 0;
+  const whatsappHref = whatsappContact(`Hola Alexa Beauty, tengo dudas sobre ${product.name}.`);
   const currentStock = selectedVariant ? selectedVariant.availableStock : 0;
   const isOutOfStock = currentStock <= 0;
 
@@ -176,9 +177,7 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
                 />
               ))
             ) : (
-              <span className="text-8xl select-none filter drop-shadow-lg -rotate-6" aria-hidden="true">
-                💄
-              </span>
+              <Sparkles className="w-20 h-20 text-wine/25" strokeWidth={1.2} aria-hidden="true" />
             )}
 
             {/* Carousel navigation & indicators if multiple images */}
@@ -251,18 +250,17 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
         {/* Product Details & Actions */}
         <div className="space-y-6">
           <div>
-            <span className="text-wine text-xs font-extrabold tracking-widest uppercase block mb-1">
-              {product.category.name} · {product.brand.name}
-            </span>
-            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-wineDark font-normal leading-tight">
+            <h1 className="font-serif text-[1.85rem] sm:text-4xl lg:text-[2.75rem] text-wineDark font-normal tracking-[-0.015em] leading-[1.1]">
               {product.name}
             </h1>
-            <p className="text-muted text-xs mt-1">SKU: <span className="font-mono">{selectedVariant?.sku || product.sku}</span></p>
+            <p className="text-muted text-xs mt-2">
+              {product.category.name} · {product.brand.name} · <span className="tabular-nums">SKU {selectedVariant?.sku || product.sku}</span>
+            </p>
           </div>
 
           {/* Price & Stock status */}
           <div aria-live="polite" className="flex flex-wrap items-baseline gap-4 py-2 border-y border-border/60">
-            <span className="font-serif text-3xl sm:text-4xl text-wine font-bold">
+            <span className="font-serif text-[2rem] sm:text-4xl text-wine font-semibold tabular-nums">
               {formatCOP(currentPrice)}
             </span>
             <div>
@@ -272,7 +270,7 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
                 </span>
               ) : currentStock <= 3 ? (
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                  ¡Solo quedan {currentStock} unidades!
+                  {currentStock === 1 ? '¡Solo queda 1 unidad!' : `¡Solo quedan ${currentStock} unidades!`}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
@@ -285,11 +283,7 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
           <ShadeSelector variants={product.variants} selectedId={selectedVariant?.id} onSelect={variant => {
             setSelectedVariant(variant); setQuantity(1); setSelectedImageIndex(0); setJustAdded(false);
           }} />
-          <div aria-live="polite" className="min-h-16 text-sm break-words">
-            {selectedVariant && <><p>Tono seleccionado: {variantLabel(selectedVariant)}</p>
-              <p className={currentStock > 0 ? 'text-emerald-700 font-medium' : 'text-rose-700 font-semibold'}>{currentStock > 0 ? `${currentStock} unidades disponibles` : 'Agotado (no disponible para compra)'}</p></>}
-            {!selectedVariant && <p>No hay variantes disponibles.</p>}
-          </div>
+          {!selectedVariant && <p className="text-sm text-muted">No hay variantes disponibles.</p>}
 
           {/* Quantity Selector & Add to Cart */}
           <div className="space-y-4 pt-2">
@@ -343,32 +337,38 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
             </div>
 
             {/* Direct WhatsApp Consultation CTA */}
-            <a
-              href={whatsappContact(`Hola Alexa Beauty, tengo dudas sobre ${product.name}.`)}
-              aria-disabled={!whatsappContact('Consulta')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3 px-4 rounded-full border border-wine/40 bg-white hover:bg-cream text-wine font-bold text-xs sm:text-sm text-center flex items-center justify-center gap-2 transition"
-            >
-              ♡ ¿Dudas con el tono? Consultar por WhatsApp
-            </a>
+            {whatsappHref && (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full min-h-12 px-4 rounded-full border border-wine/25 bg-white hover:bg-blush/60 text-wine font-bold text-sm text-center flex items-center justify-center gap-2 transition-colors"
+              >
+                <MessageCircleHeart className="w-4 h-4" aria-hidden="true" />
+                ¿Dudas con el tono? Escríbenos
+              </a>
+            )}
           </div>
 
           {/* Description & Perks */}
           <div className="pt-4 border-t border-border/60 space-y-4">
-            <h3 className="font-serif text-lg text-wineDark font-normal">Descripción del producto</h3>
-            <p className="text-muted text-sm leading-relaxed">{product.description}</p>
+            {product.description?.trim() && (
+              <>
+                <h2 className="font-serif text-xl text-wineDark font-normal">Descripción</h2>
+                <p className="text-[#5f4a53] text-[15px] leading-relaxed max-w-prose whitespace-pre-line">{product.description}</p>
+              </>
+            )}
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-white border border-border/80 text-xs text-wine font-semibold">
-                <Truck className="w-4 h-4 text-mauve shrink-0" />
-                <span>Envíos a todo el país coordinados por WhatsApp</span>
-              </div>
-              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-white border border-border/80 text-xs text-wine font-semibold">
-                <Sparkles className="w-4 h-4 text-mauve shrink-0" />
-                <span>Cosméticos 100% originales garantizados</span>
-              </div>
-            </div>
+            <ul className="space-y-2.5 pt-1 text-sm text-wine font-medium">
+              <li className="flex items-center gap-2.5">
+                <Truck className="w-4 h-4 text-mauve shrink-0" aria-hidden="true" />
+                Envíos a todo el país coordinados por WhatsApp
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Sparkles className="w-4 h-4 text-mauve shrink-0" aria-hidden="true" />
+                Cosméticos 100% originales garantizados
+              </li>
+            </ul>
           </div>
         </div>
       </div>

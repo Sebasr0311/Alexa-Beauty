@@ -30,9 +30,10 @@ export default function StoreLayout({
       <aside
         role="region"
         aria-label="Información de compra"
-        className="bg-wineDark text-white text-[11px] sm:text-xs font-semibold tracking-widest text-center py-2 px-3 selection:bg-mauve"
+        className="bg-wineDark text-white text-[10.5px] sm:text-xs font-semibold tracking-[0.16em] text-center py-2 px-3"
       >
-        PEDIDOS CON RESERVA · PAGO MANUAL VERIFICADO POR NUESTRO EQUIPO
+        <span className="sm:hidden">PEDIDOS CON RESERVA · PAGO VERIFICADO</span>
+        <span className="hidden sm:inline">PEDIDOS CON RESERVA · PAGO MANUAL VERIFICADO POR NUESTRO EQUIPO</span>
       </aside>
 
       {/* 2. Sticky Header */}

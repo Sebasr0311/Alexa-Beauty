@@ -5,8 +5,7 @@ import { Product, toStoreProduct } from '@/lib/data';
 import { api, CategoryDto, PageDto, ProductSummaryDto } from '@/lib/api';
 import { ProductCard } from '@/components/ProductCard';
 import { ProductGridSkeleton } from '@/components/store/ProductGridSkeleton';
-import ShinyText from '@/components/reactbits/ShinyText';
-import { ChevronLeft, ChevronRight, Search, X, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, SearchX } from 'lucide-react';
 
 const CATALOG_PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -75,11 +74,7 @@ export default function CatalogView({ initialPage, initialCategories }: CatalogV
     <div className="space-y-6 sm:space-y-8">
       {/* Header section */}
       <div className="border-b border-border pb-5 sm:pb-6">
-        <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.2em] text-wine flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-          <ShinyText text="Toda la colección" color="#711A38" shineColor="#F5C6D4" speed={3} />
-        </span>
-        <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl text-wine font-normal tracking-tight mt-1">
+        <h1 className="font-serif text-[2.1rem] sm:text-5xl text-wine font-normal tracking-[-0.02em] leading-tight">
           Encuentra tu favorito
         </h1>
         <p className="text-muted text-sm sm:text-base mt-2 max-w-xl">
@@ -118,7 +113,7 @@ export default function CatalogView({ initialPage, initialCategories }: CatalogV
         <div
           role="tablist"
           aria-label="Filtrar por categoría"
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar snap-x pt-4 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap"
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar snap-x scroll-px-4 sm:scroll-px-0 pt-4 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap"
         >
           {[{ slug: '', name: 'Todos' }, ...categories].map((cat) => {
             const isSelected = selectedCategory === cat.slug;
@@ -175,7 +170,7 @@ export default function CatalogView({ initialPage, initialCategories }: CatalogV
         </div>
       ) : (
         <div className="text-center py-12 sm:py-16 bg-white border border-border rounded-3xl p-6 sm:p-8 max-w-md mx-auto shadow-sm">
-          <span className="text-4xl mb-3 block" aria-hidden="true">🔍</span>
+          <SearchX className="w-9 h-9 mx-auto mb-3 text-mauve" strokeWidth={1.6} aria-hidden="true" />
           <h2 className="font-serif text-xl font-bold text-ink">No encontramos productos</h2>
           <p className="text-muted text-sm mt-1.5 leading-relaxed">
             Intenta con otro término de búsqueda o selecciona otra categoría.

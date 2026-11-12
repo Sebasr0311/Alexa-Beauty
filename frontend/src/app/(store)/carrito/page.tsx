@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { formatCOP } from '@/lib/utils';
-import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Sparkles } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag } from 'lucide-react';
 import { ProductImage } from '@/components/ProductImage';
 
 export default function CartPage() {
@@ -17,11 +17,7 @@ export default function CartPage() {
     <div className="space-y-8">
       {/* Header */}
       <div className="border-b border-border pb-6">
-        <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.2em] text-wine flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          Tus elegidos
-        </span>
-        <h1 className="font-serif text-3xl sm:text-4xl text-wine font-normal tracking-tight mt-1">
+        <h1 className="font-serif text-[2.1rem] sm:text-5xl text-wine font-normal tracking-[-0.02em] leading-tight">
           Mi carrito
         </h1>
         <p className="text-muted text-sm sm:text-base mt-2">
