@@ -14,7 +14,7 @@ spring:
     locations: classpath:db/migration
 
 app:
-  whatsapp-number: 573001234567
+  whatsapp-number: 573235814497
   timezone: America/Bogota
   reservation-minutes: 45
   jwt:

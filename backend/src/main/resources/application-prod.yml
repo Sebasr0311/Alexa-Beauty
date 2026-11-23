@@ -31,7 +31,7 @@ app:
     secret: ${JWT_SECRET}
   cors:
     allowed-origins: ${FRONTEND_ORIGIN}
-  whatsapp-number: ${WHATSAPP_BUSINESS_NUMBER}
+  whatsapp-number: ${WHATSAPP_BUSINESS_NUMBER:}
   auth:
     cookie-secure: true
     cookie-same-site: Lax

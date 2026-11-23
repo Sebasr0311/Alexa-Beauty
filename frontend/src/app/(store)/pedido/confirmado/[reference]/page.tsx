@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, OrderTrackingResponseDto } from '@/lib/api';
 import { formatCOP } from '@/lib/utils';
+import { useStoreSettings } from '@/context/StoreSettingsContext';
 import { whatsappContact } from '@/lib/contact';
 import {
   Clock,
@@ -27,6 +28,7 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
   const { reference } = use(params);
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
+  const { whatsappNumber } = useStoreSettings();
 
   const [order, setOrder] = useState<OrderTrackingResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,8 @@ export default function OrderConfirmedPage({ params }: OrderConfirmedPageProps) 
   const whatsappUrl =
     order?.whatsappUrl ||
     whatsappContact(
-      `Hola, Alexa Beauty 🌷\nQuiero consultar y confirmar mi pedido ${reference}.\nTotal: ${order ? formatCOP(order.total) : ''}\n¿Me ayudan a confirmar disponibilidad?`
+      `Hola, Alexa Beauty 🌷\nQuiero consultar y confirmar mi pedido ${reference}.\nTotal: ${order ? formatCOP(order.total) : ''}\n¿Me ayudan a confirmar disponibilidad?`,
+      whatsappNumber,
     );
 
   if (loading) return <p role="status" className="p-8">Consultando pedido...</p>;

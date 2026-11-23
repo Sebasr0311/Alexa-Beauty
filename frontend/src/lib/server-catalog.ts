@@ -1,5 +1,5 @@
 import 'server-only';
-import type { CategoryDto, PageDto, ProductDetailDto, ProductSummaryDto } from './api';
+import type { CategoryDto, PageDto, ProductDetailDto, ProductSummaryDto, PublicStoreSettingsDto } from './api';
 
 /**
  * Server-side catalog reads used to pre-render public pages (ISR).
@@ -62,4 +62,9 @@ export async function fetchCategories() {
 export async function fetchProduct(slug: string) {
   const product = await getJson<ProductDetailDto>(`/catalog/products/${encodeURIComponent(slug)}`);
   return product && product.id ? product : null;
+}
+
+export async function fetchPublicSettings(): Promise<PublicStoreSettingsDto | null> {
+  const settings = await getJson<PublicStoreSettingsDto>('/settings/public');
+  return settings && typeof settings === 'object' ? settings : null;
 }

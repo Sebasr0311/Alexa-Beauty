@@ -5,6 +5,7 @@ import com.alexabeauty.security.JwtAuthenticationEntryPoint;
 import com.alexabeauty.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -82,7 +83,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/uploads/**"
                 ).permitAll()
-                // Public Catalog and Orders endpoints
+                // Public Catalog, Settings and Orders endpoints
+                .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").permitAll()
                 .requestMatchers(
                     "/api/v1/catalog/**",
                     "/api/v1/orders",

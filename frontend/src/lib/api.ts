@@ -600,6 +600,34 @@ class ApiClient {
       credentials: 'include',
     });
   }
+
+  async getPublicSettings(): Promise<PublicStoreSettingsDto> {
+    return this.request<PublicStoreSettingsDto>('/settings/public', {
+      cache: 'no-store',
+    });
+  }
+
+  async getAdminSettings(): Promise<AdminSettingsDto> {
+    return this.request<AdminSettingsDto>('/admin/settings', {
+      cache: 'no-store',
+    });
+  }
+
+  async updateWhatsAppNumber(whatsappNumber: string): Promise<AdminSettingsDto> {
+    return this.request<AdminSettingsDto>('/admin/settings/whatsapp', {
+      method: 'PUT',
+      body: JSON.stringify({ whatsappNumber }),
+    });
+  }
+}
+
+export interface PublicStoreSettingsDto {
+  whatsappNumber: string | null;
+}
+
+export interface AdminSettingsDto {
+  whatsappNumber: string | null;
+  updatedAt?: string | null;
 }
 
 

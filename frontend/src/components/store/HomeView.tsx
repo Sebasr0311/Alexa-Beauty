@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Product, toStoreProduct } from '@/lib/data';
 import { api, ProductSummaryDto } from '@/lib/api';
+import { useStoreSettings } from '@/context/StoreSettingsContext';
 import { whatsappContact } from '@/lib/contact';
 import { ProductCard } from '@/components/ProductCard';
 import { ProductGridSkeleton } from '@/components/store/ProductGridSkeleton';
@@ -19,8 +20,6 @@ const PERKS = [
   { icon: Heart, label: 'Atención personalizada' },
   { icon: ShieldCheck, label: 'Pedidos seguros por WhatsApp' },
 ];
-
-const WHATSAPP_HREF = whatsappContact('Hola Alexa Beauty, quisiera asesoría sobre sus productos.');
 
 function HeadlineLine({ words, startIndex, className = '' }: { words: string[]; startIndex: number; className?: string }) {
   return (
@@ -40,6 +39,11 @@ interface HomeViewProps {
 }
 
 export default function HomeView({ initialFeatured }: HomeViewProps) {
+  const { whatsappNumber } = useStoreSettings();
+  const whatsappHref = whatsappContact(
+    'Hola Alexa Beauty, quisiera asesoría sobre sus productos.',
+    whatsappNumber,
+  );
   const [featuredProducts, setFeaturedProducts] = useState<Product[] | null>(
     initialFeatured ? initialFeatured.map(toStoreProduct) : null,
   );
@@ -82,9 +86,9 @@ export default function HomeView({ initialFeatured }: HomeViewProps) {
                 </Link>
               </Magnet>
 
-              {WHATSAPP_HREF && (
+              {whatsappHref && (
                 <a
-                  href={WHATSAPP_HREF}
+                  href={whatsappHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full sm:w-auto min-h-[52px] inline-flex items-center justify-center gap-2 rounded-full border border-wine/25 bg-white/70 hover:bg-white text-wine font-bold px-7 transition-colors"
@@ -172,7 +176,7 @@ export default function HomeView({ initialFeatured }: HomeViewProps) {
       </section>
 
       {/* 4. WhatsApp advisory */}
-      {WHATSAPP_HREF && (
+      {whatsappHref && (
         <section aria-labelledby="advice-heading" className="relative overflow-hidden bg-wineDark text-white rounded-[1.75rem] p-7 sm:p-12 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-soft">
           <div aria-hidden="true" className="absolute -right-16 -top-20 w-64 h-64 rounded-full bg-[radial-gradient(circle,rgba(243,201,214,0.28),transparent_70%)]" />
           <div className="relative max-w-xl">
@@ -185,7 +189,7 @@ export default function HomeView({ initialFeatured }: HomeViewProps) {
           </div>
 
           <a
-            href={WHATSAPP_HREF}
+            href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
             className="relative w-full md:w-auto min-h-[52px] flex-shrink-0 inline-flex items-center justify-center gap-2 rounded-full bg-white text-wine font-extrabold px-8 hover:bg-blush transition-colors shadow-lg"

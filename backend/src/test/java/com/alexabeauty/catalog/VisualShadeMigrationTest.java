@@ -41,17 +41,36 @@ class VisualShadeMigrationTest {
                 }
             }
             var before=snapshot(connection,columns);
+            var beforeSettings = settingsMap(connection);
             assertThat(before.get("payments")).hasSize(1);
             assertThat(before.get("order_status_history")).hasSize(1);
             assertThat(before.get("audit_logs")).hasSize(1);
+            assertThat(beforeSettings).containsEntry("whatsapp_number", "573001234567");
             Flyway.configure().dataSource(url,user,"").schemas(schema).defaultSchema(schema).load().migrate();
-            assertThat(snapshot(connection,columns)).isEqualTo(before);
+            var after = snapshot(connection, columns);
+            for (var table : columns.keySet()) {
+                if ("app_settings".equalsIgnoreCase(table)) continue;
+                assertThat(after.get(table)).as("Table %s unchanged across migrations", table).isEqualTo(before.get(table));
+            }
+            var afterSettings = settingsMap(connection);
+            assertThat(afterSettings).containsEntry("whatsapp_number", "573235814497");
+            for (var entry : beforeSettings.entrySet()) {
+                if ("whatsapp_number".equals(entry.getKey())) continue;
+                assertThat(afterSettings.get(entry.getKey())).isEqualTo(entry.getValue());
+            }
             try(Statement statement=connection.createStatement();ResultSet rows=statement.executeQuery("SELECT COUNT(*) FROM product_variants WHERE shade_code IS NOT NULL OR shade_hex IS NOT NULL")) {
                 rows.next();assertThat(rows.getInt(1)).isZero();
             }
             assertThat(columns).containsKeys("orders","order_items","product_images","stock_reservations","inventory_movements");
             System.out.println("V4_TO_V5_PRESERVATION: all "+columns.size()+" old tables and columns equal; payment, order history, audit, image, stock and order fixtures unchanged; new shade fields null.");
         }
+    }
+    private Map<String,String> settingsMap(Connection connection) throws SQLException {
+        Map<String,String> result=new TreeMap<>();
+        try(Statement statement=connection.createStatement();ResultSet rs=statement.executeQuery("SELECT setting_key, setting_value FROM app_settings")) {
+            while(rs.next()) result.put(rs.getString(1), rs.getString(2));
+        }
+        return result;
     }
     private Map<String,List<String>> snapshot(Connection connection,Map<String,List<String>> columns) throws SQLException {
         Map<String,List<String>> result=new TreeMap<>();

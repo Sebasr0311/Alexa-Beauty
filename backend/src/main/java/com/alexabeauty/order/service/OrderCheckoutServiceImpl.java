@@ -7,6 +7,7 @@ import com.alexabeauty.common.error.ResourceNotFoundException;
 import com.alexabeauty.common.error.ValidationException;
 import com.alexabeauty.config.domain.AppSetting;
 import com.alexabeauty.config.repository.AppSettingRepository;
+import com.alexabeauty.config.service.BusinessSettingsService;
 import com.alexabeauty.order.domain.Order;
 import com.alexabeauty.order.domain.OrderItem;
 import com.alexabeauty.order.domain.OrderStatus;
@@ -54,11 +55,10 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final ProductVariantRepository productVariantRepository;
     private final AppSettingRepository appSettingRepository;
+    private final BusinessSettingsService businessSettingsService;
     private final WhatsAppGateway whatsAppGateway;
     private final OrderReferenceGenerator orderReferenceGenerator;
 
-    @Value("${app.whatsapp-number:}")
-    private String configuredBusinessPhone;
     @Value("${app.reservation-minutes:45}")
     private int configuredReservationMinutes;
 
@@ -332,10 +332,7 @@ public class OrderCheckoutServiceImpl implements OrderCheckoutService {
     }
 
     private String resolveBusinessPhone() {
-        if (configuredBusinessPhone != null && configuredBusinessPhone.matches("[1-9][0-9]{9,14}")) {
-            return configuredBusinessPhone;
-        }
-        throw new ValidationException("El contacto WhatsApp del negocio no está configurado.");
+        return businessSettingsService.resolveRequiredWhatsAppNumber();
     }
 
     private String extractTrackingToken(String customerNotes) {

@@ -17,6 +17,7 @@ import {
   Sparkles,
   Receipt,
   ArrowRight,
+  Settings,
 } from 'lucide-react';
 import AdminShell from '@/components/admin/AdminShell';
 import { formatCOP } from '@/lib/utils';
@@ -391,6 +392,14 @@ export default function AdminDashboardPage() {
           >
             <Upload className="w-4 h-4" />
             <span>Importar por Excel</span>
+          </Link>
+
+          <Link
+            href="/admin/configuracion"
+            className="inline-flex items-center gap-2 rounded-full bg-white border border-[#b9899c] hover:bg-cream text-wine font-bold text-xs sm:text-sm px-6 py-3 transition shadow-sm active:scale-95"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Configuración WhatsApp</span>
           </Link>
         </div>
       </div>

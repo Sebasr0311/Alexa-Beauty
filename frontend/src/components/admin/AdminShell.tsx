@@ -15,6 +15,7 @@ import {
   Boxes,
   ArrowLeft,
   ShieldCheck,
+  Settings,
 } from 'lucide-react';
 
 export interface AdminShellProps {
@@ -33,6 +34,7 @@ export const ADMIN_NAV_ITEMS = [
   { label: 'Importar Excel', href: '/admin/importar', icon: Upload },
   { label: 'Productos', href: '/admin/productos', icon: Package },
   { label: 'Inventario', href: '/admin/inventario', icon: Boxes },
+  { label: 'Configuración', href: '/admin/configuracion', icon: Settings },
 ];
 
 // Module-level cache to eliminate flickering when switching between admin pages

@@ -45,7 +45,7 @@ class FlywayMigrationTest {
     @DisplayName("Verify all Flyway migrations are successfully executed and applied")
     void verifyFlywayMigrationsApplied() {
         MigrationInfo[] appliedMigrations = flyway.info().applied();
-        assertThat(appliedMigrations).hasSize(7);
+        assertThat(appliedMigrations).hasSize(8);
 
         assertThat(appliedMigrations[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(appliedMigrations[0].getDescription()).isEqualTo("initial schema");
@@ -58,6 +58,9 @@ class FlywayMigrationTest {
 
         assertThat(appliedMigrations[5].getVersion().getVersion()).isEqualTo("6");
         assertThat(appliedMigrations[5].getDescription()).isEqualTo("stock receipt idempotency");
+
+        assertThat(appliedMigrations[7].getVersion().getVersion()).isEqualTo("8");
+        assertThat(appliedMigrations[7].getDescription()).isEqualTo("update whatsapp number");
     }
 
     @Test
@@ -81,7 +84,7 @@ class FlywayMigrationTest {
 
         Optional<AppSetting> whatsappNumber = appSettingRepository.findBySettingKey("whatsapp_number");
         assertThat(whatsappNumber).isPresent();
-        assertThat(whatsappNumber.get().getSettingValue()).isEqualTo("573001234567");
+        assertThat(whatsappNumber.get().getSettingValue()).isEqualTo("573235814497");
     }
 
     @Test

@@ -27,9 +27,14 @@ public class ProductionConfiguration {
         https(required("app.cors.allowed-origins"), "FRONTEND_ORIGIN");
         https(required("app.storage.supabase.url"), "SUPABASE_URL");
         required("app.storage.supabase.service-role-key"); required("app.storage.supabase.bucket-public");
-        String number = required("app.whatsapp-number");
-        if (!number.matches("[1-9][0-9]{9,14}") || number.equals("573001234567")) {
-            throw new IllegalStateException("WHATSAPP_BUSINESS_NUMBER requires the verified real business number");
+        String number = environment.getProperty("app.whatsapp-number");
+        if (number != null && !number.isBlank()) {
+            if (!number.matches("[1-9][0-9]{9,14}")
+                    || number.equals("573001234567")
+                    || number.contains("CHANGE_ME")
+                    || number.contains("your-")) {
+                throw new IllegalStateException("WHATSAPP_BUSINESS_NUMBER requires the verified real business number");
+            }
         }
         String email = required("ADMIN_INITIAL_EMAIL");
         String password = required("ADMIN_INITIAL_PASSWORD");

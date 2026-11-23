@@ -8,6 +8,7 @@ import { formatCOP } from '@/lib/utils';
 import { ShadeSelector } from '@/components/catalog/ShadeSelector';
 import { initialVariant, variantImages, variantLabel } from '@/lib/shades';
 import { useCart } from '@/context/CartContext';
+import { useStoreSettings } from '@/context/StoreSettingsContext';
 import { ProductImage } from '@/components/ProductImage';
 import ClickSpark from '@/components/reactbits/ClickSpark';
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, MessageCircleHeart, Minus, Plus, ShieldCheck, Sparkles, Truck } from 'lucide-react';
@@ -21,6 +22,7 @@ const SWIPE_THRESHOLD_PX = 40;
 
 export default function ProductDetailView({ slug, initialProduct }: ProductDetailViewProps) {
   const { addItem } = useCart();
+  const { whatsappNumber } = useStoreSettings();
   const [product, setProduct] = useState<ProductDetailDto | null>(initialProduct);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariantDto | null>(
     initialProduct ? initialVariant(initialProduct.variants) : null,
@@ -107,7 +109,10 @@ export default function ProductDetailView({ slug, initialProduct }: ProductDetai
   }
 
   const currentPrice = selectedVariant ? selectedVariant.salePrice : 0;
-  const whatsappHref = whatsappContact(`Hola Alexa Beauty, tengo dudas sobre ${product.name}.`);
+  const whatsappHref = whatsappContact(
+    `Hola Alexa Beauty, tengo dudas sobre ${product.name}.`,
+    whatsappNumber,
+  );
   const currentStock = selectedVariant ? selectedVariant.availableStock : 0;
   const isOutOfStock = currentStock <= 0;
 
